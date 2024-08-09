@@ -117,4 +117,11 @@ cython_debug/
 # Project-specific
 data/raw/
 data/processed/
+data/annotations/
+data/annotations_processed/
+data/test/
+output/
 results/
+data/.DS_Store
+.DS_Store
+test.py
