@@ -115,13 +115,9 @@ cython_debug/
 *.iws
 
 # Project-specific
-data/raw/
-data/processed/
-data/annotations/
-data/annotations_processed/
-data/test/
+data/
 output/
 results/
 data/.DS_Store
 .DS_Store
-test.py
+src/test.py
