@@ -116,8 +116,11 @@ cython_debug/
 
 # Project-specific
 data/
-output/
+src/outputs/
 results/
 data/.DS_Store
 .DS_Store
 src/test.py
+src/configs/
+experiment_plots/
+src/models/yolo/
