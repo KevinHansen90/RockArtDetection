@@ -1,0 +1,160 @@
+% ******************************* PhD Thesis Template **************************
+% Please have a look at the README.md file for info on how to use the template
+
+\documentclass[a4paper,12pt,spanish,customfont,numbered,print,index]{PhDThesisPSnPDF}
+
+% Include hyphenat package to allow changing hyphenation patterns
+\usepackage{hyphenat}
+
+% Definición de encabezamientos y pié de página
+\lhead[Kevin Hansen]{Titulo de la Tesis}
+\rhead[Titulo]{Kevin Hansen}
+\lfoot[\thepage]{Capítulo \thechapter .\ \leftmark}
+\rfoot[Capítulo \thechapter .\ \leftmark]{\thepage} 
+
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{xcolor}
+\definecolor{brown}{rgb}{0.6, 0.4, 0.2}
+\definecolor{olive}{rgb}{0.5, 0.5, 0.2}
+\definecolor{darkgreen}{rgb}{0.0, 0.5, 0.0}
+\definecolor{purple}{rgb}{0.5, 0.0, 0.5}
+\definecolor{teal}{rgb}{0.0, 0.5, 0.5}
+\definecolor{navy}{rgb}{0.0, 0.0, 0.5}
+\definecolor{gray}{rgb}{0.5, 0.5, 0.5}
+\definecolor{darkpurple}{rgb}{0.4, 0.2, 0.4}
+\definecolor{darkblue}{rgb}{0.0, 0.0, 0.4}
+\definecolor{darkgreen2}{rgb}{0.0, 0.4, 0.2}
+\definecolor{brown2}{rgb}{0.6, 0.3, 0.2}
+\definecolor{seagreen}{rgb}{0.2, 0.7, 0.5}
+\definecolor{lightpurple}{rgb}{0.8, 0.6, 0.8}
+
+
+%********************************
+
+\title{Detección y Clasificación Estilística Automática de Arte Rupestre}
+
+%% Subtitle (Optional)
+
+%\subtitle{Subtítulo}
+%\else
+%\subtitle{Using the ULL template}
+%\fi
+
+%% The full name of the author
+\author{Kevin Hansen}
+
+%% Department (e.g., Department of Engineering, Maths, Physics)
+
+\dept{Departamento de Sistemas Digitales y Datos}
+
+%% University and Crest
+
+\university{Instituto Tecnológico de Buenos Aires}
+
+\crest{\includegraphics[width=0.5\textwidth]{Images/derf__64049_1952016_LOGOITBA.jpg}}
+
+%% Supervisor (optional)
+%% For multiple supervisors, append each supervisor with the \newline command
+\supervisor{Dra. Juliana Gambini}
+
+\degreetitle{Master en Ciencias de Datos}
+
+\ifdefineAbstract
+\includeonly{FrontMatter/abstract} 
+\fi
+
+% ***************************** Chapter Mode ***********************************
+% The chapter mode allows the user to only print particular chapters with references
+% Title, Contents, Frontmatter are disabled by default
+% Useful option to review a particular chapter or to send it to supervisor.
+% To use, choose `chapter` option in the document class
+
+\ifdefineChapter
+%\includeonly{Chapter3/chapter3}
+\fi
+
+% ******************************** Front Matter ********************************
+\microtypecontext{spacing=nonfrench}
+\DisableLigatures{encoding = *, family = * }
+\microtypesetup{expansion=false}
+\begin{document}
+\raggedbottom
+	
+	\frontmatter
+	
+	\maketitle
+	
+%	\include{dedication}
+%	\include{Declaration/declaration}
+%	\include{Acknowledgement/acknowledgement}
+%	\include{Abstract/abstract}
+	
+	% *********************** Adding TOC and List of Figures ***********************
+	
+	\tableofcontents
+	
+	\listoffigures
+	
+	\listoftables
+	
+	% \printnomenclature[space] space can be set as 2em between symbol and description
+	%\printnomenclature[3em]
+	
+	\printnomenclature
+	
+	% ******************************** Main Matter *********************************
+	\mainmatter
+	\include{FrontMatter/abstract}
+	\include{Chapters/abstract}
+	\include{Chapters/chapter1Introduccion}
+    \include{Chapters/chapter2MaterialesYMétodos}
+	\include{Chapters/chapter3Resultados}
+	\include{Chapters/chapter4Discusión}
+	\include{Chapters/chapter5Conclusiones}
+	%\include{Chapters/chapter7}
+	
+	% ********************************** Back Matter *******************************
+	% Backmatter should be commented out if you are using appendices after References
+	\backmatter
+	
+	% ********************************** Bibliography ******************************
+	\begin{spacing}{0.9}
+		
+		% Switch to English hyphenation for the bibliography
+		\begin{hyphenrules}{english}
+		
+		% To use the conventional natbib style referencing
+		% Bibliography style previews: http://nodonn.tipido.net/bibstyle.php
+		% Reference styles: http://sites.stat.psu.edu/~surajit/present/bib.htm
+		
+		\bibliographystyle{apalike}
+		%\bibliographystyle{unsrt} % Use for unsorted references  
+		%\bibliographystyle{plainnat} % Use this to have URLs listed in References
+		\cleardoublepage
+		\bibliography{BackMatter/references} % Path to your References.bib file
+		
+		\end{hyphenrules}
+		
+		% If you would like to use BibLaTeX for your references, pass `custombib` as
+		% an option in the document class. The location of 'references.bib' should be
+		% specified in the preamble.tex file in the custombib section.
+		% Comment out the lines related to natbib above and uncomment the following line.
+		
+		%\printbibliography[heading=bibintoc, title={References}]
+		
+	\end{spacing}
+	
+	% ********************************** Appendices ********************************
+	
+	\begin{appendices} % Using appendices environment for more functionality
+		
+		%\include{appendix1}
+	%	\include{Appendix2/appendix2}
+		
+	\end{appendices}
+	
+	% *************************************** Index ********************************
+	\printthesisindex % If index is present
+	
+\end{document}
+

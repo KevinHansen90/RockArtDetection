@@ -1,0 +1,170 @@
+\chapter{Introducción}
+
+En el presente proyecto de investigación, se desarrollan herramientas computacionales para asistir en el análisis y clasificación del arte rupestre presente en el sitio arqueológico Cueva de las Manos, ubicado en la provincia de Santa Cruz, Argentina. Este sitio, de gran valor histórico y cultural, alberga una vasta cantidad de pinturas rupestres cuya clasificación precisa es fundamental para mejorar la comprensión de las sociedades prehistóricas que las produjeron. Sin embargo, los arqueólogos enfrentan desafíos significativos en la clasificación de estas manifestaciones artísticas, debido a su abstracción, la superposición de figuras, el desgaste natural de los materiales, y la falta de herramientas computacionales adecuadas para abordar estos problemas de manera eficiente.
+
+El objetivo principal de este trabajo es desarrollar un proceso que integre técnicas de procesamiento de imágenes, modelos pre-entrenados para la detección de objetos y algoritmos de agrupamiento, con el fin de identificar y clasificar los elementos presentes en las pinturas rupestres de acuerdo a su similitud en forma. La implementación de técnicas automatizadas no solo busca superar las limitaciones actuales en la clasificación del arte rupestre, sino también aportar nuevas perspectivas en la interpretación de estas expresiones culturales.
+
+Este proyecto de tesis se enmarca en el área de la arqueología y la aplicación de técnicas de aprendizaje automático. A través del uso de técnicas avanzadas de procesamiento de imágenes y algoritmos de \textit{machine learning}, se pretende mejorar el método actual de clasificación, logrando una mayor precisión y eficiencia en el análisis de las pinturas rupestres. La capacidad de identificar y agrupar automáticamente los elementos en las pinturas podría revolucionar la forma en que se estudia el arte prehistórico, brindando a los investigadores herramientas más robustas y objetivas para la interpretación de los patrones artísticos y simbólicos de las antiguas sociedades.
+
+El documento se estructura de la siguiente manera:
+
+En el capítulo de Introducción, se plantea como problema de investigación la necesidad de desarrollar herramientas computacionales que permitan mejorar la clasificación del arte rupestre en el sitio arqueológico Cueva de las Manos. Para abordar esta problemática, se establecen como objetivos principales la identificación y clasificación de los elementos presentes en las pinturas rupestres, utilizando técnicas de procesamiento de imágenes, modelos pre-entrenados para detección de objetos y algoritmos de agrupamiento. Estos métodos permitirán superar los desafíos asociados a la naturaleza abstracta y superpuesta de las pinturas.
+
+El Estado de la Cuestión se revisa a lo largo del primer capítulo, donde se discute el modelo actual de clasificación del arte rupestre y se analiza cómo el aprendizaje automático \textit{machine learning} puede ofrecer una solución para mejorar la precisión y objetividad en este campo. Además, se abordan los avances en la clasificación de imágenes y el reconocimiento de objetos, resaltando las aplicaciones recientes de estas tecnologías en otros campos afines.
+
+En el capítulo de Limitaciones del Estudio, se exponen las limitaciones del conjunto de datos, su representatividad y calidad. Además se establecen las limitaciones técnicas y temporales sobre las que se trabaja, en base a los recursos disponibles, tanto tecnológicos como tiempos de colaboración de los involucrados. Esto permite evaluar implicaciones para trabajos futuros que abren líneas de investigación para mejorar o complementar lo realizado en el trabajo.
+
+La metodología se detalla en el capítulo de Métodos, que incluye el tipo de investigación y diseño de estudio adoptado. Se especifican la población y la muestra, que consisten en un conjunto de imágenes del arte rupestre de Cueva de las Manos. También se describen las técnicas e instrumentos empleados para el procesamiento y análisis de estas imágenes, así como el plan de análisis de los datos resultantes.
+
+Los capítulos de Resultados, Discusiones y Conclusiones, presentan los avances realizados respecto al problema inicial planteado, así como también cómo seguir con esta línea de investigación a futuro.
+
+Finalmente, la última sección del trabajo contiene todas las referencias bibliográficas utilizadas, siguiendo las normativas académicas correspondientes.
+
+\section{Planteamiento del Problema}
+
+En esta sección se presenta el problema que se aborda en el estudio. Se comienza con la Determinación del Problema, donde se describe la situación actual en relación con los procesos de detección y clasificación de arte rupestre. Luego, en la Formulación del Problema, se presentan los objetivos generales y específicos del estudio, así como la justificación del mismo. Finalmente, en la Justificación del Estudio, se explica por qué es importante llevar a cabo esta investigación y cuál es su relevancia en el campo arqueológico.
+
+\subsection{Determinación del problema}
+
+La detección y clasificación de arte rupestre no sigue un estándar uniforme, sino que varía en función del equipo de arqueólogos y el lugar de investigación. Estos procesos dependen en gran medida de tareas manuales, lo que puede introducir subjetividad.
+
+Las pinturas rupestres a menudo presentan superposición y diversos grados de deterioro, lo que complica la identificación de los distintos elementos. En la actualidad, esta identificación se realiza visualmente con la ayuda de programas como DStretch~\cite{dstretch}, un software de ``estiramiento de decorrelación'' que se utiliza para mejorar la visualización del arte rupestre. A pesar de su utilidad, DStretch ha sido criticado por su falta de actualizaciones y por no satisfacer completamente las necesidades actuales de los arqueólogos.
+
+En Argentina, el reconocido arqueólogo Carlos Aschero ha desarrollado un modelo para la clasificación estilística de los motivos rupestres basado en reglas y descripciones escritas~\cite{aschero2012}. Este modelo agrupa las pinturas según las similitudes en las características morfológicas, pero puede dejar algunos elementos sin una clasificación definitiva. El modelo actual propuesto por Aschero ha sido de gran utilidad para los científicos; sin embargo, presenta limitaciones por ser demasiado taxativo~\cite{aschero2000}.
+
+Dada la naturaleza de los estudios arqueológicos, que a menudo se realizan en ``lotes'', es esencial un proceso automatizado para una clasificación precisa y para evitar clasificaciones diferentes de los mismos dibujos~\cite{aschero1998}.
+
+\subsection{Formulación del problema}
+
+El problema identificado surge principalmente de un conjunto de preguntas de investigación que resultan de interés, las cuales servirán como hilos conductores del trabajo y se irán respondiendo en su desarrollo. A continuación, se presentan:
+
+\begin{itemize}
+    \item ¿Cuáles son las técnicas de preprocesamiento que mejor funcionan para obtener imágenes binarias que permitan ver claramente las pinturas rupestres?
+    \begin{itemize}
+        \item ¿Cuáles son las técnicas y algoritmos de realce de colores que pueden obtener filtros similares a los de DStretch?
+        \item ¿Cuáles son las técnicas y algoritmos para remover el ruido del deterioro en obras de arte?
+    \end{itemize}
+    \item ¿Cuáles son los modelos de detección de objetos que mejor funcionan para detectar objetos en imágenes binarias?
+    \item ¿Cuáles son los modelos de agrupamiento no supervisados más utilizados para clasificar obras de arte por estilos?
+\end{itemize}
+
+\subsubsection{Objetivos Generales}
+
+Integrar técnicas de procesamiento de imagen, modelos de detección de objetos pre-entrenados y algoritmos de agrupamiento para identificar y clasificar los elementos de las pinturas rupestres en un proceso automatizado. Se aplica para el caso de Cueva de las Manos.
+
+\subsubsection{Objetivos Específicos}
+
+Se propone realizar las siguientes actividades:
+\begin{enumerate}
+    \item Construir el set de datos de manera adecuada para el problema a resolver, y validarlo con un experto.
+    \item Investigar las técnicas de realce de colores más utilizadas y compararlas para las fotografías seleccionadas.
+    \item Investigar los algoritmos de detección de objetos más utilizados y compararlos para las fotografías seleccionadas.
+    \item Investigar los algoritmos de clasificación más utilizados, así como los modelos de redes neuronales preentrenados, y compararlos para las fotografías seleccionadas.
+    \item Integrar todos los procesamientos en un proceso único.
+    \item Diseñar una interfaz posible que se ajuste a las necesidades de los arqueólogos para empaquetar el proceso armado.
+\end{enumerate}
+
+\subsection{Justificación del estudio}
+
+La presente investigación responde a la necesidad de mejorar y automatizar el proceso de clasificación estilística del arte rupestre, en particular en el caso aplicado de Cueva de las Manos. El modelo actual propuesto por el arqueólogo Aschero ha sido de gran utilidad, pero presenta limitaciones en cuanto a la precisión de su clasificación~\cite{aschero2000}. Además, es importante considerar que los estudios arqueológicos suelen procesarse en forma de "lotes" o campañas, en las que primero se recopilan los datos durante un período específico y luego se procesan en un momento posterior. Debido a este flujo de trabajo, es crucial contar con un proceso automatizado que permita una clasificación lo más precisa posible para evitar la necesidad de repetir el análisis o reanalizar datos en campañas futuras, lo que genera ineficiencias~\cite{aschero1998}.
+
+En términos de utilización de los resultados, se espera que este estudio contribuya a la mejora de las prácticas arqueológicas y de investigación en el campo del arte rupestre. La automatización del proceso de identificación y clasificación de los elementos en las pinturas rupestres no solo permitirá ahorrar tiempo y recursos, sino que también abrirá la puerta a nuevas posibilidades de análisis y descubrimiento en este ámbito. Los resultados obtenidos podrían ser utilizados por arqueólogos, historiadores y especialistas en arte rupestre para profundizar en el conocimiento de las comunidades prehistóricas, su simbolismo y su evolución artística a lo largo del tiempo~\cite{aschero2018}.
+
+Además, se explorarán otras posibilidades de procesamiento de imágenes, como la eliminación de ruido en fotografías antiguas, la restauración de imágenes para reconstruir partes dañadas o faltantes de las pinturas rupestres, y técnicas de aumento de contraste para resaltar detalles.
+
+Con el avance de las tecnologías y, en particular, de los modelos de clasificación de imágenes, es necesario desarrollar modelos específicos para el arte rupestre, dado que los modelos generales aún no cuentan con bases de datos suficientemente amplias de este tipo de imágenes para ser útiles para los arqueólogos. Por lo tanto, un modelo especializado que surja de esta investigación sería de gran valor, proporcionando una solución accesible y eficaz para los desafíos actuales en el campo de la arqueología~\cite{aschero2018}.
+
+
+\newpage
+\section{Estado de la Cuestión}
+
+En esta sección se revisa el estado actual de la investigación en relación con el problema planteado. Se comienza con el Modelo Actual de Clasificación, donde se describe el enfoque que utilizan actualmente los arqueólogos para la detección y clasificación de arte rupestre. Luego, en \textit{Machine Learning} y el Arte Rupestre, se revisan estudios relevantes que aplican técnicas de aprendizaje automático en el campo del arte rupestre. Finalmente, en Clasificación de Imágenes y Reconocimiento de Objetos, se presentan algoritmos y modelos generales de clasificación de imágenes y reconocimiento de objetos que son aplicables al problema planteado.
+
+\subsection{Modelo Actual de Clasificación}
+
+El arte rupestre en la Cueva de Las Manos, ubicada en el área del Río Pinturas en Santa Cruz, Argentina, ha sido objeto de numerosos estudios y análisis a lo largo de los años. Gradin y Aschero ~\cite{aschero2010} han realizado importantes contribuciones a su comprensión, particularmente en el desarrollo de un modelo de clasificación estilística. Este modelo se basa en características principalmente morfológicas y ha sido utilizado para agrupar los objetos presentes en las pinturas rupestres de la cueva.
+
+El primer análisis de manifestaciones rupestres en la Cueva de Las Manos comenzó en 1978, cuando Gradin destacó la relevancia de la forma como un elemento central en la clasificación estilística. Su estudio enfatizó la importancia de la observación minuciosa y el análisis comparativo de las características morfológicas de los objetos representados, con el fin de establecer patrones y similitudes que permitieran agruparlos de manera coherente~\cite{gradin1978}.
+
+Este análisis se profundizó en 1979, describiendo de manera más precisa la clasificación original y teniendo en cuenta elementos como la forma, la posición, el tamaño y otros atributos visuales de los objetos representados en las pinturas rupestres~\cite{gradin1979}.
+
+Aschero, basándose en el modelo original de Gradin, proporciona una perspectiva general sobre las escenas de caza presentes en la Cueva de Las Manos. Este estudio destaca cómo el modelo de clasificación estilística ha sido utilizado para identificar y agrupar los diferentes elementos representados en estas escenas, considerando nuevamente la forma y el tamaño de los objetos relacionados con la caza~\cite{aschero2018}. Este enfoque ha permitido una mejor comprensión de las prácticas de caza prehistóricas y su representación simbólica en el arte rupestre.
+
+En un estudio sobre el grupo estilístico B1 en el área del Río Pinturas, Aschero destaca la importancia de la identificación y clasificación de los elementos en el arte rupestre. Se presenta un análisis de las pinturas centrándose en la forma y disposición de los objetos representados. Este enfoque permitió una comprensión más profunda de la demarcación territorial y la organización simbólica de los motivos~\cite{aschero2018b}.
+
+Este último modelo de clasificación estilística se utiliza como base para comparar los distintos resultados obtenidos en el presente estudio.
+
+\subsection{Machine Learning y Arte Rupestre}
+
+\sloppy
+Los avances recientes en Inteligencia Artificial (IA) y Aprendizaje Automático (AA) han abierto nuevas posibilidades para el estudio del arte rupestre. Estas tecnologías pueden facilitar en gran medida la investigación del arte rupestre de muchas maneras, como a través de la detección y reconocimiento de objetos, la extracción de motivos, la reconstrucción de objetos, los grafos de conocimiento de imágenes y las representaciones.
+
+Entre los trabajos más recientes, Jalandoni presenta un método de aprendizaje automático basado en avances recientes en el aprendizaje profundo para entrenar un modelo para identificar imágenes con arte rupestre pintado (pictogramas). La eficacia del método propuesto se demuestra utilizando datos recopilados de trabajos de campo en Australia. Además, su método propuesto puede utilizarse para entrenar modelos específicos para el arte rupestre encontrado en diferentes regiones~\cite{jalandoni2022}.
+
+Otro trabajo propone un nuevo programa de software llamado ERA (Extracción de Arte Rupestre), diseñado para ayudar a los investigadores a identificar pinturas rupestres a partir de imágenes digitales. Este software utiliza algoritmos de aprendizaje automático supervisado, como Support Vector Machines (SVM) y Random Forest, junto con técnicas de procesamiento de imágenes avanzadas para aislar las figuras pintadas. Estas técnicas incluyen la normalización de brillo y contraste de las imágenes para mejorar la visibilidad de los detalles y facilitar su clasificación precisa. El uso de este tipo de software automatizado agiliza el análisis, permitiendo a los arqueólogos trabajar de manera más eficiente~\cite{monna2022}.
+
+También se ha propuesto entrenar un modelo que ubica y clasifica objetos de imagen utilizando una red neuronal convolucional más rápida basada en regiones (\textit{Faster-RCNN}) sobre datos producidos por un método novedoso para mejorar la visualización del contenido de documentaciones 3D. Los modelos exitosos funcionan excepcionalmente bien en barcos y círculos, así como con figuras humanas y ruedas~\cite{horn2022}.
+
+\subsection{Clasificación de Imágenes y Reconocimiento de Objetos}
+
+La clasificación de imágenes y el reconocimiento de objetos son tareas fundamentales en la visión por computadora, donde el enfoque principal es tratar el reconocimiento de objetos como una tarea de clasificación. Un paso preliminar esencial para lograr un rendimiento de vanguardia en la categorización de imágenes es la detección y extracción de características.
+
+Entre las técnicas más avanzadas para la clasificación de imágenes y el reconocimiento de objetos se encuentra el aprendizaje profundo, que ha logrado mejoras significativas en el rendimiento de estas tareas. Las redes neuronales convolucionales (CNN) son un tipo de modelo de aprendizaje profundo que ha demostrado mejoras sustanciales en la detección y reconocimiento de objetos~\cite{ionescu2016}. Estas redes, cuando se combinan con técnicas de aprendizaje por transferencia, donde un modelo preentrenado en un gran conjunto de datos se ajusta para una tarea específica en un conjunto de datos más pequeño, pueden alcanzar altos niveles de precisión. Por ejemplo, los modelos preentrenados en el conjunto de datos ImageNet, que contiene más de 1.1 millones de imágenes en más de 1000 clases, son ampliamente utilizados para inicializar modelos de detección de objetos~\cite{bansal2021}.
+
+Además de las CNN y el aprendizaje por transferencia, existen algoritmos tradicionales de extracción de características como SIFT (Transformación Invariante a la Escala) y HOG (Histograma de Gradientes Orientados), junto con algoritmos de clasificación como las máquinas de vectores soporte (SVM) y k-vecinos más cercanos (k-NN), que también han sido fundamentales en las tareas de detección de objetos~\cite{bansal2021}.
+
+Dentro de las arquitecturas modernas, el modelo Deformable DETR, propuesto por Zhu et al.~\cite{zhu2021deformable}, representa un avance significativo al combinar la capacidad de modelado de relaciones de los \textit{Transformers} con la eficiencia espacial de las \textit{deformable convolutions}. A diferencia de su predecesor, DETR, que presenta limitaciones en la convergencia y en la detección de objetos pequeños, Deformable DETR introduce módulos de atención deformable (\textit{deformable attention modules}) que se centran en un conjunto reducido de puntos clave alrededor de una referencia. Esto permite que el modelo logre mejores resultados con una menor cantidad de épocas de entrenamiento. En el contexto de la detección de arte rupestre, estas mejoras son cruciales, ya que las representaciones artísticas pueden variar en tamaño y detalle. Sin embargo, el modelo también presenta desafíos, como su complejidad computacional en comparación con métodos tradicionales de una sola etapa, aunque la mejora en la precisión y la reducción del tiempo de entrenamiento lo convierten en una opción viable para la detección de objetos en arte rupestre.
+
+Otro modelo destacado es RetinaNet, presentado por Lin et al. \cite{lin2017focal}, que ha marcado un hito en la evolución de los detectores de objetos de una sola etapa. Su principal innovación es la introducción de la \textit{Focal Loss}, una función de pérdida diseñada específicamente para abordar el problema del desequilibrio extremo entre las clases de fondo y de primer plano durante el entrenamiento. Esta técnica es particularmente relevante en la detección de arte rupestre, donde las pinturas pueden estar rodeadas por grandes áreas de fondo que generan muchos ejemplos fáciles que no contribuyen significativamente al aprendizaje. RetinaNet cierra la brecha de precisión entre los detectores de dos etapas, como Faster R-CNN, y los de una sola etapa, manteniendo una alta eficiencia computacional. No obstante, su alta dependencia en la selección de hiperparámetros, especialmente los relacionados con la \textit{Focal Loss}, puede requerir un esfuerzo adicional en términos de experimentación y ajuste.
+
+El modelo Faster R-CNN, propuesto por Ren et al. \cite{ren2015faster}, unifica la generación de propuestas y la detección de objetos en un solo marco completamente convolucional. Este modelo se basa en una Red de Propuestas de Regiones (RPN), que genera regiones de interés de manera eficiente, lo cual es esencial en aplicaciones donde se requiere precisión y rapidez, como en la detección de objetos en arte rupestre. La capacidad de Faster R-CNN para compartir características convolucionales entre la red de propuestas y la red de detección reduce significativamente el costo computacional, permitiendo generar propuestas casi en tiempo real con alta precisión, incluso en conjuntos de datos complejos como PASCAL VOC y MS COCO. Sin embargo, una desventaja es su dependencia de hardware de alto rendimiento para alcanzar la velocidad prometida.
+
+Finalmente, YOLOv5, desarrollado por Ultralytics, es una evolución dentro de la familia de modelos YOLO (\textit{You Only Look Once}), enfocado en la detección rápida y precisa de objetos. A diferencia de sus predecesores, YOLOv5 introduce mejoras en la arquitectura que resultan en un menor tiempo de entrenamiento y mayor precisión, sin comprometer la velocidad de inferencia. Esto se logra mediante una optimización más efectiva de la arquitectura y el uso mejorado de técnicas de \textit{data augmentation} y \textit{auto-learning} de anclas. YOLOv5 es especialmente útil en la detección de arte rupestre, donde su capacidad para operar en tiempo real y su facilidad de despliegue en una variedad de plataformas lo convierten en una herramienta valiosa. Sin embargo, podría requerir un ajuste fino específico al contexto del arte rupestre para manejar eficazmente las complejidades visuales y el ruido presente en las imágenes~\cite{yolov5}.
+
+\section{Limitaciones de los Datos}
+
+La calidad y representatividad de los datos utilizados en este estudio presentan ciertas limitaciones que influyen directamente en los resultados obtenidos y en las interpretaciones finales. En particular, el conjunto de imágenes de arte rupestre seleccionado no cuenta con una estandarización de categorías ni etiquetas que se alineen completamente con los modelos preentrenados disponibles, lo que puede afectar la precisión y generalización de los algoritmos aplicados. Asimismo, las imágenes presentan desafíos inherentes como el deterioro natural, la superposición de elementos, y la baja variedad en la paleta de colores, lo cual puede limitar la capacidad de los modelos para identificar y clasificar motivos de forma precisa. Estas limitaciones de los datos hacen necesaria una adaptación en la metodología para maximizar la calidad de los resultados obtenidos a pesar de las restricciones presentes en el conjunto de datos.
+
+\subsection{Selección de Imágenes}
+El estudio se lleva a cabo utilizando un conjunto de 686 imágenes seleccionadas por Agustina Papú, arqueóloga especializada en arte rupestre. Las imágenes fueron capturadas en las campañas realizadas al área del Río Pinturas, Santa Cruz, Argentina, tanto por ella como por su equipo entre 2019 y 2023. Si bien representan una parte significativa del material disponible, la selección se realiza buscando cubrir la totalidad de las paredes del sitio, aunque de forma manual, lo que podría introducir sesgos en los resultados. Además, la cantidad limitada de imágenes puede afectar la capacidad del modelo para generalizar a otros contextos o sitios arqueológicos.
+
+\subsection{Calidad de las Imágenes}
+Las imágenes utilizadas en este estudio varían en calidad, debido a las condiciones en que fueron capturadas, como la iluminación y el movimiento al momento de la toma. Esta variabilidad en la calidad de las imágenes puede impactar negativamente en el rendimiento de los modelos de detección de objetos, particularmente en escenarios donde la iluminación o la nitidez son deficientes.
+
+\section{Limitaciones Técnicas y de Tiempo}
+
+El desarrollo de este estudio se enfrenta a limitaciones técnicas y de tiempo que condicionan tanto la selección de los modelos de aprendizaje automático como la implementación de técnicas experimentales. La investigación se realiza en un periodo acotado de un año y con recursos computacionales limitados, lo que influye en la elección de modelos preentrenados y en la cantidad de iteraciones y experimentos que se pueden llevar a cabo. Adicionalmente, el uso de una MacBook Pro con capacidad de procesamiento específica restringe la posibilidad de explorar configuraciones avanzadas o modelos de mayor complejidad que podrían mejorar la precisión de los resultados. Estas limitaciones temporales y de hardware requieren un enfoque metodológico adaptado que permita optimizar el uso de los recursos disponibles dentro de las restricciones impuestas.
+
+\subsection{Selección de Modelos Preentrenados}
+Los modelos seleccionados para este estudio deben ser de código abierto y estar disponibles en la plataforma HuggingFace, lo que permite unificar la metodología de código y simplificar su implementación. La unificación a través de HuggingFace facilita la gestión de modelos y la reproducibilidad de los experimentos.
+
+Además, los modelos seleccionados están preentrenados con el dataset COCO (Common Objects in Context). Aunque este dataset no contiene categorías y objetos que se alineen perfectamente con el problema de estudio del arte rupestre, su tamaño considerable y su amplia presencia en la mayoría de los modelos lo convierten en un punto de partida común y viable. Esta elección es una limitación intrínseca, ya que otros datasets más específicos, como aquellos centrados en la detección de objetos camuflados (por ejemplo, COD), podrían ofrecer características más pertinentes para este estudio. Sin embargo, la elección de COCO se justifica por su compatibilidad con los modelos disponibles y el marco temporal de la investigación.
+
+\subsection{Tiempo de Colaboración con la Experta}
+La colaboración con la arqueóloga, quien asiste en la selección y etiquetado de las imágenes, está limitada a un período de un mes. Este tiempo limitado de colaboración impone restricciones sobre la cantidad de imágenes que pueden ser etiquetadas y revisadas exhaustivamente, lo que a su vez puede limitar la profundidad del análisis.
+
+\subsection{Duración de la Investigación}
+La investigación se desarrolla dentro de un marco temporal limitado a un año. Este plazo restringido impone limitaciones significativas en cuanto al alcance de los experimentos y la cantidad de iteraciones posibles. La necesidad de cumplir con un cronograma ajustado influye en la selección de las técnicas y modelos, priorizando aquellos que son viables dentro del tiempo disponible para el ajuste fino.
+
+\subsection{Recursos Computacionales}
+El estudio se realiza utilizando los recursos computacionales disponibles, que consisten en una MacBook Pro con las siguientes especificaciones:
+
+\begin{itemize}
+    \item \textbf{Modelo:} MacBook Pro (Identificador de Modelo: MacBookPro18,3)
+    \item \textbf{Número de Modelo:} Z15G001WYLL/A
+    \item \textbf{Chip:} Apple M1 Pro
+    \item \textbf{Número Total de Núcleos:} 8 (6 núcleos de rendimiento y 2 de eficiencia)
+    \item \textbf{Memoria:} 32 GB
+    \item \textbf{Versión del Firmware del Sistema:} 10151.140.19
+    \item \textbf{Versión del Cargador del SO:} 10151.140.19
+    \item \textbf{Número de Serie (sistema):} WJ2V7DH773
+    \item \textbf{UUID del Hardware:} F1CB66FF-79B9-5085-BBB7-71E10205ECB0
+    \item \textbf{UDID de Provisión:} 00006000-000E19220EA3801E
+    \item \textbf{Estado de Bloqueo de Activación:} Deshabilitado
+\end{itemize}
+
+Estas especificaciones, aunque robustas para muchos tipos de análisis, imponen limitaciones en la elección de modelos y técnicas debido a la capacidad de procesamiento y memoria disponibles. Esto restringe la posibilidad de entrenar y ajustar modelos más complejos o realizar simulaciones a gran escala. La capacidad para explorar un rango más amplio de técnicas o realizar experimentos más exhaustivos está, por tanto, limitada por el hardware disponible.
+
+\section{Implicaciones para Trabajos Futuros}
+Dado que las limitaciones mencionadas impactan tanto en la profundidad del análisis como en la generalización de los resultados, se sugiere que investigaciones futuras exploren técnicas adicionales de preprocesamiento, así como modelos más complejos que podrían no haber sido viables en este estudio. Además, se recomienda una expansión del conjunto de datos y una colaboración más prolongada con expertos en el campo para mejorar la precisión y la validez de los resultados obtenidos.
+Sería interesante explorar el uso de modelos preentrenados en datasets especializados en camuflaje, como COD (Camouflaged Object Detection), que pueden tener una naturaleza más cercana al problema específico del arte rupestre. Estos datasets podrían mejorar la precisión en la detección de elementos en contextos complejos y con bajo contraste, como los presentes en este estudio.

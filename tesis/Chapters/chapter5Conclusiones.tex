@@ -1,0 +1,64 @@
+\chapter{Conclusiones}
+
+En este trabajo se ha abordado el desafío de identificar y clasificar imágenes de arte rupestre, específicamente animales, utilizando técnicas de aprendizaje automático. A lo largo de los capítulos anteriores, se han implementado y evaluado diferentes modelos y algoritmos, tanto supervisados como no supervisados, para optimizar la detección y agrupamiento de estas imágenes.
+
+\section{Logros y Contribuciones}
+
+Los principales logros y contribuciones de este estudio son:
+
+\begin{itemize}
+    \item \textbf{Implementación exitosa de modelos de detección}: Se entrenaron y compararon modelos de detección como YOLOv5 y Faster R-CNN, seleccionando finalmente YOLOv5 por su equilibrio entre precisión y eficiencia computacional. Este modelo permitió detectar y recortar eficazmente las imágenes de animales en el conjunto de datos de arte rupestre.
+    \item \textbf{Extracción de características con modelos profundos}: Se utilizaron modelos preentrenados como ResNet18, VGG16, DenseNet121 e InceptionV3 para extraer características representativas de las imágenes. La diversidad arquitectónica de estos modelos permitió evaluar su capacidad para capturar diferentes aspectos visuales relevantes.
+    \item \textbf{Aplicación de algoritmos de agrupamiento}: Se exploraron algoritmos de clustering como K-Means, Clustering Aglomerativo, DBSCAN y Clustering Espectral. La combinación de estos algoritmos con los modelos de extracción de características permitió identificar patrones y estructuras ocultas en los datos sin necesidad de etiquetas predefinidas.
+    \item \textbf{Identificación de la mejor combinación modelo-algoritmo}: Los resultados indican que la combinación de ResNet18 con K-Means es la más efectiva para la clasificación no supervisada de las imágenes de animales. Esta combinación logró el coeficiente de silueta más alto y formó clusters coherentes basados en similitudes visuales claras.
+    \item \textbf{Complementación del modelo de clasificación supervisado}: Los métodos no supervisados permitieron descubrir patrones adicionales y posibles nuevas categorías en las imágenes de arte rupestre, complementando y enriqueciendo el modelo supervisado existente. Esto demuestra el valor de integrar enfoques supervisados y no supervisados para una comprensión más completa de los datos.
+\end{itemize}
+
+\section{Reflexiones sobre los Objetivos}
+
+Los objetivos planteados al inicio del proyecto han sido cumplidos satisfactoriamente:
+
+\begin{enumerate}
+    \item \textbf{Desarrollar un modelo eficiente para la detección de animales en imágenes de arte rupestre}: Se implementó y seleccionó YOLOv5 como modelo óptimo, logrando una detección precisa y eficiente.
+    \item \textbf{Explorar métodos de aprendizaje no supervisado para la clasificación de las imágenes detectadas}: Se aplicaron y evaluaron diferentes modelos de extracción de características y algoritmos de clustering, identificando la combinación más efectiva.
+    \item \textbf{Comparar y complementar los resultados con modelos supervisados}: Se realizó una comparación entre los clusters obtenidos y las categorías definidas por el modelo supervisado, evidenciando la capacidad de los métodos no supervisados para aportar nuevas perspectivas y enriquecer el análisis.
+    \item \textbf{Proporcionar una base para futuras investigaciones en el área}: Las discusiones y propuestas presentadas abren líneas de investigación futuras, incluyendo la exploración de nuevos modelos, preentrenamientos especializados y colaboraciones interdisciplinarias.
+\end{enumerate}
+
+\section{Implicaciones y Relevancia}
+
+Este estudio tiene implicaciones significativas en el campo del análisis de imágenes de arte rupestre y, más ampliamente, en la aplicación de técnicas de aprendizaje automático en contextos culturales y arqueológicos:
+
+\begin{itemize}
+    \item \textbf{Preservación y estudio del patrimonio cultural}: Los métodos desarrollados pueden facilitar el análisis y catalogación de grandes volúmenes de imágenes, apoyando el trabajo de arqueólogos y conservacionistas.
+    \item \textbf{Descubrimiento de patrones y relaciones ocultas}: La utilización de aprendizaje no supervisado permite identificar estructuras y categorías que pueden no ser evidentes, aportando nuevas perspectivas al estudio del arte rupestre.
+    \item \textbf{Integración de tecnología y humanidades}: Este trabajo ejemplifica cómo la inteligencia artificial puede complementar y potenciar las investigaciones en áreas humanísticas, promoviendo enfoques interdisciplinarios.
+\end{itemize}
+
+\section{Limitaciones}
+
+A pesar de los logros alcanzados, es importante reconocer algunas limitaciones del estudio:
+
+\begin{itemize}
+    \item \textbf{Restricciones computacionales}: Las limitaciones en recursos computacionales pudieron afectar la capacidad para entrenar modelos más complejos o realizar más iteraciones, lo que podría haber influido en los resultados obtenidos.
+    \item \textbf{Tamaño y diversidad del conjunto de datos}: El conjunto de datos utilizado puede no representar completamente la diversidad de estilos y épocas del arte rupestre, lo que limita la generalización de los hallazgos.
+    \item \textbf{Etiquetado de datos}: La calidad y precisión de las etiquetas existentes podrían mejorarse, y la falta de anotaciones detalladas limita la capacidad de evaluar plenamente el desempeño de los modelos.
+\end{itemize}
+
+\section{Recomendaciones para Trabajos Futuros}
+
+Basándose en las conclusiones y limitaciones identificadas, se proponen las siguientes recomendaciones para futuros trabajos:
+
+\begin{itemize}
+    \item \textbf{Explorar modelos más avanzados}: Implementar y evaluar modelos como EfficientNet o Vision Transformers para mejorar la extracción de características.
+    \item \textbf{Preentrenamiento en conjuntos de datos especializados}: Entrenar los modelos en conjuntos de datos relacionados con camuflaje, arte o simbología antigua para capturar mejor las características propias del arte rupestre.
+    \item \textbf{Utilizar modelos multimodales}: Integrar información adicional como metadatos geográficos o contextuales para enriquecer el análisis y clasificación de las imágenes.
+    \item \textbf{Ampliar y mejorar el conjunto de datos}: Colaborar con arqueólogos y expertos para obtener más imágenes y refinar las etiquetas existentes, aumentando la diversidad y calidad del conjunto de datos.
+    \item \textbf{Optimizar el uso de recursos computacionales}: Implementar técnicas de paralelización y aprovechar infraestructuras de cómputo de alto rendimiento para superar las limitaciones actuales.
+\end{itemize}
+
+\section{Conclusión Final}
+
+Este trabajo ha demostrado la efectividad de combinar técnicas de aprendizaje supervisado y no supervisado para la detección y clasificación de imágenes de arte rupestre. La identificación de la combinación óptima de modelo y algoritmo para el agrupamiento de imágenes proporciona una base sólida para futuras investigaciones y aplicaciones en el campo.
+
+La integración de métodos de aprendizaje automático en el estudio del patrimonio cultural ofrece oportunidades valiosas para descubrir y preservar la riqueza de expresiones artísticas de la humanidad. Continuar avanzando en esta dirección, incorporando nuevos enfoques y colaboraciones interdisciplinarias, permitirá profundizar en la comprensión y apreciación del arte rupestre y otros ámbitos culturales.

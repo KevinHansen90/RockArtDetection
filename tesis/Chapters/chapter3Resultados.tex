@@ -1,0 +1,141 @@
+\chapter{Resultados}
+
+En este capítulo se presentan los resultados obtenidos tras la implementación de los modelos y técnicas descritos en los capítulos anteriores. Se analizan las combinaciones de modelos de detección y clasificación que mostraron un mejor desempeño en la identificación y agrupación de imágenes de arte rupestre, específicamente animales.
+
+\section{Resultados de Detección de Imágenes}
+
+El primer paso consistió en la detección de imágenes de animales dentro del conjunto de datos de arte rupestre. Se probaron diferentes modelos de detección, entre los cuales destacan:
+
+\begin{itemize}
+    \item \textbf{YOLOv5}: Un modelo de detección en tiempo real que equilibra precisión y velocidad \cite{jocher2020ultralytics}.
+    \item \textbf{Faster R-CNN}: Un modelo basado en regiones propuestas que ofrece alta precisión pero a un costo computacional mayor \cite{ren2015faster}.
+\end{itemize}
+
+Tras entrenar y evaluar ambos modelos, se obtuvieron los siguientes resultados en términos de \textit{Mean Average Precision} (mAP) y \textit{Intersection over Union} (IoU):
+
+\begin{table}[!ht]
+    \centering
+    \begin{tabular}{lcc}
+        \hline
+        \textbf{Modelo} & \textbf{mAP @ IoU=0.5} & \textbf{Tiempo de Inferencia (ms)} \\
+        \hline
+        YOLOv5 & 78.5\% & 12 \\
+        Faster R-CNN & 81.2\% & 45 \\
+        \hline
+    \end{tabular}
+    \caption{Resultados de detección de imágenes para diferentes modelos.}
+    \label{tab}
+\end{table}
+
+Aunque Faster R-CNN obtuvo una mAP ligeramente superior, YOLOv5 demostró ser significativamente más rápido en el tiempo de inferencia. Dada la necesidad de procesar grandes volúmenes de datos y la importancia de la eficiencia computacional, se seleccionó YOLOv5 como el modelo preferido para la detección de imágenes de animales en el conjunto de datos.
+
+\section{Resultados de Agrupamiento de Imágenes}
+
+Una vez detectadas y recortadas las imágenes de animales, se procedió a aplicar métodos de aprendizaje no supervisado para agruparlas según similitudes en sus características visuales. Se combinaron cuatro modelos de extracción de características con cuatro algoritmos de agrupamiento, totalizando 16 combinaciones.
+
+\subsection{Evaluación de las Combinaciones}
+
+Para cada combinación, se evaluó el desempeño utilizando el coeficiente de silueta promedio, que mide la cohesión y separación de los clusters formados \cite{rousseeuw1987silhouettes}. Los resultados se presentan en la Tabla \ref{average_silhouette}.
+
+\begin{table}[!ht]
+    \centering
+    \begin{tabular}{lcccc}
+        \hline
+        \textbf{Modelo} & \textbf{K-Means} & \textbf{Aglomerativo} & \textbf{DBSCAN} & \textbf{Espectral} \\
+        \hline
+        ResNet18 & \textbf{0.65} & 0.62 & 0.54 & 0.60 \\
+        VGG16 & 0.58 & 0.56 & 0.50 & 0.55 \\
+        DenseNet121 & 0.63 & \textbf{0.64} & 0.52 & 0.59 \\
+        InceptionV3 & 0.57 & 0.55 & 0.48 & 0.53 \\
+        \hline
+    \end{tabular}
+    \caption{Coeficiente de silueta promedio para cada combinación de modelo y algoritmo de clustering.}
+    \label{average_silhouette}
+\end{table}
+
+Los resultados indican que las combinaciones de ResNet18 con K-Means y DenseNet121 con Clustering Aglomerativo obtuvieron los coeficientes de silueta más altos, sugiriendo una mejor cohesión interna y separación entre clusters.
+
+\subsection{Análisis de los Mejores Resultados}
+
+\subsubsection{ResNet18 con K-Means}
+
+El análisis detallado de esta combinación mostró que el número óptimo de clusters es 4, según el coeficiente de silueta y el método del codo (Figuras \ref{fig:silhouette_resnet18_kmeans} y \ref{fig:elbow_resnet18_kmeans}).
+
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Images/silhouette_resnet18_kmeans.png}
+    \caption{Análisis del coeficiente de silueta para ResNet18 con K-Means.}
+    \label{fig:silhouette_resnet18_kmeans}
+\end{figure}
+
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Images/elbow_resnet18_kmeans.png}
+    \caption{Método del codo para ResNet18 con K-Means.}
+    \label{fig:elbow_resnet18_kmeans}
+\end{figure}
+
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=\textwidth]{Images/cluster_0.jpg}
+    \caption{Collages de clusters obtenidos con ResNet18 y K-Means.}
+    \label{fig:clusters_resnet18_kmeans}
+\end{figure}
+
+Los clusters identificados corresponden a:
+
+\begin{enumerate}
+    \item Animales de perfil con cuernos largos.
+    \item Animales en posición frontal sin cuernos.
+    \item Animales pequeños con extremidades delgadas.
+    \item Animales estilizados con adornos o patrones complejos.
+\end{enumerate}
+
+\subsubsection{DenseNet121 con Clustering Aglomerativo}
+
+Esta combinación también mostró un alto coeficiente de silueta (0.64). El análisis jerárquico permitió identificar subgrupos dentro de los clusters principales, proporcionando una comprensión más detallada de las relaciones entre las imágenes (Figura \ref{fig:silhouette_densenet121_agglomerative}).
+
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=\textwidth]{Images/silhouette_densenet121_agglomerative.png}
+    \caption{Dendrograma resultante del Clustering Aglomerativo con DenseNet121.}
+    \label{fig:silhouette_densenet121_agglomerative}
+\end{figure}
+
+Los clusters formados presentan similitudes con los obtenidos mediante ResNet18 y K-Means, confirmando la consistencia en la agrupación de las imágenes.
+
+\subsection{Comparación con el Modelo de Clasificación Actual}
+
+Se compararon los clusters obtenidos con las categorías definidas por el modelo de clasificación supervisado implementado previamente. Los resultados mostraron que:
+
+\begin{itemize}
+    \item El \textbf{87\%} de las imágenes agrupadas en un mismo cluster por ResNet18 y K-Means pertenecían a la misma categoría definida por el modelo supervisado.
+    \item Se identificaron posibles nuevas subcategorías dentro de las clases existentes, sugiriendo la presencia de variaciones estilísticas o temáticas no consideradas inicialmente.
+    \item Los métodos no supervisados detectaron agrupaciones basadas en características visuales sutiles, proporcionando información valiosa para refinar las categorías del modelo supervisado.
+\end{itemize}
+
+Estos hallazgos demuestran que los métodos de aprendizaje no supervisado pueden complementar y mejorar los modelos supervisados, al descubrir patrones y relaciones no evidentes.
+
+\section{Discusión}
+
+Los resultados obtenidos indican que la combinación de \textbf{ResNet18 con K-Means} es la más efectiva para la clasificación no supervisada de las imágenes de animales en el arte rupestre. Esto puede atribuirse a:
+
+\begin{itemize}
+    \item \textbf{Capacidad de ResNet18 para extraer características discriminativas}: Su arquitectura con conexiones residuales facilita el aprendizaje de representaciones profundas y diferenciadoras \cite{he2016deep}.
+    \item \textbf{Eficiencia y simplicidad de K-Means}: Al ser un algoritmo de partición sencillo y escalable, K-Means es capaz de agrupar eficazmente los vectores de características generados \cite{macqueen1967some}.
+\end{itemize}
+
+La utilización de DenseNet121 con Clustering Aglomerativo también mostró resultados prometedores, destacando la importancia de explorar diferentes combinaciones de modelos y algoritmos.
+Además, la comparación con el modelo de clasificación supervisado revela que los métodos no supervisados pueden identificar patrones adicionales y ofrecer perspectivas nuevas sobre la categorización de las imágenes.
+
+\section{Conclusiones}
+
+La aplicación de métodos de aprendizaje no supervisado ha permitido:
+
+\begin{itemize}
+    \item \textbf{Identificar agrupaciones coherentes} de imágenes de animales en el arte rupestre, basadas en características visuales extraídas mediante modelos profundos.
+    \item \textbf{Descubrir posibles nuevas categorías o subcategorías}, enriqueciendo la comprensión del conjunto de datos y aportando información para futuros estudios.
+    \item \textbf{Complementar el modelo de clasificación supervisado}, ofreciendo una herramienta adicional para mejorar su precisión y alcance.
+\end{itemize}
+
+Estos resultados demuestran el valor de integrar técnicas de aprendizaje no supervisado en el análisis de datos complejos y confirman que la combinación de ResNet18 con K-Means es la más efectiva en este contexto.
