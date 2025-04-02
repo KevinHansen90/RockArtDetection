@@ -116,11 +116,22 @@ cython_debug/
 
 # Project-specific
 data/
-src/outputs/
-results/
+experiments/
 data/.DS_Store
 .DS_Store
-src/test.py
-src/configs/
-experiment_plots/
-src/models/yolo/
+configs/
+
+# LaTeX-specific
+*.aux
+*.bbl
+*.idx
+*.lof
+*.log
+*.nlo
+*.out
+*.gz
+*.toc
+*.blg
+
+tesis/Images
+
