@@ -2,6 +2,8 @@
 
 A research project for a Data Science Master's Degree focusing on detecting Patagonian rock art using advanced object detection techniques and traditional image processing methods. This repository includes datasets, code for pre-processing, model training, and evaluation, as well as detailed documentation.
 
+**Dataset:** The dataset, containing **683 images** annotated with **19 classes** (named in Spanish), is available [here](https://drive.google.com/drive/u/0/folders/1JU5tohaRw7Rm83S9uUK9KazIPLRebl1x). The labeling was carried out with the invaluable assistance of Agustina Papu, an archaeologist.
+
 ## Table of Contents
 
 - [Project Overview](#project-overview)
