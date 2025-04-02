@@ -21,9 +21,9 @@ A research project for a Data Science Master's Degree focusing on detecting Pata
 ## Project Overview
 
 **Goal**: Automatically detect "Animal" figures (and potentially other categories like "Hand") in Patagonian rock art images. Many such images are **very large** (e.g., over 4200×2800 pixels), necessitating techniques like:
-    * **Tiling**: Breaking large images into smaller, manageable patches.
-    * **Label Grouping**: Mapping multiple specific classes (e.g., different animal types) into broader categories (e.g., "Animal").
-    * **Image Preprocessing**: Applying filters (Bilateral, Unsharp Mask, Laplacian, CLAHE) to enhance features potentially beneficial for detection.
+- **Tiling**: Breaking large images into smaller, manageable patches.
+- **Label Grouping**: Mapping multiple specific classes (e.g., different animal types) into broader categories (e.g., "Animal").
+- **Image Preprocessing**: Applying filters (Bilateral, Unsharp Mask, Laplacian, CLAHE) to enhance features potentially beneficial for detection.
 
 This project combines **classical** image processing techniques with **modern** deep learning object detectors (Faster R-CNN, RetinaNet, Deformable DETR) to explore robust detection strategies.
 
@@ -87,7 +87,7 @@ project/
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
+    git clone https://github.com/KevinHansen90/RockArtDetection
     cd RockArtDetection
     ```
 2.  **Create a Python environment:** (e.g., using conda or venv)
@@ -199,7 +199,7 @@ Thus, you end up with five versions of the dataset (base + 4 filters), each cont
 
 ## Model Zoo
 
-The `src/models/detection_models.py` script provides functions to instantiate various object detection models, adapting them for the number of classes in this project [cite: uploaded:src/models/detection_models.py]:
+The `src/models/detection_models.py` script provides functions to instantiate various object detection models, adapting them for the number of classes in this project:
 
 - **Faster R-CNN** (fasterrcnn): Based on [`torchvision.models.detection.fasterrcnn_resnet50_fpn_v2`](https://pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn_v2.html#torchvision.models.detection.fasterrcnn_resnet50_fpn_v2).
 - **RetinaNet** (retinanet): Based on [`torchvision.models.detection.retinanet_resnet50_fpn_v2`](https://pytorch.org/vision/main/models/generated/torchvision.models.detection.retinanet_resnet50_fpn_v2.html#torchvision.models.detection.retinanet_resnet50_fpn_v2), including custom head options for focal loss parameterization.
@@ -209,15 +209,15 @@ Models are typically loaded with pre-trained weights (e.g., on COCO) and their c
 
 ## Training Workflow
 
-Configuration: Training runs are configured using `.yaml` files (examples in `configs/`). These files specify the model type, dataset paths, hyperparameters (learning rate, batch size, epochs, optimizer, scheduler), warmup steps, backbone freezing options, etc.
+**Configuration:** Training runs are configured using `.yaml` files (examples in `configs/`). These files specify the model type, dataset paths, hyperparameters (learning rate, batch size, epochs, optimizer, scheduler), warmup steps, backbone freezing options, etc.
 
-Main Script: `src/training/train.py` is the entry point for starting a training run.
+**Main Script:** `src/training/train.py` is the entry point for starting a training run.
 
-Engine: `src/training/engine.py` contains the core logic for the training loop (`train_model`) and validation evaluation (`evaluate_on_dataset`). It handles epoch iteration, forward/backward passes, loss calculation, metric computation (mAP, mAR using torchmetrics), optimizer/scheduler steps, and logging.
+**Engine:** `src/training/engine.py` contains the core logic for the training loop (`train_model`) and validation evaluation (`evaluate_on_dataset`). It handles epoch iteration, forward/backward passes, loss calculation, metric computation (mAP, mAR using torchmetrics), optimizer/scheduler steps, and logging.
 
-Utilities: `src/training/utils.py` provides helpers for loading configs, plotting results, saving metrics, and device selection.
+**Utilities:** `src/training/utils.py` provides helpers for loading configs, plotting results, saving metrics, and device selection.
 
-Output: Each run creates a folder in `experiments/` containing logs, plots, configuration, and the final model checkpoint (`model_final.pth`).
+**Output:** Each run creates a folder in `experiments/` containing logs, plots, configuration, and the final model checkpoint (`model_final.pth`).
 
 **Example Training Command**:
 ```bash
