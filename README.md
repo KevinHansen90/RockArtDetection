@@ -17,6 +17,7 @@ A research project for a Data Science Master's Degree focusing on detecting Pata
 - [Model Zoo](#model-zoo)
 - [Training Workflow](#training-workflow)
 - [Evaluation](#evaluation)
+- [Inference](#inference)
 - [Example Usage Flow](#example-usage-flow)
 - [License](#license)
 
@@ -77,7 +78,7 @@ project/
 │   │   ├── evaluate.py       # Evaluation and visualization on test set
 │   │   └── utils.py          # Helper utilities (config loading, plotting, etc.)
 │   └── inference/
-│       └── ...               # (Future) Scripts for inference on new images
+│       └── inference.py      # Inference script to test fine-tuned models.
 │
 ├── LICENSE                   # Project license file
 └── README.md                 # This documentation file
@@ -225,7 +226,7 @@ Models are typically loaded with pre-trained weights (e.g., on COCO) and their c
 ```bash
 python src/training/train.py \
   --config configs/frcnn_config.yaml \
-  --experiment-name frcnn_base_run1
+  --experiment frcnn_base_run1
 ```
 
 ## Evaluation
@@ -235,6 +236,34 @@ python src/training/train.py \
 **After Training:** The `train.py` script can optionally run evaluation on the test set using `src/training/evaluate.py`'s `evaluate_and_visualize` function.
 
 **Visualization:** `evaluate_and_visualize` generates an image (`test_visualization.png` in the experiment folder) showing ground truth boxes (green) and predicted boxes (red, above confidence threshold) side-by-side for samples from the test set. The logic correctly handles coordinate systems and label indexing for all supported models (including the previously discussed fix for DETR ground truth visualization).
+
+## Inference
+
+After training a model, you can use the `src/inference/inference.py` script to run it on new images (or directories of images) and visualize the detections.
+
+**Script:** `src/inference/inference.py`
+
+* Loads a trained model checkpoint (`.pth` file).
+* Takes an input image path or directory path.
+* Requires the path to the class names file used during training.
+* Requires specifying the model type (fasterrcnn, retinanet, deformable_detr).
+* Applies the necessary preprocessing for the chosen model.
+* Runs inference and draws bounding boxes, class labels, and confidence scores on the images for detections above a specified threshold.
+* Saves the output images with drawn predictions to a specified output directory, creating a timestamped subfolder for each run.
+
+**Example Inference Command**:
+
+```bash
+python src/inference/inference.py \
+    --model-path experiments/your_experiment_name/model_final.pth \
+    --input path/to/your/test_images_or_image.jpg \
+    --output inference_results/ \
+    --classes data/tiles/base/grouped_classes.txt \
+    --model-type fasterrcnn \
+    --threshold 0.5
+```
+
+**Output:** A new subfolder `inference_results/inference_model_final_20250405_145500/` containing the input images with predictions drawn on them.
 
 ## Example Usage Flow
 
@@ -250,7 +279,7 @@ python src/training/train.py \
 
 **Run Training:**
 ```bash
-python src/training/train.py --config configs/my_detr_bilateral_config.yaml --experiment-name detr_bilateral_run1
+python src/training/train.py --config configs/my_detr_bilateral_config.yaml --experiment detr_bilateral_run1
 ```
 
 **Analyze Results:**
@@ -258,6 +287,18 @@ python src/training/train.py --config configs/my_detr_bilateral_config.yaml --ex
 - Check plots (`loss_curve.png`, `map_curve.png`) and logs (`metrics.csv`) in `experiments/detr_bilateral_run1/`.
 - Inspect the `test_visualization.png` if test evaluation was enabled.
 - The final model is saved as `model_final.pth`.
+
+**Run Inference on New Images:**
+
+```bash
+python src/inference/inference.py \
+    --model-path experiments/detr_bilateral_run1/model_final.pth \
+    --input path/to/some/new_images/ \
+    --output inference_output/ \
+    --classes data/tiles/base/grouped_classes.txt \
+    --model-type deformable_detr \
+    --threshold 0.4
+```
 
 ## License
 
