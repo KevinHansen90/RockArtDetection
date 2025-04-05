@@ -36,8 +36,6 @@ def get_optimizer(model, config):
         # Freeze all backbone parameters initially and log their names.
         for name, param in model.backbone.named_parameters():
             param.requires_grad = False
-            # You can add logging here if needed:
-            # print(f"Freezing backbone parameter: {name}, shape: {param.shape}")
         # Only include parameters with requires_grad == True (i.e., non-backbone parameters) in the optimizer.
         optimizer_params = [{"params": [p for p in model.parameters() if p.requires_grad],
                              "lr": config.get("head_lr", 5e-4)}]
@@ -171,7 +169,7 @@ def main():
     tqdm.write(f"Using device: {device}")
 
     # 5. Setup dataset paths
-    data_root = config["data_root"]  # e.g. data/tiles/base
+    data_root = config["data_root"]
     train_images = os.path.join(data_root, "train/images")
     train_labels = os.path.join(data_root, "train/labels")
     val_images = os.path.join(data_root, "val/images")
@@ -219,10 +217,6 @@ def main():
         if not config.get("freeze_backbone", False):
             freeze_batchnorm(model)
         model.score_thresh = config.get("eval_threshold", 0.1)
-    # # After model initialization (RetinaNet debug)
-    # print("Backbone BN grad:",
-    #       any(p.requires_grad for p in model.backbone.parameters() if isinstance(p, torch.nn.BatchNorm2d)))
-    # print("Head BN grad:", any(p.requires_grad for p in model.head.parameters() if isinstance(p, torch.nn.BatchNorm2d)))
 
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
@@ -258,7 +252,7 @@ def main():
         test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, worker_init_fn=seed_worker,
                                  collate_fn=lambda x: x[0])
         test_output_path = os.path.join(results_dir, "test_results.png")
-        threshold = 0.2  # config.get("eval_threshold", 0.5)
+        threshold = config.get("eval_threshold", 0.5)
         evaluate_and_visualize(model, test_loader, classes, device, test_output_path, threshold=threshold, model_type=model_type)
     else:
         tqdm.write("No test dataset found. Skipping test evaluation.")

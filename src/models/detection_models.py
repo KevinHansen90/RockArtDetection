@@ -24,27 +24,93 @@ class DeformableDETRWrapper(torch.nn.Module):
         super().__init__()
         self.hf_model = hf_model
         self.image_processor = image_processor
-        self.score_thresh = 0.5
+        self.score_thresh = 0.1
 
-    def forward(self, images, targets=None):
-        # Convert list of tensors -> batched tensor
-        pixel_values = torch.stack(images)  # (B, C, H, W)
-
-        if targets is not None:
-            # Training mode - return losses
-            outputs = self.hf_model(pixel_values=pixel_values, labels=targets)
-            return {"loss": outputs.loss}  # Match TorchVision format
+    def forward(self, images, targets=None, orig_sizes=None):
+        if isinstance(images, (list, tuple)):
+            pixel_values = torch.stack(images)
+            # Use provided original sizes if available, otherwise fall back to padded sizes.
+            if orig_sizes is not None:
+                target_sizes = [torch.tensor(s, device=img.device) for s, img in zip(orig_sizes, images)]
+            else:
+                target_sizes = [torch.tensor(img.shape[1:], device=img.device) for img in images]
+        elif isinstance(images, torch.Tensor):
+            pixel_values = images
+            if orig_sizes is not None:
+                target_sizes = [torch.tensor(s, device=pixel_values.device) for s in orig_sizes]
+            else:
+                target_sizes = [torch.tensor(pixel_values.shape[2:], device=pixel_values.device)] * pixel_values.shape[
+                    0]
         else:
-            # Inference mode - return predictions
+            raise TypeError(f"Unsupported input type for images: {type(images)}")
+
+        # --- Training Mode ---
+        if targets is not None:
+            hf_labels = []
+            for t in targets:
+                hf_labels.append({
+                    "class_labels": t["labels"],
+                    "boxes": t["boxes"]
+                })
+
+            outputs = self.hf_model(pixel_values=pixel_values, labels=hf_labels)
+
+            if hasattr(outputs, 'loss_dict'):
+                return outputs.loss_dict
+            elif hasattr(outputs, 'loss'):
+                return {'total_loss': outputs.loss}
+            else:
+                print("Warning: Unexpected loss output format from Hugging Face model.")
+                return {'total_loss': torch.tensor(0.0, device=pixel_values.device)}
+
+        # --- Inference Mode ---
+        else:
             outputs = self.hf_model(pixel_values=pixel_values)
-            # Get image sizes for post-processing
-            target_sizes = [img.shape[1:] for img in images]  # (H, W)
-            # Standardized prediction format
-            return self.image_processor.post_process_object_detection(
-                outputs,
-                threshold=self.score_thresh,
-                target_sizes=target_sizes
-            )
+
+            results = []
+            for i, (logits_per_image, pred_boxes_per_image) in enumerate(zip(
+                    outputs.logits, outputs.pred_boxes)):
+
+                # Get the target size for this image (original [height, width])
+                target_size = target_sizes[i]
+
+                # Convert logits to probabilities
+                probs = torch.softmax(logits_per_image, dim=-1)
+
+                # For DETR, background is typically the last class.
+                # Get scores and labels for the actual object classes.
+                object_probs = probs[:, :-1]  # Exclude background
+                scores, labels = object_probs.max(-1)
+
+                # Filter out low-confidence predictions based on score threshold.
+                keep = scores > self.score_thresh
+                boxes = pred_boxes_per_image[keep]
+                scores = scores[keep]
+                labels = labels[keep]
+
+                # Scale boxes to absolute image coordinates.
+                # target_size is a tensor [orig_h, orig_w], so we use these directly.
+                scale_x = target_size[1].item()  # Image width
+                scale_y = target_size[0].item()  # Image height
+
+                scaled_boxes = torch.zeros_like(boxes)
+                scaled_boxes[:, 0] = (boxes[:, 0] - boxes[:, 2] / 2) * scale_x
+                scaled_boxes[:, 1] = (boxes[:, 1] - boxes[:, 3] / 2) * scale_y
+                scaled_boxes[:, 2] = (boxes[:, 0] + boxes[:, 2] / 2) * scale_x
+                scaled_boxes[:, 3] = (boxes[:, 1] + boxes[:, 3] / 2) * scale_y
+
+                scaled_boxes[:, 0] = torch.clamp(scaled_boxes[:, 0], min=0)
+                scaled_boxes[:, 1] = torch.clamp(scaled_boxes[:, 1], min=0)
+                scaled_boxes[:, 2] = torch.clamp(scaled_boxes[:, 2], max=target_size[1].item())
+                scaled_boxes[:, 3] = torch.clamp(scaled_boxes[:, 3], max=target_size[0].item())
+
+                results.append({
+                    "scores": scores,
+                    "labels": labels,
+                    "boxes": scaled_boxes
+                })
+
+            return results
 
 
 class CustomRetinaNetClassificationHead(RetinaNetClassificationHead):
@@ -137,41 +203,58 @@ def get_detection_model(model_type, num_classes, config=None):
         return model
 
     elif model_type == "deformable_detr":
+        # Load processor and model
         image_processor = AutoImageProcessor.from_pretrained("SenseTime/deformable-detr", use_fast=True)
         hf_model = DeformableDetrForObjectDetection.from_pretrained(
             "SenseTime/deformable-detr",
+            num_labels=num_classes,
             ignore_mismatched_sizes=True
         )
 
-        # Set the number of object classes (excluding the no-object class)
+        # Check if we have access to model.model which contains the actual architecture
+        if hasattr(hf_model, "model"):
+            # This is likely the correct structure - check if class_embed is a ModuleList
+            if hasattr(hf_model.model, "class_embed") and isinstance(hf_model.model.class_embed, nn.ModuleList):
+                # For each classification head in the list
+                for i in range(len(hf_model.model.class_embed)):
+                    in_features = hf_model.model.class_embed[i].in_features
+                    hf_model.model.class_embed[i] = nn.Linear(in_features, num_classes + 1)
+
+            # If it's a direct attribute
+            elif hasattr(hf_model.model, "class_embed"):
+                in_features = hf_model.model.class_embed.in_features
+                hf_model.model.class_embed = nn.Linear(in_features, num_classes + 1)
+
+        # Direct access to class_embed
+        elif hasattr(hf_model, "class_embed"):
+            if isinstance(hf_model.class_embed, nn.ModuleList):
+                for i in range(len(hf_model.class_embed)):
+                    in_features = hf_model.class_embed[i].in_features
+                    hf_model.class_embed[i] = nn.Linear(in_features, num_classes + 1)
+            else:
+                in_features = hf_model.class_embed.in_features
+                hf_model.class_embed = nn.Linear(in_features, num_classes + 1)
+
+        # Fallback to d_model if defined in config
+        else:
+            if hasattr(hf_model.config, "d_model"):
+                in_features = hf_model.config.d_model
+
+                # Try to find where to place the classifier
+                if hasattr(hf_model, "class_labels_classifier"):
+                    hf_model.class_labels_classifier = nn.Linear(in_features, num_classes + 1)
+                elif hasattr(hf_model, "model") and hasattr(hf_model.model, "class_labels_classifier"):
+                    hf_model.model.class_labels_classifier = nn.Linear(in_features, num_classes + 1)
+                else:
+                    print("WARNING: Could not locate classification head to replace")
+            else:
+                print("WARNING: Could not determine input features dimension")
+
+        # Make sure the model knows we're using a smaller number of classes
         hf_model.config.num_labels = num_classes
-        # Reinitialize classifier head: output dimension = num_classes + 1 (for no-object)
-        hf_model.class_labels_classifier = nn.Linear(hf_model.config.d_model, num_classes + 1)
-        hf_model.config.eos_coef = 0.1
 
-        # Wrap tensor lists as ParameterList for query_embed, level_embed, refpoint_embed:
-        for attr in ['query_embed', 'level_embed', 'refpoint_embed']:
-            if hasattr(hf_model, attr):
-                value = getattr(hf_model, attr)
-                location = hf_model
-            elif hasattr(hf_model, "model") and hasattr(hf_model.model, attr):
-                value = getattr(hf_model.model, attr)
-                location = hf_model.model
-            else:
-                continue  # Attribute not found; skip wrapping
-            if isinstance(value, list):
-                wrapped = nn.ParameterList([
-                    p if isinstance(p, nn.Parameter) else nn.Parameter(torch.tensor(p))
-                    for p in value
-                ])
-            elif isinstance(value, torch.Tensor):
-                wrapped = nn.Parameter(value)
-            else:
-                raise TypeError(f"Unexpected type for {attr}: {type(value)}")
-            setattr(location, attr, wrapped)
-        # Now wrap the HF model with your custom wrapper.
+        # Wrap the configured HF model with your custom wrapper
         model = DeformableDETRWrapper(hf_model, image_processor)
-
         return model
 
     else:

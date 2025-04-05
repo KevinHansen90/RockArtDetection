@@ -72,15 +72,12 @@ def freeze_batchnorm(model):
 			module.eval()
 			for param in module.parameters():
 				param.requires_grad = False
-			print(f"Froze backbone BN module: {name}")
 
-	# Define a function to unfreeze BN in the head and log it.
 	def unfreeze_bn(module, prefix=""):
 		if isinstance(module, nn.BatchNorm2d):
 			module.train()
 			for param in module.parameters():
 				param.requires_grad = True
-			print(f"Unfroze head BN module: {prefix}{module.__class__.__name__}")
 		for name, child in module.named_children():
 			unfreeze_bn(child, prefix=f"{prefix}{name}/")
 
@@ -91,8 +88,5 @@ def freeze_batchnorm(model):
 
 def compute_total_loss(loss_dict):
 	if isinstance(loss_dict, dict):
-		# # Special handling for RetinaNet
-		# if "bbox_regression" in loss_dict and "classification" in loss_dict:
-		# 	return loss_dict["classification"] + loss_dict["bbox_regression"]
 		return sum(loss.sum() for loss in loss_dict.values())
 	return loss_dict.loss

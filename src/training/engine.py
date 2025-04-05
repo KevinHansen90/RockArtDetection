@@ -32,24 +32,35 @@ def evaluate_on_dataset(model, data_loader, device, verbose=False):
         images = [img.to(device) for img in images]
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         with torch.no_grad():
-            preds = model(images)
+            # Extract the original sizes from the targets.
+            orig_sizes = [t["orig_size"].tolist() for t in targets]
+            preds = model(images, orig_sizes=orig_sizes)
+
         # If using a special wrapper (e.g. Deformable DETR), adjust targets.
         if isinstance(model, DeformableDETRWrapper):
             processed_targets = []
             for t in targets:
                 h, w = t["orig_size"][0].item(), t["orig_size"][1].item()
-                cx = t["boxes"][:, 0] * w
-                cy = t["boxes"][:, 1] * h
-                bw = t["boxes"][:, 2] * w
-                bh = t["boxes"][:, 3] * h
+                boxes = t["boxes"]
+
+                # Convert from YOLO format [cx, cy, w, h] to [x1, y1, x2, y2]
+                cx = boxes[:, 0] * w
+                cy = boxes[:, 1] * h
+                bw = boxes[:, 2] * w
+                bh = boxes[:, 3] * h
                 x_min = cx - bw / 2
                 y_min = cy - bh / 2
                 x_max = cx + bw / 2
                 y_max = cy + bh / 2
+
                 processed_targets.append({
                     "boxes": torch.stack([x_min, y_min, x_max, y_max], dim=1),
-                    "labels": t["labels"]
+                    "labels": t["labels"]  # No need to modify labels
                 })
+
+            # Debug: Print first processed target for inspection
+            if verbose:
+                tqdm.write(f"Processed target boxes (first image): {processed_targets[0]['boxes']}")
             map_metric.update(preds, processed_targets)
         else:
             map_metric.update(preds, targets)
