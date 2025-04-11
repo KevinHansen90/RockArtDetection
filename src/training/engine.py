@@ -11,6 +11,28 @@ def evaluate_on_dataset(model, data_loader, device, verbose=False):
     """
     Compute average validation loss, mAP@0.5, and mAR@100 using a two-pass approach.
     """
+    # Add this debugging
+    if verbose:
+        # Check one batch to understand data format
+        sample_batch = next(iter(data_loader))
+        sample_images, sample_targets = sample_batch
+        tqdm.write(f"Sample image shape: {sample_images[0].shape}")
+        tqdm.write(f"Sample target keys: {list(sample_targets[0].keys())}")
+        tqdm.write(f"Sample target boxes shape: {sample_targets[0]['boxes'].shape}")
+        tqdm.write(
+            f"Sample target box format: {sample_targets[0]['boxes'][0] if len(sample_targets[0]['boxes']) > 0 else 'No boxes'}")
+
+        # Check model type
+        if isinstance(model, DeformableDETRWrapper):
+            tqdm.write("Using DeformableDETRWrapper model")
+            # Make a sample prediction to check format
+            with torch.no_grad():
+                sample_preds = model([img.to(device) for img in sample_images[:1]],
+                                     orig_sizes=[[t["orig_size"][0].item(), t["orig_size"][1].item()] for t in
+                                                 sample_targets[:1]])
+                tqdm.write(
+                    f"Sample prediction: {sample_preds[0]['boxes'][0] if len(sample_preds[0]['boxes']) > 0 else 'No boxes'}")
+
     # Pass 1: measure validation loss
     model.train()  # use train() so that dropout is active if needed, but disable gradients
     total_loss = 0.0
@@ -36,31 +58,34 @@ def evaluate_on_dataset(model, data_loader, device, verbose=False):
             orig_sizes = [t["orig_size"].tolist() for t in targets]
             preds = model(images, orig_sizes=orig_sizes)
 
-        # If using a special wrapper (e.g. Deformable DETR), adjust targets.
+        # If using Deformable DETR, transform targets to absolute coordinates
         if isinstance(model, DeformableDETRWrapper):
             processed_targets = []
-            for t in targets:
-                h, w = t["orig_size"][0].item(), t["orig_size"][1].item()
-                boxes = t["boxes"]
+            for i, t in enumerate(targets):
+                # Convert normalized box coordinates to absolute coordinates
+                orig_h, orig_w = t["orig_size"].tolist()
+                boxes = t["boxes"].clone()
 
-                # Convert from YOLO format [cx, cy, w, h] to [x1, y1, x2, y2]
-                cx = boxes[:, 0] * w
-                cy = boxes[:, 1] * h
-                bw = boxes[:, 2] * w
-                bh = boxes[:, 3] * h
-                x_min = cx - bw / 2
-                y_min = cy - bh / 2
-                x_max = cx + bw / 2
-                y_max = cy + bh / 2
+                # Check if boxes are in [cx, cy, w, h] format (normalized)
+                if boxes.size(1) == 4 and boxes.size(0) > 0:
+                    # Convert from [cx, cy, w, h] normalized to [x1, y1, x2, y2] absolute
+                    abs_boxes = torch.zeros_like(boxes)
+                    abs_boxes[:, 0] = (boxes[:, 0] - boxes[:, 2] / 2) * orig_w  # x1
+                    abs_boxes[:, 1] = (boxes[:, 1] - boxes[:, 3] / 2) * orig_h  # y1
+                    abs_boxes[:, 2] = (boxes[:, 0] + boxes[:, 2] / 2) * orig_w  # x2
+                    abs_boxes[:, 3] = (boxes[:, 1] + boxes[:, 3] / 2) * orig_h  # y2
+                else:
+                    abs_boxes = boxes  # Already in expected format
 
                 processed_targets.append({
-                    "boxes": torch.stack([x_min, y_min, x_max, y_max], dim=1),
-                    "labels": t["labels"]  # No need to modify labels
+                    "boxes": abs_boxes,  # Now in absolute coordinates
+                    "labels": t["labels"]
                 })
 
-            # Debug: Print first processed target for inspection
             if verbose:
-                tqdm.write(f"Processed target boxes (first image): {processed_targets[0]['boxes']}")
+                tqdm.write(f"Processed target format: {processed_targets[0]['boxes'][0]}")
+                tqdm.write(f"Prediction format: {preds[0]['boxes'][0]}")
+
             map_metric.update(preds, processed_targets)
         else:
             map_metric.update(preds, targets)
@@ -145,6 +170,16 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
 
             loss_dict = model(images, targets)
             loss_val = compute_total_loss(loss_dict)
+
+            # DEBUG
+            if not torch.isfinite(loss_val):
+                tqdm.write(
+                    f"\n!! WARNING: Non-finite loss detected: {loss_val.item()} at Epoch {epoch + 1}, Batch {batch_idx + 1}. Skipping batch.")
+                tqdm.write(f"Loss Dict: {loss_dict}")  # Log the loss components
+                optimizer.zero_grad()  # Clear potentially bad gradients from forward pass if any exist
+                continue  # Skip backprop and optimizer step for this batch
+            # END DEBUG
+
             running_loss += loss_val.item()
 
             # Detailed logging every 50 batches if verbose
@@ -165,7 +200,25 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
 
             optimizer.zero_grad()
             loss_val.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+
+            # DEBUG
+            found_non_finite_grad = False
+            for name, param in model.named_parameters():
+                if param.grad is not None and not torch.isfinite(param.grad).all():
+                    tqdm.write(
+                        f"\n!! WARNING: Non-finite gradient detected in {name} at Epoch {epoch + 1}, Batch {batch_idx + 1}.")
+                    found_non_finite_grad = True
+                    # Option: Exit loop immediately to skip clipping and step
+                    break
+
+            if found_non_finite_grad:
+                tqdm.write("!! WARNING: Skipping gradient clipping and optimizer step due to non-finite gradients.")
+                optimizer.zero_grad()  # Ensure all grads are cleared
+                continue  # Skip to next batch
+            # END DEBUG
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
+
             optimizer.step()
 
             if warmup_scheduler and epoch < warmup_epochs:

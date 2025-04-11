@@ -51,11 +51,11 @@ def get_optimizer(model, config):
 
     optimizer_choice = config.get("optimizer", "AdamW").lower()
     if optimizer_choice == "sgd":
-        optimizer = torch.optim.SGD(optimizer_params, momentum=0.9, weight_decay=config.get("weight_decay", 0.0005))
+        optimizer = torch.optim.SGD(optimizer_params, momentum=config.get("momentum", 0.9), weight_decay=config.get("weight_decay", 0.0005))
     elif optimizer_choice == "adam":
         optimizer = torch.optim.Adam(optimizer_params, weight_decay=config.get("weight_decay", 0.0005))
     elif optimizer_choice == "adamw":
-        optimizer = torch.optim.AdamW(optimizer_params, weight_decay=config.get("weight_decay", 0.0005))
+        optimizer = torch.optim.AdamW(optimizer_params, weight_decay=config.get("weight_decay", 0.0005), eps=config.get("eps", 0.0000001))
     else:
         raise ValueError(f"Unsupported optimizer type: {optimizer_choice}")
     return optimizer

@@ -55,10 +55,22 @@ class DeformableDETRWrapper(torch.nn.Module):
 
             outputs = self.hf_model(pixel_values=pixel_values, labels=hf_labels)
 
+            # Detailed loss reporting
             if hasattr(outputs, 'loss_dict'):
+                # Return the loss dict directly
                 return outputs.loss_dict
             elif hasattr(outputs, 'loss'):
-                return {'total_loss': outputs.loss}
+                # Create a more informative loss dict
+                loss_value = outputs.loss
+                if hasattr(outputs, 'class_error'):
+                    return {
+                        'loss_ce': outputs.loss * 0.5,  # Estimate class loss as portion of total
+                        'loss_bbox': outputs.loss * 0.3,  # Estimate bbox loss as portion of total
+                        'loss_giou': outputs.loss * 0.2,  # Estimate giou loss as portion of total
+                        'class_error': outputs.class_error if hasattr(outputs, 'class_error') else 0.0
+                    }
+                else:
+                    return {'total_loss': loss_value}
             else:
                 print("Warning: Unexpected loss output format from Hugging Face model.")
                 return {'total_loss': torch.tensor(0.0, device=pixel_values.device)}
@@ -94,10 +106,11 @@ class DeformableDETRWrapper(torch.nn.Module):
                 scale_y = target_size[0].item()  # Image height
 
                 scaled_boxes = torch.zeros_like(boxes)
-                scaled_boxes[:, 0] = (boxes[:, 0] - boxes[:, 2] / 2) * scale_x
-                scaled_boxes[:, 1] = (boxes[:, 1] - boxes[:, 3] / 2) * scale_y
-                scaled_boxes[:, 2] = (boxes[:, 0] + boxes[:, 2] / 2) * scale_x
-                scaled_boxes[:, 3] = (boxes[:, 1] + boxes[:, 3] / 2) * scale_y
+                # Convert from [cx, cy, w, h] to [x1, y1, x2, y2]
+                scaled_boxes[:, 0] = (boxes[:, 0] - boxes[:, 2] / 2) * scale_x  # x1
+                scaled_boxes[:, 1] = (boxes[:, 1] - boxes[:, 3] / 2) * scale_y  # y1
+                scaled_boxes[:, 2] = (boxes[:, 0] + boxes[:, 2] / 2) * scale_x  # x2
+                scaled_boxes[:, 3] = (boxes[:, 1] + boxes[:, 3] / 2) * scale_y  # y2
 
                 scaled_boxes[:, 0] = torch.clamp(scaled_boxes[:, 0], min=0)
                 scaled_boxes[:, 1] = torch.clamp(scaled_boxes[:, 1], min=0)

@@ -179,6 +179,9 @@ class TestDataset(Dataset):
 				if not parts:
 					continue
 				class_id = int(parts[0])
+				num_classes = len(self.classes)
+				assert 0 <= class_id < num_classes, \
+					f"Invalid class_id {class_id} found in {label_path}. Expected range [0, {num_classes - 1}]"
 				x_center, y_center, width, height = map(float, parts[1:])
 
 				if self.normalize_boxes:
