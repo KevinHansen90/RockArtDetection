@@ -118,10 +118,14 @@ Preprocessing is designed to be run locally or once before cloud-based training.
 
 **Script:** `src/preprocessing/tile_images.py`
 
-* Divides large raw images and their corresponding YOLO label files into smaller tiles (e.g., 512x512).
-* Uses a class mapping defined within the script (currently focusing on mapping various IDs to "Animal" and "Hand" classes).
-* Optionally skips tiles that contain no target objects after mapping (`--skip_empty_tiles`).
-* Outputs tiled images and new YOLO label files with mapped class IDs.
+* Divides large raw images and their corresponding YOLO label files into smaller patches (e.g., 512x512).
+* Includes an option to generate **overlapping tiles** (`--overlap` argument) to better handle objects that span tile boundaries.
+* Uses a class mapping defined within the script to map original label IDs to broader categories (e.g., "Animal", "Hand") specified in `labels_of_interest`.
+* Calculates correct relative YOLO coordinates for all object parts visible within each (potentially overlapping) tile.
+* Optionally skips saving tiles that contain no target objects after mapping (`--skip_empty_tiles`).
+* Optionally allows partial tiles along the right and bottom edges of the original image (`--allow_partial_tiles`).
+* Outputs tiled images and new YOLO label files. Filenames include coordinates when overlap is used (e.g., `imagename_x512_y1024_s512.jpg`).
+* Writes a `grouped_classes.txt` file listing the final class IDs and names used in the tiled dataset.
 
 **Example Command**:
 ```bash
@@ -130,11 +134,13 @@ python src/preprocessing/tile_images.py \
   --input_labels data/raw/labels \
   --output_base data/tiles/base \
   --tile_size 512 \
+  --overlap 100 \
   --allow_partial_tiles \
-  --skip_empty_tiles
+  --skip_empty_tiles \
+  --image_ext .jpg 
 ```
 
-**Output:** data/tiles/base/images/ and data/tiles/base/labels/. Also creates grouped_classes.txt in the output base.
+**Output:** A new dataset directory (e.g., `data/tiles/base/`) containing `images/` and `labels/` subfolders with the overlapping tiles and their corresponding annotations, plus the `grouped_classes.txt` file in the parent directory (e.g. `data/tiles/`).
 
 ### 2. Splitting
 

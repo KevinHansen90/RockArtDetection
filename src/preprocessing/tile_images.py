@@ -1,72 +1,42 @@
 #!/usr/bin/env python3
-"""
-tile_images.py
-
-1) Reads large images + YOLO labels from a specified directory.
-2) Tiles them into 512x512 patches.
-3) Maps your old class IDs onto new YOLO classes (e.g., 0=Animal, 1=Hand).
-4) Saves tiles + .txt labels, optionally skipping empty tiles if --skip_empty_tiles is used.
-5) Writes data/grouped_classes.txt (NOT in data/tiles/base, but in data/).
-
-IMPORTANT:
-- The output label files will contain 0-indexed class IDs (e.g., "0" for Animal, "1" for Hand).
-- Our CustomYOLODataset adds +1 to each label (so that background=0).
-- Therefore, if grouped_classes.txt contains:
-      0 Animal
-      1 Hand
-  then the model will see labels as 1 (Animal) and 2 (Hand), with 0 reserved for background.
-"""
 
 import os
-import math
 import argparse
 from PIL import Image
+import sys
+from tqdm import tqdm
 
-# 1) Mapping from old IDs => new YOLO IDs.
+# Class ID mapping: Old ID string -> New ID string
 label_mapping_dict = {
-	"0": "0",  # Animal
-	"1": "0",
-	"2": "0",
-	"3": "0",
-	"4": "2",  # e.g. Human
-	"5": "1",  # Hand
-	"6": "1",
-	"7": "3",  # Animal_print
-	"8": "1",  # Hand
-	"9": "4",  # Geometric
-	"10": "4",
-	"11": "4",
-	"12": "4",
-	"13": "5",  # Other
-	"14": "5",
-	"15": "4",
-	"16": "4",
-	"17": "4",
-	"18": "3"  # Animal_print
+	"0": "0", "1": "0", "2": "0", "3": "0",  # Animal
+	"4": "2",  # Human
+	"5": "1", "6": "1", "8": "1",  # Hand
+	"7": "3", "18": "3",  # Animal_print
+	"9": "4", "10": "4", "11": "4", "12": "4", "15": "4", "16": "4", "17": "4",  # Geometric
+	"13": "5", "14": "5"  # Other
 }
 
-# We only keep YOLO classes "0" (Animal) and "1" (Hand).
-labels_of_interest = ["0", "1"]
+# Output class IDs to keep after mapping
+labels_of_interest = ["0", "1"]  # e.g., Animal, Hand
 
 
 def parse_yolo_label(txt_file):
-	"""
-    Reads YOLO label => list of (class_id, x_center, y_center, w, h).
-    """
-	if not os.path.exists(txt_file):
-		return []
+	# Reads YOLO label file: returns list of (class_id, xc, yc, w, h)
+	if not os.path.exists(txt_file): return []
 	boxes = []
-	with open(txt_file, "r") as f:
-		for line in f:
-			parts = line.strip().split()
-			if len(parts) == 5:
-				c_id, x_c, y_c, w, h = parts
-				boxes.append((int(c_id), float(x_c), float(y_c), float(w), float(h)))
+	try:
+		with open(txt_file, "r") as f:
+			for line in f:
+				parts = line.strip().split()
+				if len(parts) == 5:
+					boxes.append((int(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])))
+	except Exception as e:
+		print(f"Error parsing label file {txt_file}: {e}", file=sys.stderr)
 	return boxes
 
 
 def convert_yolo_to_abs(class_id, x_c, y_c, w, h, img_w, img_h):
-	"""YOLO [0..1] => absolute coords (xmin, ymin, xmax, ymax)."""
+	# Converts YOLO normalized coords to absolute pixel coords (xmin, ymin, xmax, ymax)
 	xmin = (x_c - w / 2) * img_w
 	ymin = (y_c - h / 2) * img_h
 	xmax = (x_c + w / 2) * img_w
@@ -75,188 +45,176 @@ def convert_yolo_to_abs(class_id, x_c, y_c, w, h, img_w, img_h):
 
 
 def convert_abs_to_yolo(class_id, xmin, ymin, xmax, ymax, tile_w, tile_h):
-	"""Absolute coords => YOLO [0..1] relative to tile."""
+	# Converts absolute coords relative to tile origin to YOLO normalized coords
+	if tile_w <= 0 or tile_h <= 0: return None
 	box_w = xmax - xmin
 	box_h = ymax - ymin
 	x_center = xmin + box_w / 2
 	y_center = ymin + box_h / 2
-	return (
-		class_id,
-		x_center / tile_w,
-		y_center / tile_h,
-		box_w / tile_w,
-		box_h / tile_h
-	)
+
+	rel_xc = max(0.0, min(1.0, x_center / tile_w))
+	rel_yc = max(0.0, min(1.0, y_center / tile_h))
+	rel_w = max(0.0, min(1.0, box_w / tile_w))
+	rel_h = max(0.0, min(1.0, box_h / tile_h))
+
+	if rel_w <= 1e-6 or rel_h <= 1e-6: return None  # Avoid zero-dimension boxes
+	return (class_id, rel_xc, rel_yc, rel_w, rel_h)
 
 
-def get_valid_tiles(W, H, tile_size, allow_partial_tiles):
-	"""
-    Generator that yields (x0, y0, x1, y1) for valid tiles.
-    Handles partial-tile logic and ensures tile dimensions > 0.
-    """
-	if allow_partial_tiles:
-		nx = math.ceil(W / tile_size)
-		ny = math.ceil(H / tile_size)
-	else:
-		nx = W // tile_size
-		ny = H // tile_size
+def tile_image_and_labels_with_overlap(
+		img_path, lbl_path, out_img_dir, out_lbl_dir,
+		tile_size, overlap, allow_partial_tiles, skip_empty_tiles
+):
+	# Tiles a single image and its labels with overlap
+	try:
+		img_name = os.path.splitext(os.path.basename(img_path))[0]
+		image = Image.open(img_path).convert("RGB")
+		W, H = image.size
+	except Exception as e:
+		print(f"Warning: Skipping image {img_path} due to error: {e}", file=sys.stderr)
+		return
 
-	for row in range(ny):
-		y0 = row * tile_size
-		y1 = min(H, y0 + tile_size)
-		if y0 >= H:
-			break
+	orig_boxes = parse_yolo_label(lbl_path)
+	if not os.path.exists(lbl_path):
+		print(f"Warning: Label file not found {lbl_path}, tiling image without labels.", file=sys.stderr)
 
-		for col in range(nx):
-			x0 = col * tile_size
+	# Map labels and convert to absolute coordinates
+	abs_boxes = []
+	for (old_cid, x_c, y_c, w_n, h_n) in orig_boxes:
+		new_label_str = label_mapping_dict.get(str(old_cid), None)
+		if new_label_str in labels_of_interest:
+			final_cid = int(new_label_str)
+			_, x_min, y_min, x_max, y_max = convert_yolo_to_abs(final_cid, x_c, y_c, w_n, h_n, W, H)
+			if x_max > x_min and y_max > y_min:  # Check validity
+				abs_boxes.append((final_cid, x_min, y_min, x_max, y_max))
+
+	# Calculate step size for tiling
+	step = tile_size - overlap
+
+	# Iterate through tile start coordinates
+	for y0 in range(0, H, step):
+		for x0 in range(0, W, step):
 			x1 = min(W, x0 + tile_size)
-			if x0 >= W:
-				break
-
+			y1 = min(H, y0 + tile_size)
 			tw = x1 - x0
 			th = y1 - y0
 
-			# skip if tile is 0-dim
-			if tw <= 0 or th <= 0:
-				continue
+			if tw <= 0 or th <= 0: continue  # Skip invalid dimension tiles
 
-			# skip partial if not allowed
-			if (not allow_partial_tiles) and (tw < tile_size or th < tile_size):
-				continue
+			# Handle partial tiles at edges
+			is_partial = (tw < tile_size or th < tile_size)
+			if is_partial and not allow_partial_tiles: continue
 
-			yield (x0, y0, x1, y1)
+			# Find labels intersecting with this tile
+			tile_boxes = []
+			for (cid, axmin, aymin, axmax, aymax) in abs_boxes:
+				inter_xmin = max(x0, axmin)
+				inter_ymin = max(y0, aymin)
+				inter_xmax = min(x1, axmax)
+				inter_ymax = min(y1, aymax)
+
+				if inter_xmax > inter_xmin and inter_ymax > inter_ymin:  # Check intersection
+					local_xmin, local_ymin = inter_xmin - x0, inter_ymin - y0
+					local_xmax, local_ymax = inter_xmax - x0, inter_ymax - y0
+					yolo_box = convert_abs_to_yolo(cid, local_xmin, local_ymin, local_xmax, local_ymax, tw, th)
+					if yolo_box:
+						tile_boxes.append(yolo_box)
+
+			if skip_empty_tiles and not tile_boxes: continue  # Skip empty tiles if requested
+
+			# Save tile image and corresponding label file (if boxes exist)
+			try:
+				tile_img = image.crop((x0, y0, x1, y1))
+				tile_fname = f"{img_name}_x{x0}_y{y0}_s{tile_size}.jpg"
+				tile_img_path = os.path.join(out_img_dir, tile_fname)
+				tile_img.save(tile_img_path, quality=95)
+
+				if tile_boxes:
+					lbl_fname = f"{img_name}_x{x0}_y{y0}_s{tile_size}.txt"
+					tile_lbl_path = os.path.join(out_lbl_dir, lbl_fname)
+					with open(tile_lbl_path, "w") as lf:
+						for (cid2, xcn, ycn, wn, hn) in tile_boxes:
+							lf.write(f"{cid2} {xcn:.6f} {ycn:.6f} {wn:.6f} {hn:.6f}\n")
+			except Exception as e:
+				print(f"Error saving tile x{x0}_y{y0} for {img_name}: {e}", file=sys.stderr)
 
 
-def tile_image_and_labels(img_path, lbl_path, out_img_dir, out_lbl_dir,
-						  tile_size=512,
-						  allow_partial_tiles=False,
-						  skip_empty_tiles=False):
-	"""
-    Tiles the image into tile_size x tile_size patches.
-    Maps old class IDs => new YOLO IDs => absolute coords => tile coords.
-    Optionally skip tiles with zero bounding boxes if skip_empty_tiles=True.
-    """
-	img_name = os.path.splitext(os.path.basename(img_path))[0]
-	image = Image.open(img_path).convert("RGB")
-	W, H = image.size
+def write_grouped_classes(output_base_dir):
+	# Writes the grouped_classes.txt file based on labels_of_interest
+	# Determines path relative to output_base_dir
+	parent_dir = os.path.dirname(output_base_dir)
+	target_path = os.path.join(parent_dir, "grouped_classes.txt")
 
-	orig_boxes = parse_yolo_label(lbl_path)
+	# Fallback if structure isn't as expected (e.g., output_base is root)
+	if not os.path.basename(parent_dir).startswith("tiles"):
+		target_path = os.path.join(output_base_dir, "grouped_classes.txt")
 
-	# Convert old IDs => new YOLO IDs => absolute coords
-	abs_boxes = []
-	for (old_cid, x_c, y_c, w_n, h_n) in orig_boxes:
-		# Only proceed if old_cid is mapped and resulting class is of interest
-		new_label_str = label_mapping_dict.get(str(old_cid), None)
-		if new_label_str in labels_of_interest:
-			final_cid = int(new_label_str)  # 0 => Animal, 1 => Hand
-			c_id, x_min, y_min, x_max, y_max = convert_yolo_to_abs(
-				final_cid, x_c, y_c, w_n, h_n, W, H
-			)
-			abs_boxes.append((c_id, x_min, y_min, x_max, y_max))
+	print(f"Attempting to write grouped_classes.txt to: {target_path}")
+	os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
-	# Skip this image entirely if no boxes remain
-	if len(abs_boxes) == 0:
-		return
-
-	# Generate all valid tiles
-	for (x0, y0, x1, y1) in get_valid_tiles(W, H, tile_size, allow_partial_tiles):
-		tile_img = image.crop((x0, y0, x1, y1))
-		tw, th = tile_img.size
-
-		tile_boxes = []
-		for (cid, axmin, aymin, axmax, aymax) in abs_boxes:
-			cxmin = max(x0, axmin)
-			cymin = max(y0, aymin)
-			cxmax = min(x1, axmax)
-			cymax = min(y1, aymax)
-
-			if cxmax <= cxmin or cymax <= cymin:
-				continue
-
-			lxmin = cxmin - x0
-			lymin = cymin - y0
-			lxmax = cxmax - x0
-			lymax = cymax - y0
-
-			# Convert absolute => YOLO relative (boxes remain 0-indexed here)
-			new_box = convert_abs_to_yolo(cid, lxmin, lymin, lxmax, lymax, tw, th)
-			_, xcn, ycn, wn, hn = new_box
-
-			# Filter boxes that fall completely outside
-			if wn <= 0 or hn <= 0:
-				continue
-			if not (0 <= xcn <= 1 and 0 <= ycn <= 1 and 0 <= wn <= 1 and 0 <= hn <= 1):
-				continue
-
-			tile_boxes.append(new_box)
-
-		# skip empty if requested
-		if skip_empty_tiles and len(tile_boxes) == 0:
-			continue
-
-		# Write tile image & label
-		tile_fname = f"{img_name}_r{y0 // tile_size}_c{x0 // tile_size}.jpg"
-		tile_img_path = os.path.join(out_img_dir, tile_fname)
-		tile_img.save(tile_img_path, quality=95)
-
-		lbl_fname = f"{img_name}_r{y0 // tile_size}_c{x0 // tile_size}.txt"
-		tile_lbl_path = os.path.join(out_lbl_dir, lbl_fname)
-		with open(tile_lbl_path, "w") as lf:
-			for (cid2, xcn, ycn, wn, hn) in tile_boxes:
-				lf.write(f"{cid2} {xcn:.6f} {ycn:.6f} {wn:.6f} {hn:.6f}\n")
+	try:
+		# Simple hardcoded version based on common use case
+		class_content = "0 Animal\n1 Hand\n"
+		with open(target_path, "w") as gf:
+			gf.write(class_content)
+		print(f"Created/Updated grouped_classes.txt at: {target_path}")
+	except Exception as e:
+		print(f"Error writing grouped_classes.txt to {target_path}: {e}", file=sys.stderr)
 
 
 def main():
-	parser = argparse.ArgumentParser(
-		description="Tile images => YOLO dataset (Animal=0, Hand=1). Writes grouped_classes.txt to data/."
-	)
-	parser.add_argument("--input_images", required=True, help="Dir of large original images")
-	parser.add_argument("--input_labels", required=True, help="Dir of YOLO label .txt")
-	parser.add_argument("--output_base", required=True,
-						help="Output directory for the base tiled dataset, e.g. data/tiles/base")
-	parser.add_argument("--tile_size", type=int, default=512, help="Tile dimension")
-	parser.add_argument("--allow_partial_tiles", action="store_true", default=False,
-						help="Produce partial tiles at right/bottom edges.")
-	parser.add_argument("--skip_empty_tiles", action="store_true", default=False,
-						help="If true, skip saving tiles that have zero bounding boxes.")
+	parser = argparse.ArgumentParser(description="Tile images with overlap into a YOLO dataset.")
+	parser.add_argument("--input_images", required=True, help="Directory of large original images.")
+	parser.add_argument("--input_labels", required=True, help="Directory of YOLO labels for original images.")
+	parser.add_argument("--output_base", required=True, help="Output directory for the tiled dataset.")
+	parser.add_argument("--tile_size", type=int, default=512, help="Tile dimension (pixels).")
+	parser.add_argument("--overlap", type=int, default=100, help="Overlap between tiles in pixels (default: 100).")
+	parser.add_argument("--allow_partial_tiles", action="store_true", help="Produce partial tiles at edges.")
+	parser.add_argument("--skip_empty_tiles", action="store_true", help="Skip saving tiles with no target labels.")
+	parser.add_argument("--image_ext", default=".jpg", help="Input image file extension.")
 	args = parser.parse_args()
+
+	if args.overlap < 0 or args.overlap >= args.tile_size:
+		print(f"Error: Overlap ({args.overlap}) invalid for tile size ({args.tile_size}).", file=sys.stderr)
+		sys.exit(1)
 
 	out_img_dir = os.path.join(args.output_base, "images")
 	out_lbl_dir = os.path.join(args.output_base, "labels")
 	os.makedirs(out_img_dir, exist_ok=True)
 	os.makedirs(out_lbl_dir, exist_ok=True)
 
-	# Collect valid image files
-	valid_exts = (".jpg", ".jpeg", ".png")
-	img_files = [f for f in os.listdir(args.input_images) if f.lower().endswith(valid_exts)]
-	img_files.sort()
+	valid_exts = tuple(ext.strip().lower() for ext in args.image_ext.split(','))
+	if ".jpg" in valid_exts and ".jpeg" not in valid_exts: valid_exts += (".jpeg",)
 
-	# Perform tiling for each image
-	for img_file in img_files:
+	try:
+		img_files = sorted([f for f in os.listdir(args.input_images) if f.lower().endswith(valid_exts)])
+	except FileNotFoundError:
+		print(f"Error: Input image directory not found: {args.input_images}", file=sys.stderr)
+		sys.exit(1)
+
+	if not img_files:
+		print(f"Error: No images found with extension(s) '{','.join(valid_exts)}' in '{args.input_images}'.",
+			  file=sys.stderr)
+		sys.exit(1)
+
+	print(f"Found {len(img_files)} images. Starting tiling (size={args.tile_size}, overlap={args.overlap})...")
+
+	# Process images
+	for img_file in tqdm(img_files, desc="Tiling images"):
 		base_name = os.path.splitext(img_file)[0]
 		img_path = os.path.join(args.input_images, img_file)
 		lbl_path = os.path.join(args.input_labels, base_name + ".txt")
 
-		tile_image_and_labels(
-			img_path=img_path,
-			lbl_path=lbl_path,
-			out_img_dir=out_img_dir,
-			out_lbl_dir=out_lbl_dir,
-			tile_size=args.tile_size,
-			allow_partial_tiles=args.allow_partial_tiles,
-			skip_empty_tiles=args.skip_empty_tiles
+		tile_image_and_labels_with_overlap(
+			img_path, lbl_path, out_img_dir, out_lbl_dir,
+			args.tile_size, args.overlap,
+			args.allow_partial_tiles, args.skip_empty_tiles
 		)
 
-	# Write grouped_classes.txt in data/, not data/tiles/base
-	data_dir = os.path.dirname(os.path.dirname(args.output_base))
-	final_grouped_path = os.path.join(data_dir, "grouped_classes.txt")
+	# Write grouped classes file
+	write_grouped_classes(args.output_base)
 
-	with open(final_grouped_path, "w") as gf:
-		gf.write("0 Animal\n")
-		gf.write("1 Hand\n")
-
-	print("Tiling completed. Base dataset is in:", args.output_base)
-	print("Created grouped_classes.txt (YOLO class IDs) at:", final_grouped_path)
+	print(f"\nTiling completed. Tiled dataset is in: {args.output_base}")
 
 
 if __name__ == "__main__":

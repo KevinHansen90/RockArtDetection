@@ -3,7 +3,6 @@
 
 import os
 
-# IMPORTANT: Enable MPS fallback (must happen before torch import)
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 

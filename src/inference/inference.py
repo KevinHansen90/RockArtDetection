@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# src/training/train.py
+#!/usr/bin/env python3
 
 import argparse
 import os
