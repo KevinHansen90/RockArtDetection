@@ -7,4 +7,7 @@ tqdm~=4.67.1
 PyYAML~=6.0.2
 matplotlib~=3.10.0
 torchmetrics~=1.6.1
+pandas~=2.2.3
+scikit-learn~=1.6.1
 opencv-python~=4.11.0.86
+gcsfs~=2025.3.2
