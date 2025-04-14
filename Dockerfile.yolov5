@@ -1,0 +1,27 @@
+# Dockerfile for Ultralytics YOLOv5 training
+
+# Use a base image with Python. Using a PyTorch base ensures CUDA/PyTorch are set up.
+FROM pytorch/pytorch:2.2.2-cuda11.8-cudnn8-runtime
+# Alternatively, use a Python base and install torch/torchvision via YOLOv5's requirements:
+# FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install git
+RUN apt-get update && apt-get install -y git --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
+# Clone the Ultralytics YOLOv5 repository (pinning to a specific release can be safer)
+# Check https://github.com/ultralytics/yolov5/releases for tags
+RUN git clone https://github.com/ultralytics/yolov5.git yolov5_repo
+WORKDIR /app/yolov5_repo
+
+# Install YOLOv5 dependencies from its requirements file
+# This will install specific versions of torch, torchvision, pandas, etc.
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install gcsfs separately to enable reading data from/writing results to GCS
+RUN pip install --no-cache-dir gcsfs
+
+# Set the entrypoint to the YOLOv5 training script
+# Arguments like --data, --weights, --epochs, --project will be passed by Vertex AI
+ENTRYPOINT ["python", "train.py"]
