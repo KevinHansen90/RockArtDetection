@@ -159,9 +159,9 @@ python src/preprocessing/split_dataset.py \
   --input_dir data/tiles/base \
   --output_dir data/tiles/base \
   --use_ratios \
-  --train_ratio 0.75 \
+  --train_ratio 0.80 \
   --val_ratio 0.05 \
-  --test_ratio 0.20 \
+  --test_ratio 0.15 \
   --seed 42 \
   --image_ext .jpg
 ```

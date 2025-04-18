@@ -171,15 +171,6 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
             loss_dict = model(images, targets)
             loss_val = compute_total_loss(loss_dict)
 
-            # DEBUG
-            if not torch.isfinite(loss_val):
-                tqdm.write(
-                    f"\n!! WARNING: Non-finite loss detected: {loss_val.item()} at Epoch {epoch + 1}, Batch {batch_idx + 1}. Skipping batch.")
-                tqdm.write(f"Loss Dict: {loss_dict}")  # Log the loss components
-                optimizer.zero_grad()  # Clear potentially bad gradients from forward pass if any exist
-                continue  # Skip backprop and optimizer step for this batch
-            # END DEBUG
-
             running_loss += loss_val.item()
 
             # Detailed logging every 50 batches if verbose
@@ -200,22 +191,6 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
 
             optimizer.zero_grad()
             loss_val.backward()
-
-            # DEBUG
-            found_non_finite_grad = False
-            for name, param in model.named_parameters():
-                if param.grad is not None and not torch.isfinite(param.grad).all():
-                    tqdm.write(
-                        f"\n!! WARNING: Non-finite gradient detected in {name} at Epoch {epoch + 1}, Batch {batch_idx + 1}.")
-                    found_non_finite_grad = True
-                    # Option: Exit loop immediately to skip clipping and step
-                    break
-
-            if found_non_finite_grad:
-                tqdm.write("!! WARNING: Skipping gradient clipping and optimizer step due to non-finite gradients.")
-                optimizer.zero_grad()  # Ensure all grads are cleared
-                continue  # Skip to next batch
-            # END DEBUG
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
 
@@ -245,5 +220,3 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
                    f"mAP@0.5: {mAP:.4f} | mAR@100: {mAR:.4f} | LR: {lr_info}")
 
     return train_losses, val_losses, map_list, mar_list
-
-
