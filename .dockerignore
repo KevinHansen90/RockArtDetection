@@ -1,0 +1,7 @@
+# .dockerignore
+data/
+configs/
+experiments/
+*.pyc
+__pycache__/
+tesis/
