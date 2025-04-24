@@ -1,239 +1,198 @@
-# src/training/evaluate.py
+#!/usr/bin/env python3
 
 import torch
+import logging
 from tqdm import tqdm
 from PIL import Image, ImageDraw, ImageFont
 import sys
 
+# Module logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-def draw_boxes(image, boxes, labels, classes, shift_labels=True, color="red"):
-	"""
-    Draws bounding boxes and labels on a PIL image.
+# Default drawing parameters
+DEFAULT_FONT_PATH = "arial.ttf"
+DEFAULT_FONT_SIZE = 15
+DEFAULT_COLOR_GT = "green"
+DEFAULT_COLOR_PRED = "red"
+DEFAULT_MARGIN = 3
 
-    Args:
-        image (PIL.Image.Image): Image to draw on.
-        boxes (list or Tensor): List of boxes, each as [x1, y1, x2, y2].
-        labels (list or Tensor): List of labels corresponding to boxes.
-        classes (list): List of class names.
-        shift_labels (bool): If True, subtract 1 from label index (for F-RCNN/RetinaNet).
-        color (str): Color for the boxes and text background.
+
+def _load_font(path=DEFAULT_FONT_PATH, size=DEFAULT_FONT_SIZE):
+    try:
+        return ImageFont.truetype(path, size=size)
+    except IOError:
+        logger.warning(f"Font '{path}' not found; using default font.")
+        return ImageFont.load_default()
+
+
+# Load font once
+FONT = _load_font()
+
+
+def draw_boxes(
+    image: Image.Image,
+    boxes,
+    labels,
+    classes: list,
+    shift_labels: bool = True,
+    color: str = DEFAULT_COLOR_PRED,
+    margin: int = DEFAULT_MARGIN,
+    font: ImageFont.FreeTypeFont = FONT
+) -> Image.Image:
     """
-	draw = ImageDraw.Draw(image)
-	margin = 3  # Small margin around text
-
-	try:
-		# Try loading a common font, adjust path if needed or handle missing font
-		font = ImageFont.truetype("arial.ttf", size=15)
-	except IOError:
-		font = ImageFont.load_default()
-
-	for box, label in zip(boxes, labels):
-		# Convert tensor to list/float if needed.
-		if isinstance(box, torch.Tensor):
-			box = box.tolist()
-		if isinstance(label, torch.Tensor):
-			label = label.item()
-
-		# Ensure box coordinates are numeric (float or int) for drawing
-		try:
-			box_coords = [float(coord) for coord in box]
-			box_int = [int(round(coord)) for coord in box_coords]  # Use for drawing rectangle
-			left, top, _, _ = box_int  # Get top-left corner for text positioning
-		except (ValueError, TypeError) as e:
-			print(f"Warning: Skipping box due to invalid coordinates: {box}. Error: {e}", file=sys.stderr)
-			continue
-
-		# Draw the bounding box rectangle
-		draw.rectangle(box_int, outline=color, width=2)
-
-		# Determine the class index based on the model type
-		# Ensure label is treated as an integer index
-		try:
-			label_int = int(round(label))
-			class_index = (label_int - 1) if shift_labels else label_int
-		except (ValueError, TypeError):
-			print(f"Warning: Skipping label drawing due to invalid label: {label}", file=sys.stderr)
-			continue  # Skip text drawing for this box
-
-		# Get the class name text
-		if 0 <= class_index < len(classes):
-			text = classes[class_index]
-		else:
-			# Handle cases where label is out of bounds (e.g., background class for F-RCNN)
-			text = f"UNK_ID={label_int}"
-			if class_index == -1 and shift_labels:  # Likely background for F-RCNN/Retina
-				text = "BG"  # Optional: Explicitly label background
-
-		# --- Calculate text size ---
-		try:
-			# Preferred method: Get bounding box of text
-			text_bbox = draw.textbbox((0, 0), text, font=font)
-			text_width = text_bbox[2] - text_bbox[0]
-			text_height = text_bbox[3] - text_bbox[1]
-		except AttributeError:
-			# Fallback for older Pillow versions or sometimes with default font
-			try:
-				text_width, text_height = draw.textlength(text, font=font), 10  # Estimate height for default
-				# Note: draw.textsize is also deprecated, textlength is better if bbox fails
-			except AttributeError:
-				print("Warning: Could not determine text size. Text positioning might be off.", file=sys.stderr)
-				text_width, text_height = 30, 10  # Arbitrary fallback size
-
-		# --- Draw text background and text (Moved outside the try/except) ---
-		if text:  # Only draw if we have valid text
-			# Calculate position for background rectangle (above the box)
-			rect_y1 = max(0, top - text_height - margin * 2)  # Ensure y1 is not negative
-			rect_y2 = max(text_height + margin, top)  # Anchor bottom of rect near box top
-			rect_x1 = left
-			rect_x2 = left + text_width + margin * 2
-
-			# Draw background rectangle
-			draw.rectangle(
-				[(rect_x1, rect_y1), (rect_x2, rect_y2)],
-				fill=color
-			)
-			# Draw text on top of the background rectangle
-			# Adjust text position to be within the background rect
-			text_x = rect_x1 + margin
-			text_y = rect_y1 + margin // 2  # Center text vertically within the rect background
-			draw.text((text_x, text_y), text, fill="white", font=font)
-
-	return image
-
-
-def evaluate_and_visualize(model, test_loader, classes, device, output_path, threshold=0.5, model_type="fasterrcnn"):
-	"""
-    Evaluates the model on the test set and saves an image visualizing
-    ground truth vs predictions for some samples.
+    Draw bounding boxes with labels on an image.
+    boxes: list of [x1, y1, x2, y2] or Tensor
+    labels: list of int or Tensor
+    classes: list of class names
+    shift_labels: if True, subtract 1 from label index before lookup
     """
-	model.eval()
-	model.to(device)
+    draw = ImageDraw.Draw(image)
 
-	# Determine if labels need shifting based on model type
-	# shift_labels is True for models where class 0 is background (FasterRCNN, RetinaNet)
-	# shift_labels is False for models where class 0 is the first object (DETR)
-	shift_labels = (model_type.lower() != "deformable_detr")
+    for idx, (box, label) in enumerate(zip(boxes, labels)):
+        # Convert box coords to ints, clamp and sort so x0<=x1, y0<=y1
+        try:
+            raw = box.tolist() if isinstance(box, torch.Tensor) else box
+            coords = [int(round(float(c))) for c in raw]
+            x0, y0, x1, y1 = coords
+            x0 = max(0, x0)
+            y0 = max(0, y0)
+            x1 = max(x0, x1)
+            y1 = max(y0, y1)
+        except Exception as e:
+            logger.warning(f"Skipping invalid box at index {idx}: {box}. Error: {e}")
+            continue
 
-	visualizations = []
-	num_samples_to_visualize = min(len(test_loader), 10)  # Visualize up to 10 samples
+        # Draw the bounding box rectangle
+        draw.rectangle([x0, y0, x1, y1], outline=color, width=2)
 
-	# Use enumerate to limit the number of visualized samples easily
-	for i, test_data in enumerate(tqdm(test_loader, desc="Evaluating on test set", leave=False)):
-		if i >= num_samples_to_visualize:
-			break  # Stop after visualizing enough samples
+        # Determine text label
+        try:
+            lab = label.item() if isinstance(label, torch.Tensor) else int(label)
+            class_idx = (lab - 1) if shift_labels else lab
+            text = classes[class_idx] if 0 <= class_idx < len(classes) else f"UNK_ID={lab}"
+        except Exception as e:
+            logger.warning(f"Skipping invalid label at index {idx}: {label}. Error: {e}")
+            continue
 
-		# Unpack data - assumes test_loader yields (PIL Image, Image Tensor, GT Boxes, GT Labels)
-		try:
-			pil_img, img_tensor, gt_boxes_raw, gt_labels_raw = test_data
-		except ValueError as e:
-			print(f"Error unpacking test data batch {i}: {e}. Check test_loader's collate_fn.", file=sys.stderr)
-			continue
+        # Measure text size
+        try:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+        except Exception:
+            text_w, text_h = font.getsize(text)
 
-		# Ensure tensor is on the correct device and add batch dimension
-		img_tensor = img_tensor.unsqueeze(0).to(device)
-		orig_w, orig_h = pil_img.size  # Get original image dimensions for potential conversions
+        # Compute and clamp background rectangle for text
+        rx0 = x0
+        ry0 = max(0, y0 - text_h - 2 * margin)
+        rx1 = x0 + text_w + 2 * margin
+        ry1 = y0
+        rx0b, rx1b = sorted((rx0, rx1))
+        ry0b, ry1b = sorted((ry0, ry1))
 
-		# --- Run Inference ---
-		with torch.no_grad():
-			try:
-				# Model forward pass
-				# Assumes model returns a list of dicts, take the first element for batch size 1
-				predictions = model(img_tensor)
-				if isinstance(predictions, list) and len(predictions) > 0:
-					preds = predictions[0]
-				else:
-					# Handle cases where model output might not be a list (shouldn't happen with current wrappers)
-					print(f"Warning: Unexpected model output format: {type(predictions)}. Skipping batch {i}.",
-						  file=sys.stderr)
-					continue
+        # Draw background rectangle
+        draw.rectangle([(rx0b, ry0b), (rx1b, ry1b)], fill=color)
 
-				# Extract predictions (ensure they are on CPU for processing)
-				pred_boxes = preds.get("boxes", torch.empty((0, 4))).cpu()
-				pred_scores = preds.get("scores", torch.empty((0,))).cpu()
-				pred_labels = preds.get("labels", torch.empty((0,))).cpu()
+        # Draw text
+        text_x = rx0b + margin
+        text_y = ry0b + margin // 2
+        draw.text((text_x, text_y), text, fill="white", font=font)
 
-			except Exception as e:
-				print(f"Error during model inference or prediction extraction for batch {i}: {e}", file=sys.stderr)
-				continue  # Skip this sample
+    return image
 
-		# --- Filter Predictions ---
-		if model_type.lower() == "deformable_detr":
-			# No additional filtering needed for DETR
-			filtered_boxes = pred_boxes
-			filtered_labels = pred_labels
-		else:
-			keep_indices = pred_scores >= threshold
-			filtered_boxes = pred_boxes[keep_indices]
-			filtered_labels = pred_labels[keep_indices]
 
-		# --- Process Ground Truth ---
-		gt_boxes_absolute = []
-		# Ensure raw GT boxes and labels are tensors before processing
-		if not isinstance(gt_boxes_raw, torch.Tensor): gt_boxes_raw = torch.tensor(gt_boxes_raw)
-		if not isinstance(gt_labels_raw, torch.Tensor): gt_labels_raw = torch.tensor(gt_labels_raw)
+def evaluate_and_visualize(
+    model,
+    test_loader,
+    classes: list,
+    device,
+    output_path: str,
+    threshold: float = 0.5,
+    model_type: str = "fasterrcnn"
+):
+    """
+    Run inference on test set and save side-by-side GT vs prediction visualizations.
+    """
+    model.eval()
+    model.to(device)
 
-		if model_type.lower() == "deformable_detr" and gt_boxes_raw.numel() > 0:
-			# For DETR, test dataset provides normalized [cx, cy, w, h]
-			# Convert to absolute [x1, y1, x2, y2]
-			boxes_cxcywh = gt_boxes_raw.cpu()
-			boxes_xyxy = torch.zeros_like(boxes_cxcywh)
-			boxes_xyxy[:, 0] = (boxes_cxcywh[:, 0] - boxes_cxcywh[:, 2] / 2) * orig_w
-			boxes_xyxy[:, 1] = (boxes_cxcywh[:, 1] - boxes_cxcywh[:, 3] / 2) * orig_h
-			boxes_xyxy[:, 2] = (boxes_cxcywh[:, 0] + boxes_cxcywh[:, 2] / 2) * orig_w
-			boxes_xyxy[:, 3] = (boxes_cxcywh[:, 1] + boxes_cxcywh[:, 3] / 2) * orig_h
-			gt_boxes_absolute = boxes_xyxy.tolist()
-		elif gt_boxes_raw.numel() > 0:
-			# For other models, test dataset provides absolute [x1, y1, x2, y2]
-			gt_boxes_absolute = gt_boxes_raw.cpu().tolist()
-		# else: gt_boxes_absolute remains []
+    mt = model_type.lower()
+    shift_labels = (mt == "fasterrcnn")
 
-		# Convert GT labels tensor to list of ints
-		gt_labels_list = gt_labels_raw.cpu().tolist()  # labels are expected as 0-indexed from dataset
+    visualizations = []
+    max_vis = min(len(test_loader), 10)
 
-		# --- Draw Visualizations ---
-		try:
-			gt_image = pil_img.copy()
-			pred_image = pil_img.copy()
+    for i, batch in enumerate(tqdm(test_loader, desc="Eval Test", leave=False)):
+        if i >= max_vis:
+            break
+        pil_img, img_tensor, gt_boxes_raw, gt_labels_raw = batch
 
-			# Draw ground truth in green
-			# Always use shift_labels=False for GT drawing as labels are 0-indexed from dataset
-			gt_image = draw_boxes(gt_image, gt_boxes_absolute, gt_labels_list, classes, shift_labels=shift_labels,
-								  color="green")
+        # Inference
+        img = img_tensor.unsqueeze(0).to(device)
+        with torch.inference_mode():
+            preds = model(img)
+            preds = preds[0] if isinstance(preds, list) else preds
 
-			# Draw predictions in red
-			# For predictions, always use shift_labels=True for FasterRCNN/RetinaNet (they use 1-indexed labels)
-			# and shift_labels=False for DETR (it uses 0-indexed labels)
-			pred_image = draw_boxes(pred_image, filtered_boxes, filtered_labels, classes, shift_labels=shift_labels,
-									color="red")
+        # --- Extract & filter predictions (apply threshold to every model) ---
+        boxes = preds.get("boxes", torch.empty((0, 4))).cpu()
+        scores = preds.get("scores", torch.empty((0,))).cpu()
+        labels = preds.get("labels", torch.empty((0,))).cpu()
+        # Always filter by score
+        keep = scores >= threshold
+        pred_boxes = boxes[keep].tolist()
+        pred_labels = labels[keep].tolist()
 
-			# Combine images side-by-side
-			width, height = pil_img.size
-			combined = Image.new("RGB", (width * 2, height))
-			combined.paste(gt_image, (0, 0))
-			combined.paste(pred_image, (width, 0))
-			visualizations.append(combined)
-		except Exception as e:
-			print(f"Error during drawing for batch {i}: {e}", file=sys.stderr)
-			continue  # Skip this sample
+        # --- Process GT boxes & labels for DETR vs others ---
+        # gt_boxes_raw is either absolute xyxy (for FR/Retina) or normalized cxcywh (for DETR)
+        if isinstance(gt_boxes_raw, torch.Tensor):
+            gt_boxes_tensor = gt_boxes_raw.cpu()
+        else:
+            gt_boxes_tensor = torch.tensor(gt_boxes_raw)
 
-	# --- Save Combined Visualization ---
-	if visualizations:
-		total_height = sum(img.height for img in visualizations)
-		# Ensure max_width calculation handles case where visualizations list might be empty
-		max_width = max(img.width for img in visualizations) if visualizations else 0
+        if mt == "deformable_detr" and gt_boxes_tensor.numel():
+            # Convert normalized cxcywh -> absolute xyxy
+            img_w, img_h = pil_img.size  # PIL: (width, height)
+            cx, cy, ww, hh = gt_boxes_tensor.T
+            x0 = (cx - ww / 2) * img_w
+            y0 = (cy - hh / 2) * img_h
+            x1 = (cx + ww / 2) * img_w
+            y1 = (cy + hh / 2) * img_h
+            abs_boxes = torch.stack([x0, y0, x1, y1], dim=1)
+            gt_boxes = abs_boxes.tolist()
+        else:
+            # Already in absolute xyxy for FR/Retina
+            gt_boxes = gt_boxes_tensor.tolist()
 
-		if max_width > 0 and total_height > 0:
-			final_img = Image.new("RGB", (max_width, total_height))
-			y_offset = 0
-			for vis in visualizations:
-				final_img.paste(vis, (0, y_offset))
-				y_offset += vis.height
-			try:
-				final_img.save(output_path)
-				tqdm.write(f"Saved test visualization to {output_path}")
-			except Exception as e:
-				print(f"Error saving final visualization image to {output_path}: {e}", file=sys.stderr)
-		else:
-			print("Warning: Cannot save visualization image due to zero width or height.", file=sys.stderr)
-	else:
-		tqdm.write("No test images processed or no predictions above threshold; skipping visualization saving.")
+        # GT labels come out shifted (+1) for FR/Retina, unshifted for DETR
+        if isinstance(gt_labels_raw, torch.Tensor):
+            gt_labels = gt_labels_raw.cpu().tolist()
+        else:
+            gt_labels = gt_labels_raw
+
+        # --- Draw GT (green) & preds (red) with correct shift_labels logic ---
+        gt_vis = draw_boxes(pil_img.copy(), gt_boxes, gt_labels,
+                            classes, shift_labels, color="green")
+        pred_vis = draw_boxes(pil_img.copy(), pred_boxes, pred_labels,
+                              classes, shift_labels, color="red")
+
+        combined = Image.new("RGB", (pil_img.width*2, pil_img.height))
+        combined.paste(gt_vis,   (0, 0))
+        combined.paste(pred_vis, (pil_img.width, 0))
+        visualizations.append(combined)
+
+    if not visualizations:
+        logger.info("No visualizations created; skipping save.")
+        return
+
+    # Merge all visualizations vertically
+    total_h = sum(img.height for img in visualizations)
+    max_w   = max(img.width  for img in visualizations)
+    final   = Image.new("RGB", (max_w, total_h))
+    y_off   = 0
+    for img in visualizations:
+        final.paste(img, (0, y_off))
+        y_off += img.height
+
+    final.save(output_path)
+    logger.info(f"Saved visualization: {output_path}")

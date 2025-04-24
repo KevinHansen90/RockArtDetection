@@ -1,7 +1,21 @@
-# src/models/detection_models.py
+#!/usr/bin/env python3
+
+import logging
+from typing import Dict, Optional, List
 
 import torch
 import torch.nn as nn
+import torch.optim as optim
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import (
+    LRScheduler,
+    ReduceLROnPlateau,
+    StepLR,
+    CosineAnnealingLR,
+    CosineAnnealingWarmRestarts,
+    MultiStepLR,
+    OneCycleLR
+)
 from torchvision.models.detection import (
     fasterrcnn_resnet50_fpn_v2,
     retinanet_resnet50_fpn_v2,
@@ -14,261 +28,208 @@ import torchvision.ops.focal_loss as focal_loss_module
 from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torchvision.models.detection.rpn import RPNHead
 
-
-# Import Hugging Face components for Deformable DETR
+# Hugging Face imports
 from transformers import AutoImageProcessor, DeformableDetrForObjectDetection
 
+# Initialize module logger
+torch_logger = logging.getLogger(__name__)
+torch_logger.setLevel(logging.INFO)
 
-class DeformableDETRWrapper(torch.nn.Module):
+
+class DeformableDETRWrapper(nn.Module):
+    """
+    Wraps a Hugging Face Deformable DETR model for training and inference.
+    """
     def __init__(self, hf_model, image_processor):
         super().__init__()
         self.hf_model = hf_model
         self.image_processor = image_processor
         self.score_thresh = 0.1
 
-    def forward(self, images, targets=None, orig_sizes=None):
+    def forward(self, images, targets=None, orig_sizes: Optional[List[List[int]]] = None):
+        # Prepare pixel values
         if isinstance(images, (list, tuple)):
             pixel_values = torch.stack(images)
-            # Use provided original sizes if available, otherwise fall back to padded sizes.
-            if orig_sizes is not None:
-                target_sizes = [torch.tensor(s, device=img.device) for s, img in zip(orig_sizes, images)]
-            else:
-                target_sizes = [torch.tensor(img.shape[1:], device=img.device) for img in images]
+            target_sizes = [torch.tensor(s, device=img.device)
+                            for s, img in zip(orig_sizes or [], images)]
         elif isinstance(images, torch.Tensor):
             pixel_values = images
-            if orig_sizes is not None:
-                target_sizes = [torch.tensor(s, device=pixel_values.device) for s in orig_sizes]
-            else:
-                target_sizes = [torch.tensor(pixel_values.shape[2:], device=pixel_values.device)] * pixel_values.shape[
-                    0]
+            bs = pixel_values.shape[0]
+            target_sizes = [torch.tensor(s, device=pixel_values.device)
+                            for s in (orig_sizes or [pixel_values.shape[2:]] * bs)]
         else:
-            raise TypeError(f"Unsupported input type for images: {type(images)}")
+            raise TypeError(f"Unsupported images type: {type(images)}")
 
-        # --- Training Mode ---
+        # Training mode: return loss dict
         if targets is not None:
-            hf_labels = []
-            for t in targets:
-                hf_labels.append({
-                    "class_labels": t["labels"],
-                    "boxes": t["boxes"]
-                })
-
+            hf_labels = [{"class_labels": t["labels"], "boxes": t["boxes"]} for t in targets]
             outputs = self.hf_model(pixel_values=pixel_values, labels=hf_labels)
-
-            # Detailed loss reporting
             if hasattr(outputs, 'loss_dict'):
-                # Return the loss dict directly
                 return outputs.loss_dict
-            elif hasattr(outputs, 'loss'):
-                # Create a more informative loss dict
-                loss_value = outputs.loss
-                if hasattr(outputs, 'class_error'):
-                    return {
-                        'loss_ce': outputs.loss * 0.5,  # Estimate class loss as portion of total
-                        'loss_bbox': outputs.loss * 0.3,  # Estimate bbox loss as portion of total
-                        'loss_giou': outputs.loss * 0.2,  # Estimate giou loss as portion of total
-                        'class_error': outputs.class_error if hasattr(outputs, 'class_error') else 0.0
-                    }
-                else:
-                    return {'total_loss': loss_value}
-            else:
-                print("Warning: Unexpected loss output format from Hugging Face model.")
-                return {'total_loss': torch.tensor(0.0, device=pixel_values.device)}
+            return {"total_loss": outputs.loss}
 
-        # --- Inference Mode ---
-        else:
-            outputs = self.hf_model(pixel_values=pixel_values)
-
-            results = []
-            for i, (logits_per_image, pred_boxes_per_image) in enumerate(zip(
-                    outputs.logits, outputs.pred_boxes)):
-
-                # Get the target size for this image (original [height, width])
-                target_size = target_sizes[i]
-
-                # Convert logits to probabilities
-                probs = torch.softmax(logits_per_image, dim=-1)
-
-                # For DETR, background is typically the last class.
-                # Get scores and labels for the actual object classes.
-                object_probs = probs[:, :-1]  # Exclude background
-                scores, labels = object_probs.max(-1)
-
-                # Filter out low-confidence predictions based on score threshold.
-                keep = scores > self.score_thresh
-                boxes = pred_boxes_per_image[keep]
-                scores = scores[keep]
-                labels = labels[keep]
-
-                # Scale boxes to absolute image coordinates.
-                # target_size is a tensor [orig_h, orig_w], so we use these directly.
-                scale_x = target_size[1].item()  # Image width
-                scale_y = target_size[0].item()  # Image height
-
-                scaled_boxes = torch.zeros_like(boxes)
-                # Convert from [cx, cy, w, h] to [x1, y1, x2, y2]
-                scaled_boxes[:, 0] = (boxes[:, 0] - boxes[:, 2] / 2) * scale_x  # x1
-                scaled_boxes[:, 1] = (boxes[:, 1] - boxes[:, 3] / 2) * scale_y  # y1
-                scaled_boxes[:, 2] = (boxes[:, 0] + boxes[:, 2] / 2) * scale_x  # x2
-                scaled_boxes[:, 3] = (boxes[:, 1] + boxes[:, 3] / 2) * scale_y  # y2
-
-                scaled_boxes[:, 0] = torch.clamp(scaled_boxes[:, 0], min=0)
-                scaled_boxes[:, 1] = torch.clamp(scaled_boxes[:, 1], min=0)
-                scaled_boxes[:, 2] = torch.clamp(scaled_boxes[:, 2], max=target_size[1].item())
-                scaled_boxes[:, 3] = torch.clamp(scaled_boxes[:, 3], max=target_size[0].item())
-
-                results.append({
-                    "scores": scores,
-                    "labels": labels,
-                    "boxes": scaled_boxes
-                })
-
-            return results
+        # Inference mode: post-process outputs
+        outputs = self.hf_model(pixel_values=pixel_values)
+        results = []
+        for logits, boxes, size in zip(outputs.logits, outputs.pred_boxes, target_sizes):
+            probs = torch.softmax(logits, dim=-1)
+            scores, labels = probs[:, :-1].max(-1)  # exclude background
+            keep = scores > self.score_thresh
+            sel_boxes = boxes[keep]
+            # scale to absolute coords
+            h, w = size.tolist()
+            xyxy = torch.zeros_like(sel_boxes)
+            xyxy[:, 0] = (sel_boxes[:, 0] - sel_boxes[:, 2]/2) * w
+            xyxy[:, 1] = (sel_boxes[:, 1] - sel_boxes[:, 3]/2) * h
+            xyxy[:, 2] = (sel_boxes[:, 0] + sel_boxes[:, 2]/2) * w
+            xyxy[:, 3] = (sel_boxes[:, 1] + sel_boxes[:, 3]/2) * h
+            results.append({"scores": scores[keep], "labels": labels[keep], "boxes": xyxy})
+        return results
 
 
 class CustomRetinaNetClassificationHead(RetinaNetClassificationHead):
-    def __init__(self, in_channels, num_anchors, num_classes, norm_layer,
-                 focal_loss_gamma=2.5, focal_loss_alpha=0.25, prior_probability=0.01):
-        # Pass norm_layer and prior_probability as keywords.
+    """
+    RetinaNet classification head with custom focal loss parameters.
+    """
+    def __init__(
+        self,
+        in_channels: int,
+        num_anchors: int,
+        num_classes: int,
+        norm_layer,
+        focal_loss_gamma: float = 2.5,
+        focal_loss_alpha: float = 0.25,
+        prior_probability: float = 0.01
+    ):
         super().__init__(in_channels, num_anchors, num_classes,
-                         norm_layer=norm_layer, prior_probability=prior_probability)
+                         norm_layer=norm_layer,
+                         prior_probability=prior_probability)
         self.focal_loss_gamma = focal_loss_gamma
         self.focal_loss_alpha = focal_loss_alpha
-
-        # Save the original function from the focal_loss module.
-        self._original_sigmoid_focal_loss = focal_loss_module.sigmoid_focal_loss
-
-        # Define a custom sigmoid_focal_loss that always uses your parameters.
-        def custom_sigmoid_focal_loss(inputs, targets, reduction="sum", **kwargs):
-            return self._original_sigmoid_focal_loss(inputs, targets, reduction=reduction,
-                                                     gamma=self.focal_loss_gamma, alpha=self.focal_loss_alpha, **kwargs)
-        # Monkey-patch the module's sigmoid_focal_loss.
-        focal_loss_module.sigmoid_focal_loss = custom_sigmoid_focal_loss
+        self._orig_focal = focal_loss_module.sigmoid_focal_loss
+        focal_loss_module.sigmoid_focal_loss = lambda inputs, targets, **kwargs: \
+            self._orig_focal(inputs, targets,
+                             gamma=self.focal_loss_gamma,
+                             alpha=self.focal_loss_alpha,
+                             reduction=kwargs.get("reduction", "sum"))
 
 
-def get_detection_model(model_type, num_classes, config=None):
+def get_detection_model(model_type: str, num_classes: int, config: Optional[Dict] = None) -> nn.Module:
     """
-    Creates and returns a detection model with custom classifier heads for `num_classes`.
-    For deformable_detr, note that Hugging Face's model expects:
-      - `num_labels` = number of object classes (background is handled internally),
-      - and targets with boxes normalized to [0, 1].
+    Factory for detection models: 'fasterrcnn', 'retinanet', 'deformable_detr'.
     """
-    model_type = model_type.lower()
-
-    if model_type == "fasterrcnn":
-        # First create model with default anchors
-        model = fasterrcnn_resnet50_fpn_v2(weights=FasterRCNN_ResNet50_FPN_V2_Weights.COCO_V1)
-
-        # Now modify anchors
-        anchor_sizes = tuple((x, int(x * 1.5), x * 2) for x in [128, 256, 512, 1024, 2048])  # 64, 128, 256, 512, 1024
-        aspect_ratios = ((1.0, 3.0, 6.0),) * len(anchor_sizes)
-
-        # Replace both RPN and head anchors
-        model.rpn.anchor_generator = AnchorGenerator(
-            sizes=anchor_sizes,
-            aspect_ratios=aspect_ratios
-        )
-
-        # Must also update RPN head to match new anchor count
-        num_anchors = model.rpn.anchor_generator.num_anchors_per_location()[0]
-        in_channels = model.backbone.out_channels  # Typically 256 for FPN
-
-        model.rpn.head = RPNHead(
-            in_channels=in_channels,
-            num_anchors=num_anchors,
-            conv_depth=1  # Keep original depth
-        )
-
-        # Then modify ROI head as before
-        in_features = model.roi_heads.box_predictor.cls_score.in_features
-        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-
+    mt = model_type.lower()
+    if mt == "fasterrcnn":
+        model = fasterrcnn_resnet50_fpn_v2(
+            weights=FasterRCNN_ResNet50_FPN_V2_Weights.COCO_V1)
+        sizes = tuple((x, int(x*1.5), x*2) for x in [128,256,512,1024,2048])
+        ratios = ((1.0,3.0,6.0),) * len(sizes)
+        model.rpn.anchor_generator = AnchorGenerator(sizes, ratios)
+        in_channels = model.backbone.out_channels
+        n_anchors = model.rpn.anchor_generator.num_anchors_per_location()[0]
+        model.rpn.head = RPNHead(in_channels, n_anchors)
+        in_feat = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_feat, num_classes)
         return model
-
-    elif model_type == "retinanet":
+    elif mt == "retinanet":
         weights = RetinaNet_ResNet50_FPN_V2_Weights.COCO_V1
         model = retinanet_resnet50_fpn_v2(weights=weights)
-
-        # Adjusted anchor generator: 9 anchors per location (3 scales x 3 aspect ratios)
-        anchor_sizes = tuple((x, int(x * 1.5), x * 2) for x in [128, 256, 512, 1024, 2048])  #64, 128, 256, 512, 1024
+        anchor_sizes = tuple((x, int(x * 1.5), x * 2)
+                             for x in [128, 256, 512, 1024, 2048])
         aspect_ratios = ((1.0, 3.0, 6.0),) * len(anchor_sizes)
         model.anchor_generator = AnchorGenerator(
             sizes=anchor_sizes,
             aspect_ratios=aspect_ratios
         )
-
-        focal_config = config.get("focal_loss", {})
-        gamma = focal_config.get("gamma", 2.5)
-        alpha = focal_config.get("alpha", 0.25)
-        prior_probability = focal_config.get("prior_probability", 0.01)
-        num_anchors = 9  # 3 scales x 3 ratios
+        focal_cfg = config.get("focal_loss", {})
+        gamma = focal_cfg.get("gamma", 2.5)
+        alpha = focal_cfg.get("alpha", 0.25)
+        prior_prob = focal_cfg.get("prior_probability", 0.01)
+        num_anchors = model.anchor_generator.num_anchors_per_location()[0]
         in_channels = 256
         model.head.classification_head = CustomRetinaNetClassificationHead(
-            in_channels,
-            num_anchors,
-            num_classes,
+            in_channels=in_channels,
+            num_anchors=num_anchors,
+            num_classes=num_classes,
             norm_layer=torch.nn.BatchNorm2d,
             focal_loss_gamma=gamma,
             focal_loss_alpha=alpha,
-            prior_probability=prior_probability
+            prior_probability=prior_prob
         )
-
+        model.num_classes = num_classes
         return model
-
-    elif model_type == "deformable_detr":
-        # Load processor and model
-        image_processor = AutoImageProcessor.from_pretrained("SenseTime/deformable-detr", use_fast=True)
+    elif mt == "deformable_detr":
+        processor = AutoImageProcessor.from_pretrained("SenseTime/deformable-detr", use_fast=True)
         hf_model = DeformableDetrForObjectDetection.from_pretrained(
             "SenseTime/deformable-detr",
             num_labels=num_classes,
             ignore_mismatched_sizes=True
         )
-
-        # Check if we have access to model.model which contains the actual architecture
-        if hasattr(hf_model, "model"):
-            # This is likely the correct structure - check if class_embed is a ModuleList
-            if hasattr(hf_model.model, "class_embed") and isinstance(hf_model.model.class_embed, nn.ModuleList):
-                # For each classification head in the list
-                for i in range(len(hf_model.model.class_embed)):
-                    in_features = hf_model.model.class_embed[i].in_features
-                    hf_model.model.class_embed[i] = nn.Linear(in_features, num_classes + 1)
-
-            # If it's a direct attribute
-            elif hasattr(hf_model.model, "class_embed"):
-                in_features = hf_model.model.class_embed.in_features
-                hf_model.model.class_embed = nn.Linear(in_features, num_classes + 1)
-
-        # Direct access to class_embed
-        elif hasattr(hf_model, "class_embed"):
-            if isinstance(hf_model.class_embed, nn.ModuleList):
-                for i in range(len(hf_model.class_embed)):
-                    in_features = hf_model.class_embed[i].in_features
-                    hf_model.class_embed[i] = nn.Linear(in_features, num_classes + 1)
-            else:
-                in_features = hf_model.class_embed.in_features
-                hf_model.class_embed = nn.Linear(in_features, num_classes + 1)
-
-        # Fallback to d_model if defined in config
-        else:
-            if hasattr(hf_model.config, "d_model"):
-                in_features = hf_model.config.d_model
-
-                # Try to find where to place the classifier
-                if hasattr(hf_model, "class_labels_classifier"):
-                    hf_model.class_labels_classifier = nn.Linear(in_features, num_classes + 1)
-                elif hasattr(hf_model, "model") and hasattr(hf_model.model, "class_labels_classifier"):
-                    hf_model.model.class_labels_classifier = nn.Linear(in_features, num_classes + 1)
-                else:
-                    print("WARNING: Could not locate classification head to replace")
-            else:
-                print("WARNING: Could not determine input features dimension")
-
-        # Make sure the model knows we're using a smaller number of classes
-        hf_model.config.num_labels = num_classes
-
-        # Wrap the configured HF model with your custom wrapper
-        model = DeformableDETRWrapper(hf_model, image_processor)
-        return model
-
+        return DeformableDETRWrapper(hf_model, processor)
     else:
         raise ValueError(f"Unknown model_type: {model_type}")
+
+
+def get_optimizer(model: nn.Module, config: Dict) -> Optimizer:
+    freeze_bb = config.get("freeze_backbone", False)
+
+    # Collect backbone parameters (if any)
+    bb_params = list(model.backbone.parameters()) if hasattr(model, 'backbone') else []
+
+    # If freezing backbone, only optimize the rest
+    if freeze_bb:
+        for p in bb_params:
+            p.requires_grad = False
+        trainable = [p for p in model.parameters() if p.requires_grad]
+        groups = [
+            {"params": trainable, "lr": config.get("head_lr", 5e-4)}
+        ]
+        torch_logger.info(f"Backbone frozen; optimizing {len(trainable)} params.")
+    else:
+        # Partition model parameters into backbone vs head by identity
+        bb_ids = set(map(id, bb_params))
+        head_params = [p for p in model.parameters() if id(p) not in bb_ids]
+        groups = [
+            {"params": bb_params,   "lr": config.get("backbone_lr", 5e-5)},
+            {"params": head_params, "lr": config.get("head_lr",    5e-4)}
+        ]
+        torch_logger.info(
+            f"Optimizing backbone ({len(bb_params)}) + head ({len(head_params)}) parameters."
+        )
+
+    # Construct optimizer
+    opt_type = config.get("optimizer", "adamw").lower()
+    wd = config.get("weight_decay", 5e-4)
+    if opt_type == "sgd":
+        return optim.SGD(groups,
+                         momentum=config.get("momentum", 0.9),
+                         weight_decay=wd)
+    if opt_type == "adam":
+        return optim.Adam(groups,
+                          weight_decay=wd)
+    if opt_type == "adamw":
+        return optim.AdamW(groups,
+                           weight_decay=wd,
+                           eps=config.get("eps", 1e-7))
+    raise ValueError(f"Unsupported optimizer: {opt_type}")
+
+
+def get_scheduler(optimizer: Optimizer, config: Dict) -> Optional[LRScheduler]:
+    sname = config.get("scheduler")
+    if not sname or sname.lower() == "none":
+        return None
+    sname = sname.lower()
+    torch_logger.info(f"Setting up scheduler: {sname}")
+    if sname == "steplr":
+        return StepLR(optimizer, step_size=config.get("step_size",7), gamma=config.get("gamma",0.1))
+    if sname == "reducelronplateau":
+        return ReduceLROnPlateau(optimizer, mode="min", factor=config.get("plateau_factor",0.5), patience=config.get("plateau_patience",5))
+    if sname == "cosineannealinglr":
+        return CosineAnnealingLR(optimizer, T_max=config.get("T_max",10), eta_min=config.get("eta_min",0))
+    if sname == "cosineannealingwarmrestarts":
+        return CosineAnnealingWarmRestarts(optimizer, T_0=config.get("T_0",10), T_mult=config.get("T_mult",1), eta_min=config.get("eta_min",0))
+    if sname == "multisteplr":
+        return MultiStepLR(optimizer, milestones=config.get("milestones",[30,60]), gamma=config.get("gamma",0.1))
+    if sname == "onecyclelr":
+        return OneCycleLR(optimizer, max_lr=config.get("max_lr",[pg['lr'] for pg in optimizer.param_groups]), total_steps=config.get("total_steps",100), pct_start=config.get("pct_start",0.3), anneal_strategy=config.get("anneal_strategy","cos"), cycle_momentum=config.get("cycle_momentum",True), base_momentum=config.get("base_momentum",0.85), max_momentum=config.get("max_momentum",0.95), div_factor=config.get("div_factor",25.0), final_div_factor=config.get("final_div_factor",10000.0))
+    raise ValueError(f"Unsupported scheduler: {sname}")

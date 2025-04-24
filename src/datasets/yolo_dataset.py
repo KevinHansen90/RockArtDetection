@@ -1,4 +1,4 @@
-# src/datasets/yolo_dataset.py
+#!/usr/bin/env python3
 
 import os
 import torch
@@ -7,203 +7,194 @@ from PIL import Image
 from torchvision.transforms import functional as F
 
 
-def load_classes(classes_file):
-	with open(classes_file, "r") as f:
-		return [line.strip() for line in f.readlines()]
+def load_classes(classes_file: str) -> list:
+    """Read class names from a file, one per line."""
+    with open(classes_file, "r") as f:
+        return [line.strip() for line in f if line.strip()]
 
 
 def collate_fn(batch):
-	"""Custom collate function for variable-size detection targets."""
-	return tuple(zip(*batch))
+    """Collate for variable-size detection targets."""
+    return tuple(zip(*batch))
 
 
 def collate_fn_detr(batch):
-	images, targets = zip(*batch)
-	# Determine the maximum height and width in this batch.
-	max_h = max(img.shape[1] for img in images)
-	max_w = max(img.shape[2] for img in images)
-	padded_images = []
-	for img in images:
-		c, h, w = img.shape
-		# Compute the padding amounts (pad right and bottom)
-		pad_w = max_w - w
-		pad_h = max_h - h
-		# Pad format is (left, right, top, bottom)
-		padded_img = torch.nn.functional.pad(img, (0, pad_w, 0, pad_h), mode='constant', value=0)
-		padded_images.append(padded_img)
-	return padded_images, targets
+    """Collate with padding for DETR: pad all images to the same size."""
+    images, targets = zip(*batch)
+    max_h = max(img.shape[1] for img in images)
+    max_w = max(img.shape[2] for img in images)
+    padded_images = []
+    for img in images:
+        c, h, w = img.shape
+        pad_w = max_w - w
+        pad_h = max_h - h
+        # pad format: (left, right, top, bottom)
+        padded = torch.nn.functional.pad(img, (0, pad_w, 0, pad_h), mode='constant', value=0)
+        padded_images.append(padded)
+    return padded_images, targets
 
 
 class CustomYOLODataset(Dataset):
-	"""Dataset for training images with YOLO-format labels."""
+    """
+    Dataset for training images with YOLO-format labels.
+    Returns image tensor and target dict expected by torchvision detectors.
+    """
+    def __init__(
+        self,
+        images_dir: str,
+        labels_dir: str,
+        classes_file: str,
+        transforms=None,
+        normalize_boxes: bool = False
+    ):
+        self.images_dir = images_dir
+        self.labels_dir = labels_dir
+        self.transforms = transforms
+        self.normalize_boxes = normalize_boxes
+        self.image_files = sorted(
+            f for f in os.listdir(images_dir) if f.lower().endswith('.jpg')
+        )
+        self.classes = load_classes(classes_file)
 
-	def __init__(self, images_dir, labels_dir, classes_file, transforms=None, normalize_boxes=False):
-		"""
-		Args:
-			images_dir (str): Directory with images.
-			labels_dir (str): Directory with YOLO-format labels.
-			classes_file (str): Path to file listing class names.
-			transforms: Optional transform to be applied on an image.
-			normalize_boxes (bool): If True, return bounding boxes in normalized coordinates [0,1];
-									if False, return absolute pixel coordinates.
-		"""
-		self.images_dir = images_dir
-		self.labels_dir = labels_dir
-		self.transforms = transforms
-		self.normalize_boxes = normalize_boxes
-		self.image_files = sorted([
-			f for f in os.listdir(images_dir) if f.lower().endswith(".jpg")
-		])
-		self.classes = load_classes(classes_file)
+    def __len__(self) -> int:
+        return len(self.image_files)
 
-	def __len__(self):
-		return len(self.image_files)
+    def __getitem__(self, idx: int):
+        img_name = self.image_files[idx]
+        img_path = os.path.join(self.images_dir, img_name)
+        image = Image.open(img_path).convert("RGB")
+        orig_w, orig_h = image.size
 
-	def __getitem__(self, idx):
-		img_filename = self.image_files[idx]
-		img_path = os.path.join(self.images_dir, img_filename)
-		image = Image.open(img_path).convert("RGB")
+        # Apply transforms
+        if self.transforms:
+            img_tensor = self.transforms(image)
+        else:
+            img_tensor = F.to_tensor(image)
 
-		if self.transforms:
-			image = self.transforms(image)
-		else:
-			image = F.to_tensor(image)
+        # Read labels
+        label_file = os.path.splitext(img_name)[0] + ".txt"
+        label_path = os.path.join(self.labels_dir, label_file)
+        boxes, labels = [], []
 
-		# Build target from YOLO label
-		label_filename = os.path.splitext(img_filename)[0] + ".txt"
-		label_path = os.path.join(self.labels_dir, label_filename)
-		boxes, labels = [], []
+        if os.path.exists(label_path):
+            with open(label_path, "r") as lf:
+                for line in lf:
+                    parts = line.strip().split()
+                    if len(parts) != 5:
+                        continue
+                    cid = int(parts[0])
+                    xc, yc, w, h = map(float, parts[1:])
 
-		# Get original image dimensions
-		with Image.open(img_path) as img:
-			orig_w, orig_h = img.size  # <-- NEW: Get original dimensions
+                    # Box coords
+                    if self.normalize_boxes:
+                        boxes.append([xc, yc, w, h])
+                    else:
+                        x1 = (xc - w / 2) * orig_w
+                        y1 = (yc - h / 2) * orig_h
+                        x2 = (xc + w / 2) * orig_w
+                        y2 = (yc + h / 2) * orig_h
+                        boxes.append([x1, y1, x2, y2])
 
-		if os.path.exists(label_path):
-			with open(label_path, "r") as f:
-				lines = f.readlines()
-			for line in lines:
-				if not line.strip():
-					continue
-				parts = line.strip().split()
-				class_id = int(parts[0])
-				x_center, y_center, width, height = map(float, parts[1:])
+                    # Shift for Faster R-CNN & RetinaNet
+                    if self.normalize_boxes:
+                        labels.append(cid)
+                    else:
+                        labels.append(cid + 1)
 
-				if self.normalize_boxes:
-					# Directly use YOLO's normalized center coordinates <-- FIXED
-					boxes.append([x_center, y_center, width, height])
-				else:
-					# Convert to absolute coordinates
-					x1 = (x_center - width / 2) * orig_w
-					y1 = (y_center - height / 2) * orig_h
-					x2 = (x_center + width / 2) * orig_w
-					y2 = (y_center + height / 2) * orig_h
-					boxes.append([x1, y1, x2, y2])
+        # Format tensors
+        boxes_tensor = torch.tensor(boxes, dtype=torch.float32).reshape(-1, 4)
+        labels_tensor = torch.tensor(labels, dtype=torch.int64)
 
-				if self.normalize_boxes:
-					# For deformable_detr, do not shift the label.
-					labels.append(class_id)
-				else:
-					# For Faster R-CNN and RetinaNet, shift the label by +1.
-					labels.append(class_id + 1)
+        target = {
+            "boxes": boxes_tensor,
+            "labels": labels_tensor,
+            "image_id": torch.tensor([idx]),
+            "orig_size": torch.tensor([orig_h, orig_w], dtype=torch.float32)
+        }
+        if boxes_tensor.numel():
+            target["area"] = (boxes_tensor[:, 3] - boxes_tensor[:, 1]) * (boxes_tensor[:, 2] - boxes_tensor[:, 0])
+        else:
+            target["area"] = torch.tensor([])
+        target["iscrowd"] = torch.zeros((len(labels),), dtype=torch.int64)
+        target["class_labels"] = target["labels"]
 
-		boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
-		labels = torch.as_tensor(labels, dtype=torch.int64)
-		target = {
-			"boxes": boxes,
-			"labels": labels,
-			"image_id": torch.tensor([idx], dtype=torch.int64),
-			"orig_size": torch.tensor([orig_h, orig_w], dtype=torch.float32)  # <-- NEW
-		}
-
-		if boxes.numel() > 0:
-			target["area"] = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
-		else:
-			target["area"] = torch.tensor([])
-
-		target["iscrowd"] = torch.zeros((len(labels),), dtype=torch.int64)
-		target["class_labels"] = target["labels"]
-		return image, target
+        return img_tensor, target
 
 
 class TestDataset(Dataset):
-	"""
-	Test dataset that returns the original PIL image, transformed tensor,
-	ground truth boxes, and labels.
-	"""
+    """
+    Test dataset for inference & visualization.
+    Returns:
+      - PIL Image for drawing
+      - Tensor for model input
+      - boxes and labels aligned to model output indexing
+    """
+    def __init__(
+        self,
+        images_dir: str,
+        labels_dir: str,
+        classes_file: str,
+        transforms=None,
+        normalize_boxes: bool = False,
+        shift_labels: bool = False
+    ):
+        self.images_dir = images_dir
+        self.labels_dir = labels_dir
+        self.transforms = transforms
+        self.normalize_boxes = normalize_boxes
+        self.shift_labels = shift_labels
+        self.image_files = sorted(
+            f for f in os.listdir(images_dir) if f.lower().endswith('.jpg')
+        )
+        self.classes = load_classes(classes_file)
 
-	def __init__(self, images_dir, labels_dir, classes_file, transforms=None, normalize_boxes=False):
-		"""
-		Args:
-			images_dir (str): Directory with images.
-			labels_dir (str): Directory with YOLO-format labels.
-			classes_file (str): Path to file listing class names.
-			transforms: Optional transform to be applied on an image.
-			normalize_boxes (bool): If True, return bounding boxes in normalized coordinates [0,1];
-									if False, return absolute pixel coordinates.
-		"""
-		self.images_dir = images_dir
-		self.labels_dir = labels_dir
-		self.transforms = transforms
-		self.normalize_boxes = normalize_boxes
-		self.image_files = sorted(
-			f for f in os.listdir(images_dir) if f.lower().endswith(".jpg")
-		)
-		self.classes = load_classes(classes_file)
+    def __len__(self) -> int:
+        return len(self.image_files)
 
-	def __len__(self):
-		return len(self.image_files)
+    def __getitem__(self, idx: int):
+        img_name = self.image_files[idx]
+        img_path = os.path.join(self.images_dir, img_name)
+        pil_img = Image.open(img_path).convert("RGB")
+        orig_w, orig_h = pil_img.size
 
-	def __getitem__(self, idx):
-		img_filename = self.image_files[idx]
-		img_path = os.path.join(self.images_dir, img_filename)
-		pil_image = Image.open(img_path).convert("RGB")
-		orig_w, orig_h = pil_image.size  # <-- NEW: Get original dimensions
+        # Transform for model
+        img_copy = pil_img.copy()
+        if self.transforms:
+            img_tensor = self.transforms(img_copy)
+        else:
+            img_tensor = F.to_tensor(img_copy)
 
-		# Create a copy for transforms
-		transformed_image = pil_image.copy()
-		if self.transforms:
-			image_tensor = self.transforms(transformed_image)
-		else:
-			image_tensor = F.to_tensor(transformed_image)
+        # Parse YOLO labels
+        label_file = os.path.splitext(img_name)[0] + ".txt"
+        label_path = os.path.join(self.labels_dir, label_file)
+        boxes, labels = [], []
 
-		# Build ground-truth
-		label_filename = os.path.splitext(img_filename)[0] + ".txt"
-		label_path = os.path.join(self.labels_dir, label_filename)
-		boxes, labels = [], []
+        if os.path.exists(label_path):
+            with open(label_path, "r") as lf:
+                for line in lf:
+                    parts = line.strip().split()
+                    if len(parts) != 5:
+                        continue
+                    cid = int(parts[0])
+                    xc, yc, w, h = map(float, parts[1:])
 
-		if os.path.exists(label_path):
-			with open(label_path, "r") as f:
-				lines = f.readlines()
-			for line in lines:
-				parts = line.strip().split()
-				if not parts:
-					continue
-				class_id = int(parts[0])
-				num_classes = len(self.classes)
-				assert 0 <= class_id < num_classes, \
-					f"Invalid class_id {class_id} found in {label_path}. Expected range [0, {num_classes - 1}]"
-				x_center, y_center, width, height = map(float, parts[1:])
+                    # Box coords
+                    if self.normalize_boxes:
+                        boxes.append([xc, yc, w, h])
+                    else:
+                        x1 = (xc - w / 2) * orig_w
+                        y1 = (yc - h / 2) * orig_h
+                        x2 = (xc + w / 2) * orig_w
+                        y2 = (yc + h / 2) * orig_h
+                        boxes.append([x1, y1, x2, y2])
 
-				if self.normalize_boxes:
-					# Store normalized center coordinates <-- FIXED
-					boxes.append([x_center, y_center, width, height])
-				else:
-					# Convert to absolute coordinates
-					x1 = (x_center - width / 2) * orig_w
-					y1 = (y_center - height / 2) * orig_h
-					x2 = (x_center + width / 2) * orig_w
-					y2 = (y_center + height / 2) * orig_h
-					boxes.append([x1, y1, x2, y2])
+                    # Shift only if flag set (Faster R-CNN uses +1)
+                    label_val = cid + 1 if self.shift_labels else cid
+                    labels.append(label_val)
 
-				if self.normalize_boxes:
-					# For deformable_detr, do not shift the label.
-					labels.append(class_id)
-				else:
-					# For Faster R-CNN and RetinaNet, shift the label by +1.
-					labels.append(class_id + 1)
+        boxes_tensor = torch.tensor(boxes, dtype=torch.float32)
+        labels_tensor = torch.tensor(labels, dtype=torch.int64)
 
-		boxes = torch.as_tensor(boxes, dtype=torch.float32)
-		labels = torch.as_tensor(labels, dtype=torch.int64)
+        # Return PIL image for drawing, tensor for inference, and GT data
+        return pil_img, img_tensor, boxes_tensor, labels_tensor
 
-		# Return original dimensions for visualization
-		return (pil_image, image_tensor, boxes, labels)
