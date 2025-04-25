@@ -1,27 +1,21 @@
-# Start from the same PyTorch base to ensure CUDA compatibility
+# Dockerfile.yolov5
 FROM pytorch/pytorch:2.2.2-cuda11.8-cudnn8-runtime
-
-# Unbuffered logging
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
-
-# Git for cloning YOLOv5
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git \
+ && apt-get install -y --no-install-recommends \
+      git \
+      libgl1-mesa-glx \
+      libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
-# Clone a specific YOLOv5 release tag for reproducibility
-RUN git clone --branch v8.0 https://github.com/ultralytics/yolov5.git yolov5_repo
+# Shallow clone of the default (master/main) branch
+RUN git clone --depth 1 https://github.com/ultralytics/yolov5.git yolov5_repo  # from README :contentReference[oaicite:6]{index=6}
 
 WORKDIR /app/yolov5_repo
-
-# Install YOLOv5’s own requirements
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -r requirements.txt
+ && pip install --no-cache-dir -r requirements.txt \
+ && pip install --no-cache-dir gcsfs
 
-# Add GCS support for remote data
-RUN pip install --no-cache-dir gcsfs
-
-# Entrypoint into the Ultralytics training script
 ENTRYPOINT ["python", "train.py"]
