@@ -44,6 +44,7 @@ class DeformableDETRWrapper(nn.Module):
         super().__init__()
         self.hf_model = hf_model
         self.image_processor = image_processor
+        self.backbone = self.hf_model.model.backbone
         self.score_thresh = 0.1
 
     def forward(self, images, targets=None, orig_sizes: Optional[List[List[int]]] = None):
@@ -122,9 +123,14 @@ def get_detection_model(model_type: str, num_classes: int, config: Optional[Dict
     if mt == "fasterrcnn":
         model = fasterrcnn_resnet50_fpn_v2(
             weights=FasterRCNN_ResNet50_FPN_V2_Weights.COCO_V1)
-        sizes = tuple((x, int(x*1.5), x*2) for x in [128,256,512,1024,2048])
-        ratios = ((1.0,3.0,6.0),) * len(sizes)
-        model.rpn.anchor_generator = AnchorGenerator(sizes, ratios)
+        a_cfg = config.get("anchor_params", {})
+        base = a_cfg.get("sizes", [128, 256, 512, 1024, 2048])
+        ratios = a_cfg.get("ratios", [1.0, 3.0, 6.0])
+        anchor_sizes = tuple((x, int(x * 1.5), x * 2) for x in base) \
+            if isinstance(base[0], (int, float)) else tuple(tuple(b) for b in base)
+        aspect_ratios = (tuple(ratios),) * len(anchor_sizes) \
+            if isinstance(ratios[0], (int, float)) else tuple(tuple(r) for r in ratios)
+        model.rpn.anchor_generator = AnchorGenerator(anchor_sizes, aspect_ratios)
         in_channels = model.backbone.out_channels
         n_anchors = model.rpn.anchor_generator.num_anchors_per_location()[0]
         model.rpn.head = RPNHead(in_channels, n_anchors)
@@ -134,9 +140,13 @@ def get_detection_model(model_type: str, num_classes: int, config: Optional[Dict
     elif mt == "retinanet":
         weights = RetinaNet_ResNet50_FPN_V2_Weights.COCO_V1
         model = retinanet_resnet50_fpn_v2(weights=weights)
-        anchor_sizes = tuple((x, int(x * 1.5), x * 2)
-                             for x in [128, 256, 512, 1024, 2048])
-        aspect_ratios = ((1.0, 3.0, 6.0),) * len(anchor_sizes)
+        a_cfg = config.get("anchor_params", {})
+        base = a_cfg.get("sizes", [128, 256, 512, 1024, 2048])
+        ratios = a_cfg.get("ratios", [1.0, 3.0, 6.0])
+        anchor_sizes = tuple((x, int(x * 1.5), x * 2) for x in base) \
+            if isinstance(base[0], (int, float)) else tuple(tuple(b) for b in base)
+        aspect_ratios = (tuple(ratios),) * len(anchor_sizes) \
+            if isinstance(ratios[0], (int, float)) else tuple(tuple(r) for r in ratios)
         model.anchor_generator = AnchorGenerator(
             sizes=anchor_sizes,
             aspect_ratios=aspect_ratios
@@ -165,6 +175,7 @@ def get_detection_model(model_type: str, num_classes: int, config: Optional[Dict
             num_labels=num_classes,
             ignore_mismatched_sizes=True
         )
+        hf_model.config.num_queries = config.get("num_queries", 300)
         return DeformableDETRWrapper(hf_model, processor)
     else:
         raise ValueError(f"Unknown model_type: {model_type}")

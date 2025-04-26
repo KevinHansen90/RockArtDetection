@@ -255,53 +255,122 @@ python src/training/train.py \
 
 For efficient and scalable training of multiple model/dataset combinations, Google Cloud Platform (GCP) using Vertex AI is recommended.
 
-**Purpose:** To run the 20 planned experiments (4 models x 5 dataset versions) cost-effectively within the target budget (~$300), leveraging cloud GPUs.
+**Purpose:** To run the 20 planned experiments (4 models x 5 dataset versions) cost-effectively.
 
-**Overview:**
-1.  **Local Preprocessing:** Prepare all 5 dataset versions (e.g., `base_overlap100`, `bilateral_overlap100`, etc.) locally, including tiling with overlap, splitting, and applying filters.
-2.  **GCS Upload:** Upload the prepared datasets and necessary config files (`.yaml` for custom models, `data.yaml` for YOLOv5) to a Google Cloud Storage (GCS) bucket.
-3.  **Docker Containers:** Create two Docker images (using `Dockerfile` and `Dockerfile.yolov5`) containing the code and dependencies for:
-    * Your custom training script (`src/training/train.py`).
-    * The Ultralytics YOLOv5 training script.
-    Push these images to Google Container Registry (GCR) or Artifact Registry.
-4.  **Vertex AI Custom Jobs:** Submit training jobs (one per experiment) to Vertex AI Training.
-    * Use the appropriate Docker container for each job.
-    * Configure jobs to use cost-effective **preemptible/spot NVIDIA T4 GPUs**.
-    * Pass GCS paths for data, configs, and output directories as arguments.
-    * Ensure training scripts save checkpoints frequently to GCS to handle potential preemptions.
-5.  **Monitoring:** Track job progress and costs in the GCP console. Set budget alerts.
-6.  **GCS Results:** Completed jobs will save outputs (checkpoints, logs, plots) to the specified GCS bucket.
-7.  **Local Analysis:** Download the final trained models (`.pth` or `.pt` files) from GCS for local inference, evaluation, and clustering analysis.
+### 1. Authenticate & Project Setup
 
-**Cost Optimization:** The primary cost-saving techniques are using **preemptible/spot T4 GPUs** and performing all data preprocessing locally.
-
-**Preliminary Runs:** It is highly recommended to first run each job configuration on GCP for only 1-3 epochs to verify the entire pipeline (container works, data access okay, training starts, outputs saved) before launching full training runs.
-
-**Example Job Submission (Conceptual - requires `gcloud` CLI):**
-*For Custom Model (`train.py`):*
 ```bash
-# Example - Replace placeholders with your actual values!
-gcloud ai custom-jobs create \
-  --project=your-project-id \
-  --region=us-central1 \
-  --display-name="train_DETR_bilateral_overlap" \
-  --worker-pool-spec=machine-type=n1-standard-4,replica-count=1,accelerator-type=NVIDIA_TESLA_T4,accelerator-count=1,container-image-uri="gcr.io/your-project-id/rockart-trainer:latest" \
-  --args="--config=gs://your-bucket-name/configs/gcp/bilateral_detr.yaml,--experiment=DETR_bilateral_run1_$(date +%Y%m%d_%H%M%S)" \
-  --base-output-directory="gs://your-bucket-name/experiments/" \
-  --enable-scheduling-termination
+gcloud init
+gcloud config set project YOUR_PROJECT_ID
+export PROJECT_ID=$(gcloud config get-value project)
 ```
 
-*For YOLOv5 (`yolov5/train.py`):*
+### 2. Create a GCS Bucket
 ```bash
-# Example - Replace placeholders with your actual values!
+export BUCKET=rockart-detection-1234
+gsutil mb -l us-central1 gs://$BUCKET/
+```
+
+### 3. Build & Push “Trainer” Docker Image
+```bash
+# (a) Remove old images locally
+docker image rm rockart-trainer:latest \
+                gcr.io/$PROJECT_ID/rockart-trainer:latest || true
+
+# (b) Remove old tags in GCR
+gcloud container images list-tags gcr.io/$PROJECT_ID/rockart-trainer \
+  --format="get(digest)" \
+| xargs -r -I{} gcloud container images delete \
+    gcr.io/$PROJECT_ID/rockart-trainer@{} \
+    --force-delete-tags --quiet
+
+# (c) Build & tag
+docker build -t rockart-trainer:latest .
+docker tag rockart-trainer:latest \
+    gcr.io/$PROJECT_ID/rockart-trainer:latest
+
+# (d) Push to GCR
+gcloud auth configure-docker
+docker push gcr.io/$PROJECT_ID/rockart-trainer:latest
+```
+
+### 4. Build & Push YOLOv5 Docker Image
+
+```bash
+# (a) Remove old YOLO image locally
+docker image rm yolov5-trainer:latest \
+                gcr.io/$PROJECT_ID/yolov5-trainer:latest || true
+
+# (b) Remove old YOLO tags in GCR
+gcloud container images list-tags gcr.io/$PROJECT_ID/yolov5-trainer \
+  --format="get(digest)" \
+| xargs -r -I{} gcloud container images delete \
+    gcr.io/$PROJECT_ID/yolov5-trainer@{} \
+    --force-delete-tags --quiet
+
+# (c) Build & tag YOLO
+docker build -f Dockerfile.yolov5 -t yolov5-trainer:latest .
+docker tag yolov5-trainer:latest \
+    gcr.io/$PROJECT_ID/yolov5-trainer:latest
+
+# (d) Push to GCR
+docker push gcr.io/$PROJECT_ID/yolov5-trainer:latest
+```
+
+### 5. Grant IAM Roles
+
+```bash
+SA="$PROJECT_ID-compute@developer.gserviceaccount.com"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA" --role="roles/storage.objectAdmin"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA" --role="roles/aiplatform.admin"
+```
+
+### 6. Upload Configs, Labels & Data
+
+```bash
+# 6.1 Push all configs
+gsutil -m cp -r configs/* gs://$BUCKET/configs/
+
+# 6.2 Push class list
+gsutil cp data/grouped_classes.txt gs://$BUCKET/data/grouped_classes.txt
+
+# 6.3 Push tiled dataset
+gsutil -m cp -r data/tiles gs://$BUCKET/data/tiles/
+```
+
+### 7. Submit Pilot Jobs
+
+#### 7.1 YOLOv5 Pilot
+
+```bash
 gcloud ai custom-jobs create \
-  --project=your-project-id \
   --region=us-central1 \
-  --display-name="train_YOLOv5m_bilateral_overlap" \
-  --worker-pool-spec=machine-type=n1-standard-4,replica-count=1,accelerator-type=NVIDIA_TESLA_T4,accelerator-count=1,container-image-uri="gcr.io/your-project-id/yolov5-trainer:latest" \
-  --args="--img=640,--batch=16,--epochs=50,--data=gs://your-bucket-name/configs/yolov5/bilateral_overlap100_data.yaml,--weights=yolov5m.pt,--project=gs://your-bucket-name/experiments/YOLOv5m_bilateral_run1/,--name='',--cache=ram" \
-  --base-output-directory="gs://your-bucket-name/experiments/YOLOv5m_bilateral_run1/" \
-  --enable-scheduling-termination
+  --display-name="pilot_yolov5_cpu" \
+  --config=job-yolov5.json
+```
+
+#### 7.2 DETR / Faster-RCNN / RetinaNet Pilots
+
+```bash
+for MODEL in detr frcnn retinanet; do
+  export CONFIG=pilot_${MODEL}.yaml
+  export EXPERIMENT=pilot_${MODEL}_cpu
+
+  envsubst '$CONFIG $EXPERIMENT' < job-template-cpu.json \
+    | gcloud ai custom-jobs create \
+        --region=us-central1 \
+        --display-name="$EXPERIMENT" \
+        --config=-
+done
+```
+
+### 8. Monitor & Stream Logs
+
+```bash
+gcloud ai custom-jobs list --region=us-central1
+gcloud ai custom-jobs stream-logs JOB_ID --region=us-central1
 ```
 
 ## Evaluation

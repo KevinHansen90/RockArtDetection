@@ -118,7 +118,7 @@ def evaluate_and_visualize(
     model.to(device)
 
     mt = model_type.lower()
-    shift_labels = (mt == "fasterrcnn")
+    shift_labels = (mt == "fasterrcnn" or mt == "retinanet")
 
     visualizations = []
     max_vis = min(len(test_loader), 10)
@@ -138,8 +138,15 @@ def evaluate_and_visualize(
         boxes = preds.get("boxes", torch.empty((0, 4))).cpu()
         scores = preds.get("scores", torch.empty((0,))).cpu()
         labels = preds.get("labels", torch.empty((0,))).cpu()
-        # Always filter by score
-        keep = scores >= threshold
+        # Filter by score AND filter out background class (label 0 for FR/Retina)
+        score_keep = scores >= threshold
+        if mt == "fasterrcnn" or mt == "retinanet":
+            # For these models, label 0 is background, filter it out
+            class_keep = labels != 0
+            keep = score_keep & class_keep  # Combine score and non-background filters
+        else:
+            # For DETR, assume background is handled elsewhere or not applicable in the same way
+            keep = score_keep
         pred_boxes = boxes[keep].tolist()
         pred_labels = labels[keep].tolist()
 

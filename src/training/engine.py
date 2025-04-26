@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import torch
 from torch.backends import cudnn
+from torch.cuda.amp import autocast, GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.detection import MeanAveragePrecision
 from torch.optim.lr_scheduler import LinearLR
@@ -41,7 +42,7 @@ def evaluate_on_dataset(
     total_loss = 0.0
     with torch.inference_mode():
         for imgs, tgts in data_loader:
-            imgs = [i.to(device) for i in imgs]
+            imgs = [i.to(device, non_blocking=True) for i in imgs]
             tgts = [{k: v.to(device) for k, v in t.items()} for t in tgts]
             loss_dict = model(imgs, tgts)
             total_loss += compute_total_loss(loss_dict).item()
@@ -52,8 +53,8 @@ def evaluate_on_dataset(
     _map_metric.reset()
     with torch.inference_mode():
         for imgs, tgts in data_loader:
-            imgs = [i.to(device) for i in imgs]
-            tgts = [{k: v.to(device) for k, v in t.items()} for t in tgts]
+            imgs = [i.to(device, non_blocking=True) for i in imgs]
+            tgts = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in tgts]
 
             # Deformable DETR needs orig_sizes
             if isinstance(model, DeformableDETRWrapper):
@@ -146,12 +147,12 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
     classes = load_classes(config["classes_file"])
     num_epochs    = config.get("num_epochs", 10)
     warmup_epochs = config.get("warmup_epochs", 0)
+    accum_steps = max(1, config.get("grad_accum_steps", 1))
 
-    writer = (
-        SummaryWriter(config["log_dir"])
-        if config.get("log_dir")
-        else None
-    )
+    writer = SummaryWriter(config["log_dir"]) if config.get("log_dir") else None
+
+    # AMP scaler: only needed on CUDA
+    scaler = GradScaler() if next(model.parameters()).device.type == "cuda" else None
     global_step = 0
 
     # Warmup scheduler
@@ -177,16 +178,37 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
         # ——— Training pass ———
         model.train()
         running_loss = 0.0
+        accum_count = 0
         for imgs, tgts in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
-            imgs = [i.to(device) for i in imgs]
-            tgts = [{k: v.to(device) for k, v in t.items()} for t in tgts]
-            loss_dict = model(imgs, tgts)
-            loss_val  = compute_total_loss(loss_dict)
+            imgs = [i.to(device, non_blocking=True) for i in imgs]
+            tgts = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in tgts]
 
-            optimizer.zero_grad()
-            loss_val.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
-            optimizer.step()
+            if accum_count == 0:
+                optimizer.zero_grad(set_to_none=True)
+
+            if scaler:
+                # mixed‐precision
+                with autocast():
+                    loss_dict = model(imgs, tgts)
+                    loss_val = compute_total_loss(loss_dict)
+                scaler.scale(loss_val / accum_steps).backward()
+                accum_count += 1
+                if accum_count == accum_steps:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
+                    scaler.step(optimizer)
+                    scaler.update()
+                    accum_count = 0
+            else:
+                # full FP32
+                loss_dict = model(imgs, tgts)
+                loss_val = compute_total_loss(loss_dict)
+                (loss_val / accum_steps).backward()
+                accum_count += 1
+                if accum_count == accum_steps:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
+                    optimizer.step()
+                    accum_count = 0
 
             if warmup_scheduler and epoch < warmup_epochs:
                 warmup_scheduler.step()
@@ -195,6 +217,17 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
             if writer:
                 writer.add_scalar("Train/Loss", loss_val.item(), global_step)
             global_step += 1
+
+        if accum_count:
+            if scaler:
+                scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
+            if scaler:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
+            accum_count = 0
 
         avg_train_loss = running_loss / len(train_loader)
         train_losses.append(avg_train_loss)

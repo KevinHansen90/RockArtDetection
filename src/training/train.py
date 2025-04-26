@@ -169,6 +169,7 @@ def main():
 
 	# Dataset & Dataloader
 	is_detr = (cfg["model_type"].lower() == "deformable_detr")
+	requires_shift_for_viz = not is_detr
 	coll = collate_fn_detr if is_detr else collate_fn
 	transform = get_simple_transform()
 
@@ -180,7 +181,7 @@ def main():
 		"batch_size": cfg.get("batch_size", 2),
 		"shuffle": True,
 		"num_workers": cfg.get("num_workers", 0),
-		"pin_memory": True,
+		"pin_memory": (device.type == "cuda"),
 		"collate_fn": coll,
 		"generator": g,
 	}
@@ -194,6 +195,9 @@ def main():
 	model_type = cfg["model_type"].lower()
 	num_classes = len(classes) + (0 if is_detr else 1)
 	model = get_detection_model(model_type, num_classes, config=cfg).to(device)
+	# optional: compile + fuse for faster kernels on GPU (no effect on CPU)
+	if device.type == "cuda":
+		model = torch.compile(model)
 	optim = get_optimizer(model, cfg)
 	sched = get_scheduler(optim, cfg)
 
@@ -241,7 +245,8 @@ def main():
 	if os.path.isdir(test_imgs) and os.path.isdir(test_lbls):
 		test_ds = TestDataset(test_imgs, test_lbls,
 							  classes_file, transforms=transform,
-							  normalize_boxes=is_detr)
+							  normalize_boxes=is_detr,
+							  shift_labels=requires_shift_for_viz)
 		test_loader = DataLoader(test_ds,
 								 batch_size=1, shuffle=False,
 								 num_workers=0,
@@ -257,7 +262,13 @@ def main():
 
 	# If using cloud, upload all artifacts at end
 	if use_cloud and out_base and out_base.startswith("gs://"):
-		upload_dir(exp_dir, out_base)
+		upload_dir(ckpt_dir, f"{out_base}/checkpoints")
+		upload_dir(log_dir, f"{out_base}/logs")
+		upload_dir(result_dir, f"{out_base}/results")
+		bucket_name, prefix = out_base[5:].split("/", 1)
+		client = storage.Client()
+		blob = client.bucket(bucket_name).blob(f"{prefix}/used_config.yaml")
+		blob.upload_from_filename(dest_cfg)
 		logger.info(f"Uploaded experiment results to {out_base}")
 
 
