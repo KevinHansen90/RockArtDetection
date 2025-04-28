@@ -36,14 +36,15 @@ This project combines **classical** image processing with **modern** deep learni
 
 ```
 project/
-├── configs/                  # Configuration files (.yaml) for experiments
-│   ├── gcp/                  # Configs for GCP runs (pointing to GCS paths)
-│   │   └── base_detr.yaml    # Example GCP config
-│   ├── yolov5/               # YOLOv5 data config files
-│   │   └── base_data.yaml    # Example YOLOv5 data config for GCS
-│   ├── frcnn_config.yaml     # Example local config for Faster R-CNN
-│   ├── retina_config.yaml    # Example local config for RetinaNet
-│   └── detr_config.yaml      # Example local config for Deformable DETR
+├── configs/                   # Hydra configuration tree
+│   ├── data/                  # Dataset variants (base_pilot, bilateral_full, …)
+│   ├── model/                 # Detector-specific hyper-parameters
+│   ├── train/                 # Hardware / loop profiles (cpu_pilot, gpu_t4_pilot, …)
+│   ├── runtime/               # One-off CLI toggles (amp.yaml, debug.yaml, …)
+│   ├── yolov5/                # Ultralytics-style data.yaml files for YOLOv5 jobs
+│   └── defaults.yaml          # Root Hydra defaults list
+│
+├── job_templates/             # Vertex-AI CustomJob JSON templates
 │
 ├── data/
 │   ├── raw/                  # Original large images & their YOLO labels
@@ -219,7 +220,7 @@ nc: 2  # Number of classes
 names: ['Animal', 'Hand'] # Class names
 ```
 
-**Custom Model Loading:** The `src/datasets/yolo_dataset.py` script defines PyTorch `Dataset` classes (`CustomYOLODataset`, `TestDataset`) used by `src/training/train.py` for Faster R-CNN, RetinaNet, and Deformable DETR. It handles coordinate/label format adjustments automatically based on the model type.
+**Custom Model Loading:** The `src/datasets/yolo_dataset.py` script defines a PyTorch `Dataset` class (`YOLODataset`, with `train`, `val` and `test` modes) used by `src/training/train.py` for Faster R-CNN, RetinaNet, and Deformable DETR. It handles coordinate/label format adjustments automatically based on the model type.
 
 ## Model Zoo
 
@@ -247,15 +248,20 @@ This section describes running training experiments locally using `src/training/
 **Example Local Training Command:**
 ```bash
 python src/training/train.py \
-  --config configs/detr_config.yaml \
-  --experiment detr_local_run1
+  model=deformable_detr \         # detector to train
+  data=tiles_base \               # which dataset group in configs/data/
+  train=cpu \                     # training profile (cpu, gpu, etc.)
+  experiment=detr_local_run1      # output sub-folder under experiments/
 ```
 
 ## Cloud Training Workflow (GCP)
 
 For efficient and scalable training of multiple model/dataset combinations, Google Cloud Platform (GCP) using Vertex AI is recommended.
 
-**Purpose:** To run the 20 planned experiments (4 models x 5 dataset versions) cost-effectively.
+**Purpose:**  
+* 4 CPU pilots – one per model on the 10 % “base” subset.
+* 16 GPU pilots – every model × 4 pre-processing subsets (10 %).
+* 2 – 3 full GPU runs – winners retrained on the complete dataset.
 
 ### 1. Authenticate & Project Setup
 
@@ -342,27 +348,73 @@ gsutil -m cp -r data/tiles gs://$BUCKET/data/tiles/
 
 ### 7. Submit Pilot Jobs
 
-#### 7.1 YOLOv5 Pilot
+#### 7.1 YOLOv5 Pilots
+
+##### 7.1.1 CPU pilot (base subset)
 
 ```bash
+export DATA_YAML=base_pilot           # 10 % subset
+export EXPERIMENT=pilot_yolov5_base_cpu
+
+envsubst '$DATA_YAML $EXPERIMENT' \
+  < job_templates/yolov5-pilot-cpu.json | \
 gcloud ai custom-jobs create \
   --region=us-central1 \
-  --display-name="pilot_yolov5_cpu" \
-  --config=job-yolov5.json
+  --display-name="$EXPERIMENT" \
+  --config=-
+```
+
+##### 7.1.2 GPU pilots (pre-processing subsets)
+
+```bash
+for FILTER in bilateral unsharp laplacian clahe; do
+  export DATA_YAML=${FILTER}_pilot
+  export EXPERIMENT=pilot_yolov5_${FILTER}_gpu
+
+  envsubst '$DATA_YAML $EXPERIMENT' \
+    < job_templates/yolov5-pilot-gpu.json | \
+  gcloud ai custom-jobs create \
+    --region=us-central1 \
+    --display-name="$EXPERIMENT" \
+    --config=-
+done
 ```
 
 #### 7.2 DETR / Faster-RCNN / RetinaNet Pilots
 
+#### 7.2.1  CPU pilots  (4 runs, one per model)
+
 ```bash
-for MODEL in detr frcnn retinanet; do
-  export CONFIG=pilot_${MODEL}.yaml
+for MODEL in fasterrcnn retinanet deformable_detr; do
+  export DATA=tiles_base_pilot
+  export TRAIN_PROFILE=cpu_pilot
   export EXPERIMENT=pilot_${MODEL}_cpu
 
-  envsubst '$CONFIG $EXPERIMENT' < job-template-cpu.json \
-    | gcloud ai custom-jobs create \
-        --region=us-central1 \
-        --display-name="$EXPERIMENT" \
-        --config=-
+  envsubst '$MODEL $DATA $TRAIN_PROFILE $EXPERIMENT' \
+    < job_templates/pilot-cpu.json | \
+  gcloud ai custom-jobs create \
+    --region=us-central1 \
+    --display-name="$EXPERIMENT" \
+    --config=-
+done
+```
+
+#### 7.2.2  GPU pilots  (16 runs, model × preprocessing subset)
+
+```bash
+for MODEL in fasterrcnn retinanet deformable_detr; do
+  for FILTER in bilateral unsharp laplacian clahe; do
+    export DATA=tiles_${FILTER}_pilot
+    export TRAIN_PROFILE=gpu_t4_pilot
+    export EXPERIMENT=pilot_${MODEL}_${FILTER}_gpu
+
+    envsubst '$MODEL $DATA $TRAIN_PROFILE $EXPERIMENT' \
+      < job_templates/pilot-gpu.json | \
+    gcloud ai custom-jobs create \
+      --region=us-central1 \
+      --display-name="$EXPERIMENT" \
+      --config=-
+  done
 done
 ```
 

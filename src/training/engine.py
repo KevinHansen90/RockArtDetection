@@ -9,10 +9,14 @@ from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
 
-from src.training.utils import compute_total_loss, auto_amp_supported
+from src.training.utils import (
+    compute_total_loss,
+    auto_amp_supported,
+    get_cfg_dict,         # unified DictConfig → dict helper
+)
 from src.datasets.yolo_dataset import load_classes
 
-# optional import – avoids hard crash if wrapper moves again
+# Optional import – prevents a hard crash if the wrapper moves again
 try:
     from src.models.detection_models import DeformableDETRWrapper  # type: ignore
 except Exception:  # pragma: no cover
@@ -22,11 +26,11 @@ except Exception:  # pragma: no cover
 cudnn.benchmark = True
 _map_metric = MeanAveragePrecision(class_metrics=True)
 
-# --------------------------------------------------------------------------- #
-# Gradient accumulator                                                        #
-# --------------------------------------------------------------------------- #
+# ─────────────────────────────────────────────────────────────────────────────
+# Gradient-accumulation helper
+# ─────────────────────────────────────────────────────────────────────────────
 class GradAccumulator:
-    """Context-free helper to handle micro-batch accumulation."""
+    """Micro-batch accumulator independent of training loop internals."""
 
     def __init__(self, model, optimizer, scaler: GradScaler | None, every: int):
         self.model = model
@@ -64,14 +68,14 @@ class GradAccumulator:
             self.count = 0
 
     def flush(self):
-        if self.count:  # handle leftovers at epoch end
+        if self.count:          # handle leftovers at epoch end
             self._step()
             self.count = 0
 
 
-# --------------------------------------------------------------------------- #
-# Val / metrics helper (unchanged logic)                                      #
-# --------------------------------------------------------------------------- #
+# ─────────────────────────────────────────────────────────────────────────────
+# Validation helper (loss + mAP/mAR)
+# ─────────────────────────────────────────────────────────────────────────────
 def evaluate_on_dataset(
     model,
     data_loader,
@@ -137,10 +141,17 @@ def evaluate_on_dataset(
     )
 
 
-# --------------------------------------------------------------------------- #
-# Training loop                                                               #
-# --------------------------------------------------------------------------- #
+# ─────────────────────────────────────────────────────────────────────────────
+# Training loop
+# ─────────────────────────────────────────────────────────────────────────────
 def train_model(model, train_loader, val_loader, device, optimizer, scheduler, config):
+    """
+    Core training loop.  *config* may be a Hydra DictConfig or a plain dict.
+    We normalise it immediately so legacy `config['key']` access continues
+    to work.
+    """
+    config = get_cfg_dict(config)
+
     classes = load_classes(config["classes_file"])
     num_epochs    = config.get("num_epochs", 10)
     warmup_epochs = config.get("warmup_epochs", 0)
@@ -225,3 +236,4 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
         m_s, m_m, m_l,
         r_s, r_m, r_l,
     )
+

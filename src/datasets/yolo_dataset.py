@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Tuple
 
 import albumentations as A
 import numpy as np

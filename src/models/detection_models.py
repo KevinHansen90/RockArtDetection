@@ -34,6 +34,9 @@ import torchvision.ops.focal_loss as focal_loss_module
 # Hugging Face imports for Deformable-DETR
 from transformers import AutoImageProcessor, DeformableDetrForObjectDetection
 
+# ── our helpers -------------------------------------------------------------
+from src.training.utils import get_cfg_dict  # ← unified cfg → dict helper
+
 log = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
@@ -118,7 +121,7 @@ class DetectorCfg:
     focal_alpha: float = 0.25
     focal_prior: float = 0.01
 
-    # Optimiser params (used by helper below)
+    # Optimiser params
     freeze_backbone: bool = False
     backbone_lr: float = 5e-5
     head_lr: float = 5e-4
@@ -228,15 +231,21 @@ class CustomRetinaNetClassificationHead(RetinaNetClassificationHead):
 # 3.  Factory                                                                 #
 # --------------------------------------------------------------------------- #
 def get_detection_model(
-    model_type: str, num_classes: int, config: Optional[Dict] = None
+    model_type: str | None,
+    num_classes: int,
+    config: Optional[Dict] = None,
 ) -> nn.Module:  # noqa: C901
-    """Return a TorchVision or HF detection model ready for training."""
-    cfg = (
-        config
-        if isinstance(config, DetectorCfg)
-        else DetectorCfg.from_dict(config or {})
-    )
-    mt = cfg.model_type.lower()
+    """
+    Return a TorchVision or HF detection model ready for training.
+
+    *config* may be a Hydra DictConfig, plain ``dict``, or ``DetectorCfg``.
+    """
+    if isinstance(config, DetectorCfg):
+        cfg = config
+    else:
+        cfg = DetectorCfg.from_dict(get_cfg_dict(config or {}))
+
+    mt = (model_type or cfg.model_type).lower()
 
     # -------------------- Faster R-CNN -----------------------------
     if mt == "fasterrcnn":
@@ -286,14 +295,16 @@ def get_detection_model(
         hf_model.config.num_queries = cfg.num_queries
         return DeformableDETRWrapper(hf_model, processor)
 
-    raise ValueError(f"Unknown model_type: {model_type}")
+    raise ValueError(f"Unknown model_type: {mt}")
 
 
 # --------------------------------------------------------------------------- #
 # 4.  Optimiser & scheduler helpers                                           #
 # --------------------------------------------------------------------------- #
 def get_optimizer(model: nn.Module, config: Dict) -> Optimizer:
-    cfg = DetectorCfg.from_dict(config)
+    cfg = (
+        config if isinstance(config, DetectorCfg) else DetectorCfg.from_dict(get_cfg_dict(config))
+    )
 
     bb_params = (
         list(model.backbone.parameters()) if hasattr(model, "backbone") else []
@@ -328,52 +339,56 @@ def get_optimizer(model: nn.Module, config: Dict) -> Optimizer:
 
 
 def get_scheduler(optimizer: Optimizer, config: Dict) -> Optional[LRScheduler]:
-    sname = (config.get("scheduler") or "none").lower()
+    cfg_dict = get_cfg_dict(config)
+    sname = (cfg_dict.get("scheduler") or "none").lower()
+
     if sname == "none":
         return None
     if sname == "steplr":
         return StepLR(
             optimizer,
-            step_size=config.get("step_size", 7),
-            gamma=config.get("gamma", 0.1),
+            step_size=cfg_dict.get("step_size", 7),
+            gamma=cfg_dict.get("gamma", 0.1),
         )
     if sname == "reducelronplateau":
         return ReduceLROnPlateau(
             optimizer,
             mode="min",
-            factor=config.get("plateau_factor", 0.5),
-            patience=config.get("plateau_patience", 5),
+            factor=cfg_dict.get("plateau_factor", 0.5),
+            patience=cfg_dict.get("plateau_patience", 5),
         )
     if sname == "cosineannealinglr":
         return CosineAnnealingLR(
-            optimizer, T_max=config.get("T_max", 10), eta_min=config.get("eta_min", 0)
+            optimizer,
+            T_max=cfg_dict.get("T_max", 10),
+            eta_min=cfg_dict.get("eta_min", 0),
         )
     if sname == "cosineannealingwarmrestarts":
         return CosineAnnealingWarmRestarts(
             optimizer,
-            T_0=config.get("T_0", 10),
-            T_mult=config.get("T_mult", 1),
-            eta_min=config.get("eta_min", 0),
+            T_0=cfg_dict.get("T_0", 10),
+            T_mult=cfg_dict.get("T_mult", 1),
+            eta_min=cfg_dict.get("eta_min", 0),
         )
     if sname == "multisteplr":
         return MultiStepLR(
             optimizer,
-            milestones=config.get("milestones", [30, 60]),
-            gamma=config.get("gamma", 0.1),
+            milestones=cfg_dict.get("milestones", [30, 60]),
+            gamma=cfg_dict.get("gamma", 0.1),
         )
     if sname == "onecyclelr":
         return OneCycleLR(
             optimizer,
-            max_lr=config.get(
+            max_lr=cfg_dict.get(
                 "max_lr", [pg["lr"] for pg in optimizer.param_groups]
             ),
-            total_steps=config.get("total_steps", 100),
-            pct_start=config.get("pct_start", 0.3),
-            anneal_strategy=config.get("anneal_strategy", "cos"),
-            cycle_momentum=config.get("cycle_momentum", True),
-            base_momentum=config.get("base_momentum", 0.85),
-            max_momentum=config.get("max_momentum", 0.95),
-            div_factor=config.get("div_factor", 25.0),
-            final_div_factor=config.get("final_div_factor", 10000.0),
+            total_steps=cfg_dict.get("total_steps", 100),
+            pct_start=cfg_dict.get("pct_start", 0.3),
+            anneal_strategy=cfg_dict.get("anneal_strategy", "cos"),
+            cycle_momentum=cfg_dict.get("cycle_momentum", True),
+            base_momentum=cfg_dict.get("base_momentum", 0.85),
+            max_momentum=cfg_dict.get("max_momentum", 0.95),
+            div_factor=cfg_dict.get("div_factor", 25.0),
+            final_div_factor=cfg_dict.get("final_div_factor", 10000.0),
         )
     raise ValueError(f"Unsupported scheduler: {sname}")
