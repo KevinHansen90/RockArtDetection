@@ -1,13 +1,22 @@
 \chapter{Materiales y Métodos}
 
-A continuación se describe la metodología empleada en el estudio, detallando los materiales y procedimientos que permiten analizar y clasificar las representaciones de arte rupestre presentes en las imágenes seleccionadas. Primero, se expone el proceso de selección y clasificación de imágenes, considerando la diversidad iconográfica y las condiciones de captura de las mismas. Seguidamente, se presenta la división automática de las imágenes en sub-regiones que facilitan la tarea de detección y el empleo de técnicas de preprocesamiento, diseñadas para mejorar la visibilidad de elementos complejos o de bajo contraste. Se incluye una selección de modelos de detección preentrenados y se describe el proceso experimental implementado para evaluar su rendimiento. Finalmente, se detallan los métodos de agrupamiento aplicados para la organización de elementos identificados, junto con una discusión de los resultados preliminares, las métricas evaluadas y las conclusiones de las técnicas y modelos que mejor se adaptan a la problemática de detección en arte rupestre.
+A continuación se describe la metodología empleada en el estudio, detallando los materiales y procedimientos que permiten analizar y clasificar las representaciones de arte rupestre presentes en las imágenes seleccionadas.
+Primero, se expone el proceso de selección y clasificación de imágenes, considerando la diversidad iconográfica y las condiciones de captura de las mismas.
+Seguidamente, se presenta la división automática de las imágenes en sub-regiones que facilitan la tarea de detección y el empleo de técnicas de preprocesamiento, diseñadas para mejorar la visibilidad de elementos complejos o de bajo contraste.
+Se incluye una selección de modelos de detección preentrenados y se describe el proceso experimental implementado para evaluar su rendimiento.
+Finalmente, se detallan los métodos de agrupamiento aplicados para la organización de elementos identificados, junto con una discusión de los resultados preliminares, las métricas evaluadas y las conclusiones de las técnicas y modelos que mejor se adaptan a la problemática de detección en arte rupestre.
 
 \section{Selección de Imágenes}
-Se seleccionan un total de 686 fotografías con una resolución de 4288x2848 píxeles, capturadas entre los años 2019 y 2023 en los aleros de Cueva de las Manos, ubicada en la zona de Río Pinturas, Santa Cruz, Argentina. Estas imágenes son tomadas por el equipo de arqueólogos que trabajan en el sitio y pertenecen al Instituto Nacional de Antropología y Pensamiento Latinoamericano (INAPL). Se trabaja en estrecha colaboración con Agustina Papú, una arqueóloga especializada en Arte Rupestre, quien asiste en la selección y etiquetado de las imágenes.
+Se seleccionan un total de 686 fotografías con una resolución de 4288x2848 píxeles, capturadas entre los años 2019 y 2023 en los aleros de Cueva de las Manos, ubicada en la zona de Río Pinturas, Santa Cruz, Argentina.
+Estas imágenes son tomadas por el equipo de arqueólogos que trabajan en el sitio y pertenecen al Instituto Nacional de Antropología y Pensamiento Latinoamericano (INAPL).
+Se trabaja en estrecha colaboración con Agustina Papú, una arqueóloga especializada en Arte Rupestre, quien asiste en la selección y etiquetado de las imágenes.
 
-La metodología para la selección de las imágenes busca cubrir la totalidad de los paneles presentes en los aleros, asegurando la repetición de capturas en aquellas zonas donde se consiguen diferentes ángulos o condiciones lumínicas. Esta estrategia permite obtener una representación más completa de los elementos presentes en el sitio.
+La metodología para la selección de las imágenes busca cubrir la totalidad de los paneles presentes en los aleros, asegurando la repetición de capturas en aquellas zonas donde se consiguen diferentes ángulos o condiciones lumínicas.
+Esta estrategia permite obtener una representación más completa de los elementos presentes en el sitio.
 
-En la Figura \ref{fig:imagen_ejemplo} se muestra un ejemplo de las imágenes seleccionadas. Esta imagen contiene un total de X elementos, donde se observa la presencia de superposiciones, una característica común en el arte rupestre de la zona. La diferenciación de algunos de estos elementos respecto del fondo presenta dificultades, dadas las similitudes cromáticas y la erosión natural que ha sufrido la superficie rocosa a lo largo del tiempo. Estas condiciones complican el reconocimiento automatizado del arte rupestre.
+En la Figura \ref{fig:imagen_ejemplo} se muestra un ejemplo de las imágenes seleccionadas. Esta imagen contiene un total de X elementos, donde se observa la presencia de superposiciones, una característica común en el arte rupestre de la zona.
+La diferenciación de algunos de estos elementos respecto del fondo presenta dificultades, dadas las similitudes cromáticas y la erosión natural que ha sufrido la superficie rocosa a lo largo del tiempo.
+Estas condiciones complican el reconocimiento automatizado del arte rupestre.
 
 \begin{figure}[ht!]
     \centering
@@ -18,9 +27,12 @@ En la Figura \ref{fig:imagen_ejemplo} se muestra un ejemplo de las imágenes sel
 
 \section{Clasificación y Etiquetado de Imágenes}
 
-En el sitio arqueológico de Cueva de las Manos se encuentran imágenes que varían considerablemente en su grado de abstracción, abarcando desde representaciones detalladas de animales y figuras humanas hasta elementos geométricos más simples. Esta diversidad iconográfica refleja la riqueza del arte rupestre de la región, cubriendo tanto aspectos figurativos como abstractos.
+En el sitio arqueológico de Cueva de las Manos se encuentran imágenes que varían considerablemente en su grado de abstracción, abarcando desde representaciones detalladas de animales y figuras humanas hasta elementos geométricos más simples.
+Esta diversidad iconográfica refleja la riqueza del arte rupestre de la región, cubriendo tanto aspectos figurativos como abstractos.
 
-Con el objetivo de llevar a cabo un análisis detallado y sistemático, se propone una clasificación inicial de las imágenes, que comprende un total de 19 clases distintas. Esta clasificación se basa en los conocimientos especializados de la licenciada Agustina Papú, arqueóloga experta en arte rupestre, quien colabora estrechamente en este proceso. Las clases iniciales propuestas son las siguientes:
+Con el objetivo de llevar a cabo un análisis detallado y sistemático, se propone una clasificación inicial de las imágenes, que comprende un total de 19 clases distintas.
+Esta clasificación se basa en los conocimientos especializados de la licenciada Agustina Papú, arqueóloga experta en arte rupestre, quien colabora estrechamente en este proceso.
+Las clases iniciales propuestas son las siguientes:
 
 \begin{itemize}
     \item Zoomorfo (artiodactyla)
@@ -44,9 +56,12 @@ Con el objetivo de llevar a cabo un análisis detallado y sistemático, se propo
     \item Tridígitos
 \end{itemize}
 
-La herramienta makesense.ai ~\cite{makesense} se utiliza para el etiquetado de las imágenes, elegida por su facilidad de uso y la capacidad de trabajar con lotes de tamaño personalizado. Esta flexibilidad permite adaptarse a la disponibilidad de la arqueóloga, optimizando así el proceso de etiquetado. A lo largo de un mes, se lleva a cabo el etiquetado de las imágenes utilizando la clasificación inicial mencionada, lo que facilita no sólo la organización de los datos, sino también un análisis más profundo de las representaciones iconográficas presentes en el sitio.
+La herramienta makesense.ai ~\cite{makesense} se utiliza para el etiquetado de las imágenes, elegida por su facilidad de uso y la capacidad de trabajar con lotes de tamaño personalizado.
+Esta flexibilidad permite adaptarse a la disponibilidad de la arqueóloga, optimizando así el proceso de etiquetado.
+A lo largo de un mes, se lleva a cabo el etiquetado de las imágenes utilizando la clasificación inicial mencionada, lo que facilita no sólo la organización de los datos, sino también un análisis más profundo de las representaciones iconográficas presentes en el sitio.
 
-En la Figura \ref{fig:imagen_etiquetada} se presenta un ejemplo de una de las imágenes etiquetadas según esta clasificación inicial. Esta figura ilustra cómo las diferentes clases se aplican a los elementos identificados en la imagen, proporcionando una visualización clara del proceso de etiquetado.
+En la Figura \ref{fig:imagen_etiquetada} se presenta un ejemplo de una de las imágenes etiquetadas según esta clasificación inicial.
+Esta figura ilustra cómo las diferentes clases se aplican a los elementos identificados en la imagen, proporcionando una visualización clara del proceso de etiquetado.
 
 \begin{figure}[ht!]
     \centering
@@ -56,9 +71,12 @@ En la Figura \ref{fig:imagen_etiquetada} se presenta un ejemplo de una de las im
 \end{figure}
 
 \section{División Automática de Imágenes}
-Dada la gran cantidad de elementos presentes en cada imagen y la dificultad inherente en la detección de objetos, se decide dividir las imágenes automáticamente en cuadrados de 512x512 píxeles, tamaño estándar utilizado en la mayoría de los modelos de detección de objetos. Esta división se realiza manteniendo los objetos etiquetados originalmente, los cuales pueden quedar fraccionados, y descartando aquellos cuadrados en los que no se identifica ninguna parte relevante de las etiquetas.
+Dada la gran cantidad de elementos presentes en cada imagen y la dificultad inherente en la detección de objetos, se decide dividir las imágenes automáticamente en cuadrados de 512x512 píxeles, tamaño estándar utilizado en la mayoría de los modelos de detección de objetos.
+Esta división se realiza manteniendo los objetos etiquetados originalmente, los cuales pueden quedar fraccionados, y descartando aquellos cuadrados en los que no se identifica ninguna parte relevante de las etiquetas.
 
-En la Figura \ref{fig:imagen_dividida} se muestran cinco recortes de 512x512 píxeles obtenidos a partir de la imagen original. Cada clase identificada en los recortes está representada por un color específico, lo cual facilita la visualización de los distintos elementos en el arte rupestre. A continuación, se detalla la correspondencia de cada clase con su color:
+En la Figura \ref{fig:imagen_dividida} se muestran cinco recortes de 512x512 píxeles obtenidos a partir de la imagen original.
+Cada clase identificada en los recortes está representada por un color específico, lo cual facilita la visualización de los distintos elementos en el arte rupestre.
+A continuación, se detalla la correspondencia de cada clase con su color:
 
 \begin{itemize}
     \item \textbf{Zoomorfo (artiodactyla)}: Representado en \textcolor{red}{rojo}.
@@ -110,45 +128,79 @@ Esta correspondencia permite una identificación visual rápida y facilita la in
 \end{figure}
 
 \section{Selección de Técnicas de Preprocesamiento}
-Tras la división automática de las imágenes, se seleccionan distintas técnicas de preprocesamiento con el objetivo de resaltar contrastes y mejorar la detección de objetos. Estas técnicas se eligen basándose en su efectividad en escenarios similares, como la detección de objetos camuflados en entornos complejos, y son las siguientes:
+Tras la división automática de las imágenes, se seleccionan distintas técnicas de preprocesamiento con el objetivo de resaltar contrastes y mejorar la detección de objetos.
+Estas técnicas se eligen basándose en su efectividad en escenarios similares, como la detección de objetos camuflados en entornos complejos, y son las siguientes:
 
 \begin{itemize}
-    \item \textbf{Ecualización de Histograma (CLAHE):} La técnica de Ecualización de Histograma Adaptativa con Limitación de Contraste (CLAHE) fue introducida para mejorar el contraste local en las imágenes, siendo especialmente útil en áreas con iluminación desigual o bajo contraste, como el arte rupestre. CLAHE limita la amplificación de contraste para evitar la sobreexposición en áreas claras o oscuras, manteniendo los detalles en las zonas intermedias \cite{zuiderveld1994contrast}. Este método ha demostrado ser particularmente efectivo para resaltar diferencias sutiles entre el fondo y los elementos pictográficos.
+    \item \textbf{Ecualización de Histograma (CLAHE):}
+    La técnica de Ecualización de Histograma Adaptativa con Limitación de Contraste (CLAHE) fue introducida para mejorar el contraste local en las imágenes, siendo especialmente útil en áreas con iluminación desigual o bajo contraste, como el arte rupestre.
+    CLAHE limita la amplificación de contraste para evitar la sobreexposición en áreas claras o oscuras, manteniendo los detalles en las zonas intermedias \cite{zuiderveld1994contrast}.
+    Este método ha demostrado ser particularmente efectivo para resaltar diferencias sutiles entre el fondo y los elementos pictográficos.
 
-    \item \textbf{Filtro Bilateral:} Propuso por Tomasi y Manduchi \cite{tomasi1998bilateral}, el filtro bilateral suaviza la imagen mientras preserva los bordes, ideal para contextos donde es necesario reducir el ruido sin perder detalles importantes. En el arte rupestre, donde la textura y el detalle son esenciales, este filtro ayuda a mejorar la visibilidad de los elementos, preservando las características clave de bordes.
+    \item \textbf{Filtro Bilateral:}
+    Propuso por Tomasi y Manduchi \cite{tomasi1998bilateral}, el filtro bilateral suaviza la imagen mientras preserva los bordes, ideal para contextos donde es necesario reducir el ruido sin perder detalles importantes.
+    En el arte rupestre, donde la textura y el detalle son esenciales, este filtro ayuda a mejorar la visibilidad de los elementos, preservando las características clave de bordes.
 
-    \item \textbf{Filtro Gaussiano:} Este filtro, ampliamente estudiado en el procesamiento de imágenes, reduce el ruido mediante la aplicación de una convolución con un núcleo gaussiano, suavizando las imágenes mediante un promedio ponderado de los píxeles vecinos. Al ser menos susceptible a ruidos aleatorios, ayuda a eliminar imperfecciones sin perder la estructura general de los elementos pictográficos \cite{gonzalesWood}.
+    \item \textbf{Filtro Gaussiano:}
+    Este filtro, ampliamente estudiado en el procesamiento de imágenes, reduce el ruido mediante la aplicación de una convolución con un núcleo gaussiano, suavizando las imágenes mediante un promedio ponderado de los píxeles vecinos.
+    Al ser menos susceptible a ruidos aleatorios, ayuda a eliminar imperfecciones sin perder la estructura general de los elementos pictográficos \cite{gonzalesWood}.
 
-    \item \textbf{Escala de Grises:} La conversión a escala de grises es una técnica clásica en el procesamiento de imágenes que permite simplificar la información reduciéndola a variaciones de intensidad en una sola dimensión. Esto facilita el enfoque en formas y contornos sin las distracciones del color, siendo especialmente relevante para analizar patrones en el arte rupestre, donde las diferencias de color no siempre aportan información significativa \cite{gonzalesWood}.
+    \item \textbf{Escala de Grises:}
+    La conversión a escala de grises es una técnica clásica en el procesamiento de imágenes que permite simplificar la información reduciéndola a variaciones de intensidad en una sola dimensión.
+    Esto facilita el enfoque en formas y contornos sin las distracciones del color, siendo especialmente relevante para analizar patrones en el arte rupestre, donde las diferencias de color no siempre aportan información significativa \cite{gonzalesWood}.
 
-    \item \textbf{Pirámide Laplaciana:} Introducida por Burt y Adelson \cite{burt1983laplacian}, la pirámide laplaciana permite representar la imagen en diferentes niveles de detalle. Esta técnica es ideal para analizar elementos grandes y pequeños en imágenes complejas, como las de arte rupestre, donde se necesita visualizar tanto detalles finos como formas generales para una adecuada identificación.
+    \item \textbf{Pirámide Laplaciana:}
+    Introducida por Burt y Adelson \cite{burt1983laplacian}, la pirámide laplaciana permite representar la imagen en diferentes niveles de detalle.
+    Esta técnica es ideal para analizar elementos grandes y pequeños en imágenes complejas, como las de arte rupestre, donde se necesita visualizar tanto detalles finos como formas generales para una adecuada identificación.
 
-    \item \textbf{Transformaciones de Color:} Las transformaciones de color, exploradas en profundidad en la literatura de procesamiento de imágenes, permiten manipular el espacio de color de la imagen para resaltar características específicas \cite{gonzalesWood}. Estas transformaciones pueden ser útiles para el análisis de imágenes de arte rupestre al reducir la interferencia de colores irrelevantes y resaltar elementos importantes en el espectro de color.
+    \item \textbf{Transformaciones de Color:}
+    Las transformaciones de color, exploradas en profundidad en la literatura de procesamiento de imágenes, permiten manipular el espacio de color de la imagen para resaltar características específicas \cite{gonzalesWood}.
+    Estas transformaciones pueden ser útiles para el análisis de imágenes de arte rupestre al reducir la interferencia de colores irrelevantes y resaltar elementos importantes en el espectro de color.
 \end{itemize}
 
-La aplicación de estas técnicas a las imágenes seleccionadas busca mejorar la calidad de la detección de objetos en las pinturas rupestres. Al resaltar contrastes, reducir ruido y enfocar las características clave, se espera que estas técnicas permitan una detección más precisa y efectiva de los elementos presentes en el arte rupestre de la Cueva de las Manos.
+La aplicación de estas técnicas a las imágenes seleccionadas busca mejorar la calidad de la detección de objetos en las pinturas rupestres.
+Al resaltar contrastes, reducir ruido y enfocar las características clave, se espera que estas técnicas permitan una detección más precisa y efectiva de los elementos presentes en el arte rupestre de la Cueva de las Manos.
 
 \section{Selección de Modelos Preentrenados}
-Se seleccionan modelos preentrenados de diversas estructuras, teniendo en cuenta su eficacia en la detección de objetos pequeños y de bajo contraste, como los presentes en el arte rupestre, así como su disponibilidad como open source, compatibilidad con los recursos computacionales disponibles, y la diversidad en la literatura revisada. Los modelos seleccionados incluyen:
+Se seleccionan modelos preentrenados de diversas estructuras, teniendo en cuenta su eficacia en la detección de objetos pequeños y de bajo contraste, como los presentes en el arte rupestre, así como su disponibilidad como open source, compatibilidad con los recursos computacionales disponibles, y la diversidad en la literatura revisada.
+Los modelos seleccionados incluyen:
 
 \begin{itemize}
-    \item \textbf{CNNs de una etapa (RetinaNet, YOLOv5):} RetinaNet se selecciona por su capacidad para manejar el desequilibrio de clases a través de su función de pérdida focal \cite{lin2017focal}. Este enfoque es particularmente útil en problemas donde ciertos objetos pequeños, como los elementos de arte rupestre, tienden a estar subrepresentados y podrían ser ignorados. Además, el uso de la Red de Pirámide de Características (FPN) permite a RetinaNet detectar objetos de diferentes tamaños y en condiciones de bajo contraste, haciendo que sea una opción robusta para detección de arte rupestre con detalles finos. Por su parte, YOLOv5 se selecciona debido a su rapidez y eficiencia, proporcionando un balance entre precisión y velocidad \cite{yolov5}. Su diseño optimizado permite realizar pruebas iterativas de manera rápida, aunque enfrenta limitaciones en contextos de bajo contraste y con objetos superpuestos, comunes en imágenes de arte rupestre.
+    \item \textbf{CNNs de una etapa (RetinaNet, YOLOv5):}
+    RetinaNet se selecciona por su capacidad para manejar el desequilibrio de clases a través de su función de pérdida focal \cite{lin2017focal}.
+    Este enfoque es particularmente útil en problemas donde ciertos objetos pequeños, como los elementos de arte rupestre, tienden a estar subrepresentados y podrían ser ignorados.
+    Además, el uso de la Red de Pirámide de Características (FPN) permite a RetinaNet detectar objetos de diferentes tamaños y en condiciones de bajo contraste, haciendo que sea una opción robusta para detección de arte rupestre con detalles finos.
+    Por su parte, YOLOv5 se selecciona debido a su rapidez y eficiencia, proporcionando un balance entre precisión y velocidad \cite{yolov5}.
+    Su diseño optimizado permite realizar pruebas iterativas de manera rápida, aunque enfrenta limitaciones en contextos de bajo contraste y con objetos superpuestos, comunes en imágenes de arte rupestre.
 
-    \item \textbf{CNNs de dos etapas (Faster R-CNN):} Faster R-CNN es conocido por su capacidad de detectar objetos con alta precisión gracias a su estructura de dos etapas \cite{ren2015faster}. Este modelo utiliza Redes de Propuesta de Regiones (RPN) para generar posibles ubicaciones de objetos, lo que le permite enfocar sus predicciones de manera refinada, algo crucial para detectar pequeños elementos y manejar la superposición que se encuentra en el arte rupestre. Al combinar Faster R-CNN con FPN, se logra mejorar la detección en múltiples escalas, permitiendo capturar tanto elementos grandes como detalles pequeños con mayor precisión.
+    \item \textbf{CNNs de dos etapas (Faster R-CNN):}
+    Faster R-CNN es conocido por su capacidad de detectar objetos con alta precisión gracias a su estructura de dos etapas \cite{ren2015faster}.
+    Este modelo utiliza Redes de Propuesta de Regiones (RPN) para generar posibles ubicaciones de objetos, lo que le permite enfocar sus predicciones de manera refinada, algo crucial para detectar pequeños elementos y manejar la superposición que se encuentra en el arte rupestre.
+    Al combinar Faster R-CNN con FPN, se logra mejorar la detección en múltiples escalas, permitiendo capturar tanto elementos grandes como detalles pequeños con mayor precisión.
 
-    \item \textbf{Modelos basados en transformers (Deformable DETR):} Deformable DETR se selecciona por sus mejoras en la detección de objetos pequeños y su capacidad para manejar escenas complejas \cite{zhu2021deformable}. A diferencia de DETR original, Deformable DETR incorpora un mecanismo de atención deformable que focaliza su atención en áreas específicas de la imagen, adaptándose a patrones irregulares como los presentes en el arte rupestre. Esta técnica es particularmente eficaz para trabajar con la superposición y el bajo contraste característicos de estos entornos. Además, su arquitectura end-to-end simplifica el proceso de detección, eliminando la necesidad de etapas separadas de anclaje y refinamiento, lo cual es ventajoso cuando se trabaja con objetos abstractos y difusos.
+    \item \textbf{Modelos basados en transformers (Deformable DETR):}
+    Deformable DETR se selecciona por sus mejoras en la detección de objetos pequeños y su capacidad para manejar escenas complejas \cite{zhu2021}.
+    A diferencia de DETR original, Deformable DETR incorpora un mecanismo de atención deformable que focaliza su atención en áreas específicas de la imagen, adaptándose a patrones irregulares como los presentes en el arte rupestre.
+    Esta técnica es particularmente eficaz para trabajar con la superposición y el bajo contraste característicos de estos entornos.
+    Además, su arquitectura end-to-end simplifica el proceso de detección, eliminando la necesidad de etapas separadas de anclaje y refinamiento, lo cual es ventajoso cuando se trabaja con objetos abstractos y difusos.
 \end{itemize}
 
-Estos modelos se entrenan sobre un conjunto de 128 imágenes como conjunto de entrenamiento y 32 como conjunto de validación, divididas aleatoriamente y manteniendo solamente las etiquetas de animales, con el objetivo de reducir la complejidad para los modelos, utilizando uno de los elementos de menor abstracción. Esta aproximación permite una evaluación preliminar del rendimiento de cada modelo en un contexto relevante antes de proceder con ajustes y optimizaciones adicionales.
+Estos modelos se entrenan sobre un conjunto de 128 imágenes como conjunto de entrenamiento y 32 como conjunto de validación, divididas aleatoriamente y manteniendo solamente las etiquetas de animales, con el objetivo de reducir la complejidad para los modelos, utilizando uno de los elementos de menor abstracción.
+Esta aproximación permite una evaluación preliminar del rendimiento de cada modelo en un contexto relevante antes de proceder con ajustes y optimizaciones adicionales.
 
 \section{Métricas Utilizadas}
 
 Las métricas utilizadas para evaluar el rendimiento de los modelos son:
 
 \begin{itemize}
-    \item \textbf{mAP\textsubscript{0.5} (mean Average Precision at 0.5 IoU):} Esta métrica mide la precisión media del modelo en la detección de objetos, utilizando un umbral de Intersección sobre Unión (IoU) de 0.5. El valor de mAP se calcula promediando la precisión en todas las clases y a lo largo de múltiples puntos de recuperación, proporcionando una visión general de la capacidad del modelo para detectar correctamente los objetos. Una mAP más alta indica que el modelo tiene un mejor rendimiento general en la localización y clasificación de los objetos \cite{lin2014microsoft,everingham2010pascal}.
+    \item \textbf{mAP\textsubscript{0.5} (mean Average Precision at 0.5 IoU):}
+    Esta métrica mide la precisión media del modelo en la detección de objetos, utilizando un umbral de Intersección sobre Unión (IoU) de 0.5.
+    El valor de mAP se calcula promediando la precisión en todas las clases y a lo largo de múltiples puntos de recuperación, proporcionando una visión general de la capacidad del modelo para detectar correctamente los objetos.
+    Una mAP más alta indica que el modelo tiene un mejor rendimiento general en la localización y clasificación de los objetos \cite{lin2014microsoft,everingham2010pascal}.
 
-    \item \textbf{mar\textsubscript{100} (mean Average Recall @ 100 detections per image):} Esta métrica mide el recall promedio del modelo, considerando un máximo de 100 detecciones por imagen. A diferencia de la precisión, el recall se centra en la capacidad del modelo para detectar todos los objetos relevantes en la imagen. Un valor más alto de mar\textsubscript{100} sugiere que el modelo tiene una mayor capacidad para identificar la mayoría de los objetos presentes, lo cual es crucial en tareas de detección de objetos donde es importante minimizar los falsos negativos \cite{cocoEval2015}.
+    \item \textbf{mar\textsubscript{100} (mean Average Recall @ 100 detections per image):}
+    Esta métrica mide el recall promedio del modelo, considerando un máximo de 100 detecciones por imagen.
+    A diferencia de la precisión, el recall se centra en la capacidad del modelo para detectar todos los objetos relevantes en la imagen. Un valor más alto de mar\textsubscript{100} sugiere que el modelo tiene una mayor capacidad para identificar la mayoría de los objetos presentes, lo cual es crucial en tareas de detección de objetos donde es importante minimizar los falsos negativos \cite{cocoEval2015}.
 \end{itemize}
 
 \section{Proceso Experimental}
@@ -160,7 +212,9 @@ El proceso experimental se lleva a cabo de la siguiente manera:
 \end{itemize}
 
 \subsection{Resultados Experimentales Preliminares}
-En la Tabla~\ref{tab:resultados_preliminares}, se presentan los resultados experimentales preliminares obtenidos al aplicar distintas técnicas de preprocesamiento sobre varios modelos de detección de objetos, evaluados en la época 10. Los valores reportados para cada combinación de modelo y técnica incluyen la pérdida de entrenamiento (\textit{Train Loss}), la pérdida de validación (\textit{Val Loss}), la media de precisión (\textit{mAP\textsubscript{0.5}}) y el \textit{recall} medio (\textit{mar\textsubscript{100}}). A continuación, se analizan los resultados de cada modelo y el impacto de las diferentes técnicas de preprocesamiento.
+En la Tabla~\ref{tab:resultados_preliminares}, se presentan los resultados experimentales preliminares obtenidos al aplicar distintas técnicas de preprocesamiento sobre varios modelos de detección de objetos, evaluados en la época 10.
+Los valores reportados para cada combinación de modelo y técnica incluyen la pérdida de entrenamiento (\textit{Train Loss}), la pérdida de validación (\textit{Val Loss}), la media de precisión (\textit{mAP\textsubscript{0.5}}) y el \textit{recall} medio (\textit{mar\textsubscript{100}}).
+A continuación, se analizan los resultados de cada modelo y el impacto de las diferentes técnicas de preprocesamiento.
 
 \begin{table}[htbp]
     \centering
@@ -194,15 +248,33 @@ En la Tabla~\ref{tab:resultados_preliminares}, se presentan los resultados exper
     \label{tab:resultados_preliminares}
 \end{table}
 
-Para YOLOv5, la configuración base sin preprocesamiento adicional muestra una \textit{Train Loss} de 0.125752 y una \textit{Val Loss} de 0.097014, alcanzando un \textit{mAP\textsubscript{0.5}} de 0.10815 y un \textit{mar\textsubscript{100}} de 0.32653. Entre las técnicas de preprocesamiento, el filtro bilateral mejora levemente el \textit{mAP\textsubscript{0.5}} (0.12424) y el \textit{mar\textsubscript{100}} (0.34694), lo cual sugiere que el filtro bilateral permite conservar mejor las características clave al reducir el ruido sin afectar los bordes. Por otro lado, la técnica de CLAHE, aunque reduce la \textit{Val Loss} a 0.094315, muestra una disminución en \textit{mAP\textsubscript{0.5}} (0.076353) y \textit{mar\textsubscript{100}} (0.040816), indicando que el aumento de contraste local introducido por CLAHE no beneficia la detección de objetos en este caso. \textit{Unsharp Masking}, por su parte, incrementa el \textit{mAP\textsubscript{0.5}} a 0.13915, lo que sugiere que el realce de bordes mejora la identificación de elementos de bajo contraste, aunque su \textit{mar\textsubscript{100}} permanece bajo (0.10204). La \textit{Pirámide Laplaciana} no parece aportar mejoras significativas y presenta valores de \textit{mAP\textsubscript{0.5}} y \textit{mar\textsubscript{100}} menores comparados con la configuración base.
+Para YOLOv5, la configuración base sin preprocesamiento adicional muestra una \textit{Train Loss} de 0.125752 y una \textit{Val Loss} de 0.097014, alcanzando un \textit{mAP\textsubscript{0.5}} de 0.10815 y un \textit{mar\textsubscript{100}} de 0.32653.
+Entre las técnicas de preprocesamiento, el filtro bilateral mejora levemente el \textit{mAP\textsubscript{0.5}} (0.12424) y el \textit{mar\textsubscript{100}} (0.34694), lo cual sugiere que el filtro bilateral permite conservar mejor las características clave al reducir el ruido sin afectar los bordes.
+Por otro lado, la técnica de CLAHE, aunque reduce la \textit{Val Loss} a 0.094315, muestra una disminución en \textit{mAP\textsubscript{0.5}} (0.076353) y \textit{mar\textsubscript{100}} (0.040816), indicando que el aumento de contraste local introducido por CLAHE no beneficia la detección de objetos en este caso.
+\textit{Unsharp Masking}, por su parte, incrementa el \textit{mAP\textsubscript{0.5}} a 0.13915, lo que sugiere que el realce de bordes mejora la identificación de elementos de bajo contraste, aunque su \textit{mar\textsubscript{100}} permanece bajo (0.10204).
+La \textit{Pirámide Laplaciana} no parece aportar mejoras significativas y presenta valores de \textit{mAP\textsubscript{0.5}} y \textit{mar\textsubscript{100}} menores comparados con la configuración base.
 
-En el caso de \textit{Faster R-CNN}, el modelo base ya muestra un rendimiento notable, con un \textit{mAP\textsubscript{0.5}} de 0.36 y un \textit{mar\textsubscript{100}} de 0.4857. La aplicación de CLAHE incrementa tanto el \textit{mAP\textsubscript{0.5}} (0.3968) como el \textit{mar\textsubscript{100}} (0.5306), lo cual indica que el aumento de contraste es efectivo para mejorar la detección en imágenes complejas. Además, \textit{Unsharp Masking} resulta en un \textit{mAP\textsubscript{0.5}} de 0.3713 y un \textit{mar\textsubscript{100}} de 0.5551, sugiriendo que esta técnica ayuda a resaltar características de interés, aumentando la capacidad de \textit{recall} del modelo. Las técnicas de \textit{Bilateral Filter} y \textit{Laplacian Pyramid} muestran un rendimiento ligeramente inferior en términos de \textit{mAP\textsubscript{0.5}} y \textit{mar\textsubscript{100}} en comparación con CLAHE y \textit{Unsharp Masking}, aunque aún mantienen un rendimiento sólido. Esto sugiere que \textit{Faster R-CNN} se beneficia en particular de técnicas de preprocesamiento que mejoran el contraste y la definición de los bordes.
+En el caso de \textit{Faster R-CNN}, el modelo base ya muestra un rendimiento notable, con un \textit{mAP\textsubscript{0.5}} de 0.36 y un \textit{mar\textsubscript{100}} de 0.4857.
+La aplicación de CLAHE incrementa tanto el \textit{mAP\textsubscript{0.5}} (0.3968) como el \textit{mar\textsubscript{100}} (0.5306), lo cual indica que el aumento de contraste es efectivo para mejorar la detección en imágenes complejas.
+Además, \textit{Unsharp Masking} resulta en un \textit{mAP\textsubscript{0.5}} de 0.3713 y un \textit{mar\textsubscript{100}} de 0.5551, sugiriendo que esta técnica ayuda a resaltar características de interés, aumentando la capacidad de \textit{recall} del modelo.
+Las técnicas de \textit{Bilateral Filter} y \textit{Laplacian Pyramid} muestran un rendimiento ligeramente inferior en términos de \textit{mAP\textsubscript{0.5}} y \textit{mar\textsubscript{100}} en comparación con CLAHE y \textit{Unsharp Masking}, aunque aún mantienen un rendimiento sólido.
+Esto sugiere que \textit{Faster R-CNN} se beneficia en particular de técnicas de preprocesamiento que mejoran el contraste y la definición de los bordes.
 
-Para \textit{RetinaNet}, el modelo base presenta una \textit{Train Loss} de 0.7601 y una \textit{Val Loss} de 1.0042, con un \textit{mAP\textsubscript{0.5}} de 0.2320 y un \textit{mar\textsubscript{100}} de 0.4714. La aplicación de CLAHE y \textit{Unsharp Masking} reduce la \textit{Val Loss} a 0.9663 y 0.9683, respectivamente. Entre estas, \textit{Unsharp Masking} ofrece el mejor \textit{mAP\textsubscript{0.5}} (0.2934) y un \textit{mar\textsubscript{100}} de 0.5, indicando que el realce de bordes contribuye positivamente a la capacidad del modelo para detectar y diferenciar objetos, especialmente en condiciones de bajo contraste. La \textit{Pirámide Laplaciana}, en cambio, presenta un \textit{mar\textsubscript{100}} de 0.4285, lo cual sugiere una menor efectividad de esta técnica para el modelo \textit{RetinaNet} en este contexto específico. En general, \textit{RetinaNet} parece beneficiarse de técnicas de preprocesamiento que destacan los bordes, aunque los valores de precisión y \textit{recall} son menores en comparación con \textit{Faster R-CNN}.
+Para \textit{RetinaNet}, el modelo base presenta una \textit{Train Loss} de 0.7601 y una \textit{Val Loss} de 1.0042, con un \textit{mAP\textsubscript{0.5}} de 0.2320 y un \textit{mar\textsubscript{100}} de 0.4714.
+La aplicación de CLAHE y \textit{Unsharp Masking} reduce la \textit{Val Loss} a 0.9663 y 0.9683, respectivamente.
+Entre estas, \textit{Unsharp Masking} ofrece el mejor \textit{mAP\textsubscript{0.5}} (0.2934) y un \textit{mar\textsubscript{100}} de 0.5, indicando que el realce de bordes contribuye positivamente a la capacidad del modelo para detectar y diferenciar objetos, especialmente en condiciones de bajo contraste.
+La \textit{Pirámide Laplaciana}, en cambio, presenta un \textit{mar\textsubscript{100}} de 0.4285, lo cual sugiere una menor efectividad de esta técnica para el modelo \textit{RetinaNet} en este contexto específico.
+En general, \textit{RetinaNet} parece beneficiarse de técnicas de preprocesamiento que destacan los bordes, aunque los valores de precisión y \textit{recall} son menores en comparación con \textit{Faster R-CNN}.
 
-Finalmente, el modelo \textit{Deformable DETR} muestra las pérdidas más altas tanto en entrenamiento (\textit{Train Loss} de 2.9916 en el modelo base) como en validación (\textit{Val Loss} de 2.4219 en el modelo base), lo cual es consistente con su mayor complejidad y la naturaleza de las imágenes utilizadas. Aunque \textit{Deformable DETR} no presenta una alta precisión en \textit{mAP\textsubscript{0.5}} en comparación con los modelos \textit{CNN} (0.0679 en la configuración base), la técnica de \textit{Unsharp Masking} logra una mejora en \textit{mAP\textsubscript{0.5}} (0.0696), lo que sugiere que el realce de bordes puede ayudar a este modelo a identificar mejor objetos en imágenes de arte rupestre con baja definición. Sin embargo, las otras técnicas de preprocesamiento, como CLAHE y el filtro bilateral, no parecen aportar mejoras significativas en el rendimiento de este modelo. La \textit{Pirámide Laplaciana}, en particular, resulta en el \textit{mAP\textsubscript{0.5}} más bajo (0.0563), lo que indica que la representación en múltiples escalas no es especialmente efectiva para este modelo en estas imágenes.
+Finalmente, el modelo \textit{Deformable DETR} muestra las pérdidas más altas tanto en entrenamiento (\textit{Train Loss} de 2.9916 en el modelo base) como en validación (\textit{Val Loss} de 2.4219 en el modelo base), lo cual es consistente con su mayor complejidad y la naturaleza de las imágenes utilizadas.
+Aunque \textit{Deformable DETR} no presenta una alta precisión en \textit{mAP\textsubscript{0.5}} en comparación con los modelos \textit{CNN} (0.0679 en la configuración base), la técnica de \textit{Unsharp Masking} logra una mejora en \textit{mAP\textsubscript{0.5}} (0.0696), lo que sugiere que el realce de bordes puede ayudar a este modelo a identificar mejor objetos en imágenes de arte rupestre con baja definición.
+Sin embargo, las otras técnicas de preprocesamiento, como CLAHE y el filtro bilateral, no parecen aportar mejoras significativas en el rendimiento de este modelo.
+La \textit{Pirámide Laplaciana}, en particular, resulta en el \textit{mAP\textsubscript{0.5}} más bajo (0.0563), lo que indica que la representación en múltiples escalas no es especialmente efectiva para este modelo en estas imágenes.
 
-Los resultados obtenidos en la Tabla~\ref{tab:resultados_preliminares} sugieren que el rendimiento de cada modelo varía significativamente dependiendo de la técnica de preprocesamiento aplicada. En general, \textit{Faster R-CNN} y \textit{RetinaNet} muestran una mayor sensibilidad a técnicas de contraste y realce de bordes, como CLAHE y \textit{Unsharp Masking}, mientras que \textit{Deformable DETR} responde marginalmente a estas mismas técnicas. \textit{YOLOv5} parece ser el modelo menos sensible a las variaciones de preprocesamiento, con un rendimiento relativamente consistente en todas las técnicas. Estos resultados preliminares proporcionan una base para identificar las configuraciones de preprocesamiento y modelos que muestran mayor potencial en la detección de elementos en arte rupestre y pueden guiar iteraciones futuras para optimizar el rendimiento en este contexto específico.
+Los resultados obtenidos en la Tabla~\ref{tab:resultados_preliminares} sugieren que el rendimiento de cada modelo varía significativamente dependiendo de la técnica de preprocesamiento aplicada.
+En general, \textit{Faster R-CNN} y \textit{RetinaNet} muestran una mayor sensibilidad a técnicas de contraste y realce de bordes, como CLAHE y \textit{Unsharp Masking}, mientras que \textit{Deformable DETR} responde marginalmente a estas mismas técnicas.
+\textit{YOLOv5} parece ser el modelo menos sensible a las variaciones de preprocesamiento, con un rendimiento relativamente consistente en todas las técnicas.
+Estos resultados preliminares proporcionan una base para identificar las configuraciones de preprocesamiento y modelos que muestran mayor potencial en la detección de elementos en arte rupestre y pueden guiar iteraciones futuras para optimizar el rendimiento en este contexto específico.
 
 \subsection{Análisis de Resultados}
 
@@ -215,7 +287,9 @@ A continuación, se presentan los rangos de valores de mAP\textsubscript{0.5} ob
     \item Deformable DETR: 0.056 - 0.069
 \end{enumerate}
 
-Faster R-CNN muestra consistentemente el mejor rendimiento en términos de mAP\textsubscript{0.5} entre todos los modelos, seguido por RetinaNet. YOLOv5 y Deformable DETR presentan un rendimiento inferior en comparación. En cuanto a las técnicas de preprocesamiento, se observa que \textbf{Unsharp Masking} y \textbf{CLAHE} mejoran el rendimiento en mAP para la mayoría de los modelos, particularmente en Faster R-CNN y RetinaNet.
+Faster R-CNN muestra consistentemente el mejor rendimiento en términos de mAP\textsubscript{0.5} entre todos los modelos, seguido por RetinaNet.
+YOLOv5 y Deformable DETR presentan un rendimiento inferior en comparación.
+En cuanto a las técnicas de preprocesamiento, se observa que \textbf{Unsharp Masking} y \textbf{CLAHE} mejoran el rendimiento en mAP para la mayoría de los modelos, particularmente en Faster R-CNN y RetinaNet.
 
 Los gráficos de las Figuras \ref{fig:yolov5_results}, \ref{fig:faster_rcnn_results}, \ref{fig:retinanet_results} y \ref{fig:deformable_detr_results} muestran la evolución de las métricas de entrenamiento y validación para cada modelo y técnica de preprocesamiento.
 
@@ -248,24 +322,34 @@ Los gráficos de las Figuras \ref{fig:yolov5_results}, \ref{fig:faster_rcnn_resu
 \end{figure}
 
 \subsubsection*{Análisis de YOLOv5}
-Como se observa en la Figura \ref{fig:yolov5_results}, YOLOv5 muestra una disminución constante en las pérdidas de entrenamiento y validación a medida que avanzan las épocas, especialmente con técnicas como CLAHE y el filtro bilateral. Sin embargo, los valores de mAP\textsubscript{0.5} son relativamente bajos, lo que indica dificultades para detectar objetos en contextos complejos. La técnica \textbf{Unsharp Masking} aporta un aumento notable en mAP\textsubscript{0.5}, lo que sugiere que el realce de bordes puede ser beneficioso para este modelo.
+Como se observa en la Figura \ref{fig:yolov5_results}, YOLOv5 muestra una disminución constante en las pérdidas de entrenamiento y validación a medida que avanzan las épocas, especialmente con técnicas como CLAHE y el filtro bilateral.
+Sin embargo, los valores de mAP\textsubscript{0.5} son relativamente bajos, lo que indica dificultades para detectar objetos en contextos complejos.
+La técnica \textbf{Unsharp Masking} aporta un aumento notable en mAP\textsubscript{0.5}, lo que sugiere que el realce de bordes puede ser beneficioso para este modelo.
 
 \subsubsection*{Análisis de Faster R-CNN}
-En la Figura \ref{fig:faster_rcnn_results}, Faster R-CNN destaca por su rendimiento estable y elevado en mAP\textsubscript{0.5}, especialmente al aplicar CLAHE y Unsharp Masking. Las pérdidas de validación también muestran una mejora constante, lo que indica una buena generalización del modelo. Esta estabilidad sugiere que Faster R-CNN maneja mejor la detección de objetos en condiciones difíciles, como la superposición de elementos.
+En la Figura \ref{fig:faster_rcnn_results}, Faster R-CNN destaca por su rendimiento estable y elevado en mAP\textsubscript{0.5}, especialmente al aplicar CLAHE y Unsharp Masking.
+Las pérdidas de validación también muestran una mejora constante, lo que indica una buena generalización del modelo.
+Esta estabilidad sugiere que Faster R-CNN maneja mejor la detección de objetos en condiciones difíciles, como la superposición de elementos.
 
 \subsubsection*{Análisis de RetinaNet}
-En la Figura \ref{fig:retinanet_results}, RetinaNet muestra una tendencia decreciente en las pérdidas de entrenamiento y validación y mejora en mAP\textsubscript{0.5} al aplicar técnicas como CLAHE y el filtro bilateral. Aunque el rendimiento de RetinaNet es competitivo, no alcanza la precisión de Faster R-CNN.
+En la Figura \ref{fig:retinanet_results}, RetinaNet muestra una tendencia decreciente en las pérdidas de entrenamiento y validación y mejora en mAP\textsubscript{0.5} al aplicar técnicas como CLAHE y el filtro bilateral.
+Aunque el rendimiento de RetinaNet es competitivo, no alcanza la precisión de Faster R-CNN.
 
 \subsubsection*{Análisis de Deformable DETR}
-Como se observa en la Figura \ref{fig:deformable_detr_results}, Deformable DETR muestra un rendimiento menos estable en mAP\textsubscript{0.5} y valores más bajos en comparación con los otros modelos. Aunque las técnicas de preprocesamiento, en particular CLAHE, tienen un ligero efecto positivo, el impacto en mAP\textsubscript{0.5} es limitado.
+Como se observa en la Figura \ref{fig:deformable_detr_results}, Deformable DETR muestra un rendimiento menos estable en mAP\textsubscript{0.5} y valores más bajos en comparación con los otros modelos.
+Aunque las técnicas de preprocesamiento, en particular CLAHE, tienen un ligero efecto positivo, el impacto en mAP\textsubscript{0.5} es limitado.
 
 \subsubsection*{Resumen}
-Cada modelo responde de forma distinta a las técnicas de preprocesamiento. Faster R-CNN se beneficia notablemente de CLAHE y Unsharp Masking, mientras que YOLOv5 y RetinaNet también muestran mejoras, aunque en menor medida. Deformable DETR parece menos sensible al preprocesamiento, lo que sugiere que puede requerir ajustes específicos para maximizar su desempeño. La combinación de Faster R-CNN con CLAHE y Unsharp Masking emerge como una opción robusta para el arte rupestre, dada su capacidad para manejar objetos complejos con alta precisión.
+Cada modelo responde de forma distinta a las técnicas de preprocesamiento. Faster R-CNN se beneficia notablemente de CLAHE y Unsharp Masking, mientras que YOLOv5 y RetinaNet también muestran mejoras, aunque en menor medida.
+Deformable DETR parece menos sensible al preprocesamiento, lo que sugiere que puede requerir ajustes específicos para maximizar su desempeño.
+La combinación de Faster R-CNN con CLAHE y Unsharp Masking emerge como una opción robusta para el arte rupestre, dada su capacidad para manejar objetos complejos con alta precisión.
 
 \subsection{Conclusiones de los Experimentos Preliminares}
-A partir de los resultados obtenidos, se observa que Faster R-CNN y RetinaNet muestran el mejor rendimiento general en la tarea de detección de objetos en imágenes de arte rupestre. Las técnicas de preprocesamiento, especialmente Unsharp Masking y CLAHE, mejoran el rendimiento de estos modelos.
+A partir de los resultados obtenidos, se observa que Faster R-CNN y RetinaNet muestran el mejor rendimiento general en la tarea de detección de objetos en imágenes de arte rupestre.
+Las técnicas de preprocesamiento, especialmente Unsharp Masking y CLAHE, mejoran el rendimiento de estos modelos.
 
-Con base en estos resultados, se decide realizar un fine-tuning de Faster R-CNN y RetinaNet utilizando el conjunto completo de imágenes y aplicando las técnicas de preprocesamiento Unsharp Masking y CLAHE. Además, se explorará YOLOv5 con Unsharp Masking y Bilateral Filter, dado que mostró potencial de mejora con estas técnicas.
+Con base en estos resultados, se decide realizar un fine-tuning de Faster R-CNN y RetinaNet utilizando el conjunto completo de imágenes y aplicando las técnicas de preprocesamiento Unsharp Masking y CLAHE.
+Además, se explorará YOLOv5 con Unsharp Masking y Bilateral Filter, dado que mostró potencial de mejora con estas técnicas.
 
 Para futuros experimentos, se considerarán técnicas adicionales como:
 \begin{itemize}
@@ -283,7 +367,8 @@ Para futuros experimentos, se considerarán técnicas adicionales como:
 Estas técnicas adicionales podrían ayudar a mejorar aún más el rendimiento en la detección de objetos en imágenes de arte rupestre.
 
 \section{Fine-Tuning y Evaluación}
-Se procede a realizar un fine-tuning completo utilizando el dataset completo, compuesto por \textbf{X} imágenes, distribuidas en \textbf{Y} iteraciones. Para este proceso, se han seleccionado los siguientes modelos y técnicas de preprocesamiento basados en los resultados preliminares:
+Se procede a realizar un fine-tuning completo utilizando el dataset completo, compuesto por \textbf{X} imágenes, distribuidas en \textbf{Y} iteraciones.
+Para este proceso, se han seleccionado los siguientes modelos y técnicas de preprocesamiento basados en los resultados preliminares:
 
 \begin{itemize}
     \item \textbf{Modelos}: Faster R-CNN y RetinaNet.
@@ -315,29 +400,56 @@ Las conclusiones de esta fase indican que las técnicas y modelos seleccionados 
 
 \section{Métodos de Aprendizaje No Supervisado}
 
-En esta sección se implementan y analizan métodos de aprendizaje no supervisado para la agrupación de imágenes de arte rupestre. El objetivo es identificar patrones y estructuras ocultas en los datos sin recurrir a etiquetas predefinidas. Se emplean diferentes modelos de extracción de características y algoritmos de agrupamiento para evaluar su desempeño y seleccionar las combinaciones más efectivas.
+En esta sección se implementan y analizan métodos de aprendizaje no supervisado para la agrupación de imágenes de arte rupestre.
+El objetivo es identificar patrones y estructuras ocultas en los datos sin recurrir a etiquetas predefinidas. Se emplean diferentes modelos de extracción de características y algoritmos de agrupamiento para evaluar su desempeño y seleccionar las combinaciones más efectivas.
 
 \subsection{Modelos de Extracción de Características}
 
 Se utilizan cuatro modelos de redes neuronales convolucionales preentrenados para la extracción de características de las imágenes recortadas de animales:
 
-\begin{itemize} \item \textbf{ResNet18}: Propuesto por He et al., ResNet introduce conexiones residuales que facilitan el entrenamiento de redes profundas al mitigar el problema del gradiente desvaneciente \cite{he2016deep}. \item \textbf{VGG16}: Desarrollado por Simonyan y Zisserman, VGG16 se caracteriza por su arquitectura profunda y uniforme, utilizando convoluciones de $3 \times 3$ para capturar características de alto nivel \cite{simonyan2014very}. \item \textbf{DenseNet121}: Huang et al. presentan DenseNet, que conecta cada capa con todas las anteriores, promoviendo la reutilización de características y mejorando el flujo de información \cite{huang2017densely}. \item \textbf{InceptionV3}: Szegedy et al. introducen InceptionV3, que utiliza módulos de \textit{inception} para capturar características a múltiples escalas, siendo eficaz en la representación de variaciones en tamaño y forma \cite{szegedy2016rethinking}. \end{itemize}
+\begin{itemize}
+    \item \textbf{ResNet18}: Propuesto por He et al., ResNet introduce conexiones residuales que facilitan el entrenamiento de redes profundas al mitigar el problema del gradiente desvaneciente \cite{he2016deep}.
+    \item \textbf{VGG16}: Desarrollado por Simonyan y Zisserman, VGG16 se caracteriza por su arquitectura profunda y uniforme, utilizando convoluciones de $3 \times 3$ para capturar características de alto nivel \cite{simonyan2014very}.
+    \item \textbf{DenseNet121}: Huang et al. presentan DenseNet, que conecta cada capa con todas las anteriores, promoviendo la reutilización de características y mejorando el flujo de información \cite{huang2017densely}.
+    \item \textbf{InceptionV3}: Szegedy et al. introducen InceptionV3, que utiliza módulos de \textit{inception} para capturar características a múltiples escalas, siendo eficaz en la representación de variaciones en tamaño y forma \cite{szegedy2016rethinking}.
+\end{itemize}
 
-Estos modelos se seleccionan por su diversidad arquitectónica y su capacidad para extraer representaciones ricas de las imágenes. Al aprovechar diferentes enfoques en la arquitectura de redes neuronales, se busca evaluar cómo influye la extracción de características en el proceso de agrupamiento.
+Estos modelos se seleccionan por su diversidad arquitectónica y su capacidad para extraer representaciones ricas de las imágenes.
+Al aprovechar diferentes enfoques en la arquitectura de redes neuronales, se busca evaluar cómo influye la extracción de características en el proceso de agrupamiento.
 
 \subsection{Algoritmos de Agrupamiento}
 
 Se aplican cuatro algoritmos de agrupamiento para explorar diferentes enfoques en la agrupación de datos:
 
-\begin{itemize} \item \textbf{K-Means}: Es un algoritmo de partición que asigna cada punto de datos al cluster más cercano, minimizando la suma de distancias al centroide \cite{macqueen1967some}. Es eficiente en términos computacionales y funciona bien con clusters de forma esférica. \item \textbf{Clustering Aglomerativo}: Es un método jerárquico que fusiona iterativamente clusters basándose en una medida de similitud, capturando estructuras anidadas en los datos \cite{rokach2005clustering}. No requiere especificar el número de clusters a priori y puede utilizar diferentes criterios de enlace (simple, completo, promedio). \item \textbf{DBSCAN}: Identifica clusters de forma arbitraria y es robusto frente al ruido, agrupando puntos densamente conectados \cite{ester1996density}. Es especialmente útil para detectar clusters de formas complejas y manejar datos con ruido. \item \textbf{Clustering Espectral}: Utiliza técnicas de álgebra lineal y teoría de grafos para identificar clusters en datos con estructuras complejas \cite{ng2002spectral}. Es efectivo para detectar clusters que no son necesariamente convexos o separables linealmente. \end{itemize}
+\begin{itemize}
+    \item \textbf{K-Means}: Es un algoritmo de partición que asigna cada punto de datos al cluster más cercano, minimizando la suma de distancias al centroide \cite{macqueen1967some}. Es eficiente en términos computacionales y funciona bien con clusters de forma esférica.
+    \item \textbf{Clustering Aglomerativo}: Es un método jerárquico que fusiona iterativamente clusters basándose en una medida de similitud, capturando estructuras anidadas en los datos \cite{rokach2005clustering}.
+    No requiere especificar el número de clusters a priori y puede utilizar diferentes criterios de enlace (simple, completo, promedio).
+    \item \textbf{DBSCAN}: Identifica clusters de forma arbitraria y es robusto frente al ruido, agrupando puntos densamente conectados \cite{ester1996density}.
+    Es especialmente útil para detectar clusters de formas complejas y manejar datos con ruido.
+    \item \textbf{Clustering Espectral}: Utiliza técnicas de álgebra lineal y teoría de grafos para identificar clusters en datos con estructuras complejas \cite{ng2002spectral}.
+    Es efectivo para detectar clusters que no son necesariamente convexos o separables linealmente.
+\end{itemize}
 
 La selección de estos algoritmos permite explorar diferentes metodologías de agrupamiento y evaluar cuál se adapta mejor a las características de los datos.
 
 \subsection{Metodología}
 
-Se realiza un experimento combinando cada modelo de extracción de características con cada algoritmo de agrupamiento, totalizando 16 combinaciones. El flujo de trabajo es el siguiente:
+Se realiza un experimento combinando cada modelo de extracción de características con cada algoritmo de agrupamiento, totalizando 16 combinaciones.
+El flujo de trabajo es el siguiente:
 
-\begin{enumerate} \item \textbf{Preprocesamiento y Extracción de Características}: Se preprocesan las imágenes recortadas aplicando técnicas de normalización y ajuste de tamaño adecuadas para cada modelo. Se extraen las características utilizando cada modelo preentrenado, obteniendo un vector de características por imagen. \item \textbf{Reducción de Dimensionalidad}: Se aplica Análisis de Componentes Principales (PCA) para reducir la dimensionalidad de los vectores de características a 50 componentes, preservando la mayor varianza posible \cite{jolliffe2016principal}. Esto facilita el proceso de agrupamiento y reduce el costo computacional. \item \textbf{Agrupamiento}: Se ejecuta cada algoritmo de clustering con los datos reducidos. Para los algoritmos que requieren especificar el número de clusters, se prueban diferentes valores. \item \textbf{Determinación del Número Óptimo de Clusters}: Se utilizan el método del codo y el coeficiente de silueta para seleccionar el número óptimo de clusters \cite{rousseeuw1987silhouettes}. Estos métodos permiten evaluar la cohesión y separación de los clusters formados. \item \textbf{Visualización y Análisis}: Se generan collages de imágenes por cluster para una evaluación visual y se analizan los resultados cuantitativos. Se comparan los clusters obtenidos con las etiquetas conocidas (si están disponibles) para evaluar la capacidad de los métodos no supervisados en identificar clases relevantes. \end{enumerate}
+\begin{enumerate}
+    \item \textbf{Preprocesamiento y Extracción de Características}: Se preprocesan las imágenes recortadas aplicando técnicas de normalización y ajuste de tamaño adecuadas para cada modelo.
+    Se extraen las características utilizando cada modelo preentrenado, obteniendo un vector de características por imagen.
+    \item \textbf{Reducción de Dimensionalidad}: Se aplica Análisis de Componentes Principales (PCA) para reducir la dimensionalidad de los vectores de características a 50 componentes, preservando la mayor varianza posible \cite{jolliffe2016principal}.
+    Esto facilita el proceso de agrupamiento y reduce el costo computacional.
+    \item \textbf{Agrupamiento}: Se ejecuta cada algoritmo de clustering con los datos reducidos.
+    Para los algoritmos que requieren especificar el número de clusters, se prueban diferentes valores.
+    \item \textbf{Determinación del Número Óptimo de Clusters}: Se utilizan el método del codo y el coeficiente de silueta para seleccionar el número óptimo de clusters \cite{rousseeuw1987silhouettes}.
+    Estos métodos permiten evaluar la cohesión y separación de los clusters formados.
+    \item \textbf{Visualización y Análisis}: Se generan collages de imágenes por cluster para una evaluación visual y se analizan los resultados cuantitativos.
+    Se comparan los clusters obtenidos con las etiquetas conocidas (si están disponibles) para evaluar la capacidad de los métodos no supervisados en identificar clases relevantes.
+\end{enumerate}
 
 \subsection{Resultados y Análisis}
 
@@ -354,21 +466,27 @@ Se observa que las imágenes dentro de cada cluster comparten similitudes en for
 
 \textbf{Clustering Aglomerativo}:
 
-Se observa un rendimiento similar al de K-Means, con un número óptimo de clusters en 4. Las estructuras jerárquicas permiten identificar subgrupos dentro de los clusters principales. Los dendrogramas generados facilitan la visualización de las relaciones entre las imágenes.
+Se observa un rendimiento similar al de K-Means, con un número óptimo de clusters en 4.
+Las estructuras jerárquicas permiten identificar subgrupos dentro de los clusters principales.
+Los dendrogramas generados facilitan la visualización de las relaciones entre las imágenes.
 
 \textbf{DBSCAN}:
 
-Con un valor óptimo de $\epsilon=5$, el algoritmo identifica 3 clusters significativos y considera algunos puntos como ruido. Los clusters capturan formas distintivas de animales, pero se detecta una menor cohesión en comparación con K-Means. La robustez frente al ruido es una ventaja en este caso, aunque la elección de $\epsilon$ es crítica.
+Con un valor óptimo de $\epsilon=5$, el algoritmo identifica 3 clusters significativos y considera algunos puntos como ruido.
+Los clusters capturan formas distintivas de animales, pero se detecta una menor cohesión en comparación con K-Means.
+La robustez frente al ruido es una ventaja en este caso, aunque la elección de $\epsilon$ es crítica.
 
 \textbf{Clustering Espectral}:
 
-Este método detecta 5 clusters óptimos, capturando estructuras más complejas en los datos. Sin embargo, es computacionalmente más costoso y puede ser sensible a la construcción del grafo de afinidad.
+Este método detecta 5 clusters óptimos, capturando estructuras más complejas en los datos.
+Sin embargo, es computacionalmente más costoso y puede ser sensible a la construcción del grafo de afinidad.
 
 % Se repite un análisis similar para VGG16, DenseNet121 e InceptionV3.
 
 \subsubsection{Comparación con el Modelo de Clasificación Actual}
 
-Se realiza una comparación entre los resultados obtenidos mediante los métodos de agrupamiento no supervisado y el modelo de clasificación supervisado desarrollado previamente. El modelo de clasificación actual está entrenado para reconocer categorías específicas de animales en el arte rupestre.
+Se realiza una comparación entre los resultados obtenidos mediante los métodos de agrupamiento no supervisado y el modelo de clasificación supervisado desarrollado previamente.
+El modelo de clasificación actual está entrenado para reconocer categorías específicas de animales en el arte rupestre.
 
 Al comparar los clusters generados con las etiquetas del modelo supervisado, se observa que:
 
@@ -384,19 +502,28 @@ Esta comparación permite evaluar la efectividad de los métodos no supervisados
 
 Al comparar los resultados entre modelos y algoritmos, se observa que:
 
-\begin{itemize} \item Los modelos ResNet18 y DenseNet121 tienden a producir agrupaciones más coherentes, posiblemente debido a sus arquitecturas que facilitan la extracción de características discriminativas. \item K-Means y Clustering Aglomerativo muestran un desempeño consistente en la mayoría de los casos, siendo adecuados para datos con clusters bien definidos. \item DBSCAN es eficaz en la detección de ruido y en la identificación de clusters de forma arbitraria, aunque su rendimiento depende sensiblemente de la elección de $\epsilon$. \item Clustering Espectral captura estructuras complejas pero puede ser computacionalmente más costoso y sensible a la construcción del grafo de afinidad. \item Los modelos InceptionV3 y VGG16 presentan resultados menos consistentes en algunos casos, posiblemente debido a diferencias en la representación de características. \end{itemize}
+\begin{itemize}
+    \item Los modelos ResNet18 y DenseNet121 tienden a producir agrupaciones más coherentes, posiblemente debido a sus arquitecturas que facilitan la extracción de características discriminativas.
+    \item K-Means y Clustering Aglomerativo muestran un desempeño consistente en la mayoría de los casos, siendo adecuados para datos con clusters bien definidos.
+    \item DBSCAN es eficaz en la detección de ruido y en la identificación de clusters de forma arbitraria, aunque su rendimiento depende sensiblemente de la elección de $\epsilon$.
+    \item Clustering Espectral captura estructuras complejas pero puede ser computacionalmente más costoso y sensible a la construcción del grafo de afinidad.
+    \item Los modelos InceptionV3 y VGG16 presentan resultados menos consistentes en algunos casos, posiblemente debido a diferencias en la representación de características.
+\end{itemize}
 
 \subsection{Selección Final}
 
-Basándose en los coeficientes de silueta, las visualizaciones y la coherencia de los clusters, se seleccionan las combinaciones de ResNet18 con K-Means y Clustering Aglomerativo como las más efectivas para este conjunto de datos. Estas técnicas permiten identificar grupos significativos de imágenes que pueden representar diferentes categorías o estilos en el arte rupestre.
+Basándose en los coeficientes de silueta, las visualizaciones y la coherencia de los clusters, se seleccionan las combinaciones de ResNet18 con K-Means y Clustering Aglomerativo como las más efectivas para este conjunto de datos.
+Estas técnicas permiten identificar grupos significativos de imágenes que pueden representar diferentes categorías o estilos en el arte rupestre.
 
 Además, se reconoce el valor de los métodos no supervisados para complementar el modelo de clasificación actual, ofreciendo \textbf{insights} sobre posibles nuevas clases o subgrupos que podrían incorporarse en futuros trabajos.
 
 \subsection{Conclusiones}
 
-La aplicación de métodos de aprendizaje no supervisado ha permitido explorar y descubrir patrones en las imágenes de arte rupestre sin necesidad de anotaciones. La combinación de modelos de extracción de características profundos con algoritmos de clustering ha demostrado ser una estrategia eficaz para la agrupación de datos visuales complejos.
+La aplicación de métodos de aprendizaje no supervisado ha permitido explorar y descubrir patrones en las imágenes de arte rupestre sin necesidad de anotaciones.
+La combinación de modelos de extracción de características profundos con algoritmos de clustering ha demostrado ser una estrategia eficaz para la agrupación de datos visuales complejos.
 
-Estos métodos proporcionan una herramienta valiosa para el análisis exploratorio de datos, permitiendo identificar estructuras y relaciones que pueden no ser evidentes mediante métodos supervisados. La integración de los hallazgos obtenidos con los métodos no supervisados en el modelo de clasificación actual puede conducir a mejoras en la precisión y comprensión del conjunto de datos.
+Estos métodos proporcionan una herramienta valiosa para el análisis exploratorio de datos, permitiendo identificar estructuras y relaciones que pueden no ser evidentes mediante métodos supervisados.
+La integración de los hallazgos obtenidos con los métodos no supervisados en el modelo de clasificación actual puede conducir a mejoras en la precisión y comprensión del conjunto de datos.
 
 \newpage
 

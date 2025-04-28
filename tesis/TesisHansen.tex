@@ -5,12 +5,13 @@
 
 % Include hyphenat package to allow changing hyphenation patterns
 \usepackage{hyphenat}
+\sloppy
 
 % Definición de encabezamientos y pié de página
 \lhead[Kevin Hansen]{Titulo de la Tesis}
 \rhead[Titulo]{Kevin Hansen}
 \lfoot[\thepage]{Capítulo \thechapter .\ \leftmark}
-\rfoot[Capítulo \thechapter .\ \leftmark]{\thepage} 
+\rfoot[Capítulo \thechapter .\ \leftmark]{\thepage}
 
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{xcolor}
@@ -60,7 +61,7 @@
 \degreetitle{Master en Ciencias de Datos}
 
 \ifdefineAbstract
-\includeonly{FrontMatter/abstract} 
+\includeonly{FrontMatter/abstract}
 \fi
 
 % ***************************** Chapter Mode ***********************************
@@ -79,29 +80,29 @@
 \microtypesetup{expansion=false}
 \begin{document}
 \raggedbottom
-	
+
 	\frontmatter
-	
+
 	\maketitle
-	
+
 %	\include{dedication}
 %	\include{Declaration/declaration}
 %	\include{Acknowledgement/acknowledgement}
 %	\include{Abstract/abstract}
-	
+
 	% *********************** Adding TOC and List of Figures ***********************
-	
+
 	\tableofcontents
-	
+
 	\listoffigures
-	
+
 	\listoftables
-	
+
 	% \printnomenclature[space] space can be set as 2em between symbol and description
 	%\printnomenclature[3em]
-	
+
 	\printnomenclature
-	
+
 	% ******************************** Main Matter *********************************
 	\mainmatter
 	\include{FrontMatter/abstract}
@@ -110,47 +111,47 @@
 	\include{Chapters/chapter3Resultados}
 	\include{Chapters/chapter4ProblemasYSoluciones}
 	\include{Chapters/chapter5Conclusiones}
-	
+
 	% ********************************** Back Matter *******************************
 	% Backmatter should be commented out if you are using appendices after References
 	\backmatter
-	
+
 	% ********************************** Bibliography ******************************
 	\begin{spacing}{0.9}
-		
+
 		% Switch to English hyphenation for the bibliography
 		\begin{hyphenrules}{english}
-		
+
 		% To use the conventional natbib style referencing
 		% Bibliography style previews: http://nodonn.tipido.net/bibstyle.php
 		% Reference styles: http://sites.stat.psu.edu/~surajit/present/bib.htm
-		
+
 		\bibliographystyle{apalike}
-		%\bibliographystyle{unsrt} % Use for unsorted references  
+		%\bibliographystyle{unsrt} % Use for unsorted references
 		%\bibliographystyle{plainnat} % Use this to have URLs listed in References
 		\cleardoublepage
 		\bibliography{BackMatter/references} % Path to your References.bib file
-		
+
 		\end{hyphenrules}
-		
+
 		% If you would like to use BibLaTeX for your references, pass `custombib` as
 		% an option in the document class. The location of 'references.bib' should be
 		% specified in the preamble.tex file in the custombib section.
 		% Comment out the lines related to natbib above and uncomment the following line.
-		
+
 		%\printbibliography[heading=bibintoc, title={References}]
-		
+
 	\end{spacing}
-	
+
 	% ********************************** Appendices ********************************
-	
+
 	\begin{appendices} % Using appendices environment for more functionality
-		
+
 		%\include{appendix1}
 	%	\include{Appendix2/appendix2}
-		
+
 	\end{appendices}
-	
+
 	% *************************************** Index ********************************
 	\printthesisindex % If index is present
 	
