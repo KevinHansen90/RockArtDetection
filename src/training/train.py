@@ -1,287 +1,266 @@
 #!/usr/bin/env python3
-import os
+from __future__ import annotations
 
-# Force MPS fallback
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+import argparse, logging, os, random, shutil, sys, tempfile, threading
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+from pathlib import Path
+from typing import Any, Dict, List
 
-import argparse
-import sys
-import tempfile
-
-# Ensure project root on sys.path
-_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if _ROOT not in sys.path:
-	sys.path.insert(0, _ROOT)
-
-import random
-import shutil
-import logging
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+# ---------------- project imports ----------------------------------------- #
+_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(_ROOT)) if str(_ROOT) not in sys.path else None
+
 from src.training.utils import (
-	load_config, get_device, get_simple_transform, get_train_transform,
-	plot_curve, save_metrics_csv
+    load_config, get_device, get_simple_transform, get_train_transform,
+    plot_curve, save_metrics_csv, setup_logging, DEFAULT_NUM_WORKERS,
 )
 from src.training.engine import train_model
-from src.models.detection_models import (
-	get_detection_model, get_optimizer, get_scheduler
-)
-from src.datasets.yolo_dataset import (
-	CustomYOLODataset, TestDataset, collate_fn, collate_fn_detr, load_classes
-)
+from src.models.detection_models import get_detection_model, get_optimizer, get_scheduler
+from src.datasets.yolo_dataset import YOLODataset, collate_fn, collate_fn_detr, load_classes
 from src.training.evaluate import evaluate_and_visualize
 
-# -- Optional GCS helpers -----------------------------------------
+# ---------------- cloud helpers ------------------------------------------- #
 try:
-	from google.cloud import storage
+    from google.cloud import storage  # type: ignore
 except ImportError:
-	storage = None
+    storage = None  # pragma: no cover
+
+# ---------------- logging -------------------------------------------------- #
+setup_logging()
+log = logging.getLogger("train")
 
 
-def download_blob(gcs_uri: str, dst_path: str):
-	bucket_name, blob_name = gcs_uri[5:].split("/", 1)
-	client = storage.Client()
-	bucket = client.bucket(bucket_name)
-	blob = bucket.blob(blob_name)
-	blob.download_to_filename(dst_path)
+# -------------------------------------------------------------------------- #
+# GCS helpers (unchanged bodies)                                             #
+# -------------------------------------------------------------------------- #
+def _download_blob(gcs_uri: str, dst_path: str) -> None:
+    bucket_name, blob_name = gcs_uri[5:].split("/", 1)
+    storage.Client().bucket(bucket_name).blob(blob_name).download_to_filename(dst_path)
 
 
-def download_dir(gcs_uri: str, local_dir: str):
-	bucket_name, prefix = gcs_uri[5:].split("/", 1)
-	client = storage.Client()
-	blobs = client.list_blobs(bucket_name, prefix=prefix)
-	for blob in blobs:
-		rel_path = blob.name[len(prefix):].lstrip("/")
-		dst_path = os.path.join(local_dir, rel_path)
-		os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-		blob.download_to_filename(dst_path)
+def _download_dir(gcs_uri: str, local_dir: str) -> None:
+    bucket, pref = gcs_uri[5:].split("/", 1)
+    client = storage.Client()
+    for blob in client.list_blobs(bucket, prefix=pref):
+        rel = Path(blob.name[len(pref):].lstrip("/"))
+        dst = Path(local_dir, rel); dst.parent.mkdir(parents=True, exist_ok=True)
+        blob.download_to_filename(dst)
 
 
-def upload_dir(local_dir: str, gcs_uri: str):
-	bucket_name, prefix = gcs_uri[5:].split("/", 1)
-	client = storage.Client()
-	bucket = client.bucket(bucket_name)
-	for root, _, files in os.walk(local_dir):
-		for fname in files:
-			local_path = os.path.join(root, fname)
-			rel_path = os.path.relpath(local_path, local_dir)
-			blob = bucket.blob(f"{prefix}/{rel_path}")
-			blob.upload_from_filename(local_path)
+def _upload_dir(local_dir: str, gcs_uri: str) -> None:
+    bucket, pref = gcs_uri[5:].split("/", 1)
+    client = storage.Client()
+    for root, _, files in os.walk(local_dir):
+        for f in files:
+            lp = Path(root, f); rel = lp.relative_to(local_dir)
+            client.bucket(bucket).blob(f"{pref}/{rel}").upload_from_filename(lp)
 
 
-# ------------------------------------------------------------------
-# Logger setup
-logger = logging.getLogger("train")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+# -------------------------------------------------------------------------- #
+# Arg-parser                                                                 #
+# -------------------------------------------------------------------------- #
+def _build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser("train.py", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p.add_argument("--config", required=True, help="Path to YAML config (local or gs://)")
+    p.add_argument("--experiment", required=True, help="Experiment name")
+    p.add_argument("--output-dir", default=None,
+                   help="Base output directory (local or gs://) for artifacts")
+    p.add_argument("--compile", action="store_true",
+                   help="Enable torch.compile (CUDA only).")
+    p.add_argument("--deterministic", action="store_true",
+                   help="Force deterministic algorithms & seeds.")
+    p.add_argument("--async-upload", action="store_true",
+                   help="Upload checkpoints/logs to GCS in background thread.")
+    return p
 
 
-def main():
-	parser = argparse.ArgumentParser(description="Train an object detection model")
-	parser.add_argument("--config", required=True, help="Path to YAML config (local or gs://)")
-	parser.add_argument("--experiment", required=True, help="Experiment name")
-	parser.add_argument("--output-dir", default=None,
-						help="Base output directory (local or gs://) for artifacts")
-	opts = parser.parse_args()
+# worker-seed helper for full determinism
+def _seed_worker(worker_id: int, base_seed: int):
+    ws = base_seed + worker_id
+    np.random.seed(ws); random.seed(ws)
 
-	# --- Stage 0: Handle config download if on GCS ----------------
-	cfg_path = opts.config
-	if cfg_path.startswith("gs://"):
-		assert storage, "google-cloud-storage is required to load remote configs"
-		tmp_cfg = os.path.join(tempfile.gettempdir(), opts.experiment, "used_config.yaml")
-		os.makedirs(os.path.dirname(tmp_cfg), exist_ok=True)
-		download_blob(cfg_path, tmp_cfg)
-		cfg_path = tmp_cfg
 
-	# Load config + set seeds
-	cfg = load_config(cfg_path)
-	seed = cfg.get("seed", 42)
-	random.seed(seed)
-	np.random.seed(seed)
-	torch.manual_seed(seed)
-	if torch.cuda.is_available():
-		torch.cuda.manual_seed_all(seed)
+# -------------------------------------------------------------------------- #
+# Main                                                                       #
+# -------------------------------------------------------------------------- #
+def main(argv: List[str] | None = None) -> None:
+    args = _build_parser().parse_args(argv)
+    cfg_path = args.config
 
-	# --- Stage 1: Determine output base directory ------------------
-	use_cloud = False
-	out_base = opts.output_dir
-	# Override with Vertex AI env var if present
-	aip_model = os.getenv("AIP_MODEL_DIR")
-	if aip_model:
-		use_cloud = True
-		out_base = aip_model.rsplit('/', 1)[0]
+    # --- fetch remote YAML ------------------------------------------------ #
+    if cfg_path.startswith("gs://"):
+        tmp = Path(tempfile.gettempdir(), args.experiment, "used_config.yaml")
+        tmp.parent.mkdir(parents=True, exist_ok=True)
+        _download_blob(cfg_path, tmp)
+        cfg_path = str(tmp)
 
-	if out_base:
-		if out_base.startswith("gs://"):
-			use_cloud = True
-			local_base = os.path.join(tempfile.gettempdir(), opts.experiment)
-		else:
-			local_base = out_base
-	else:
-		local_base = os.path.join("experiments", opts.experiment)
+    cfg: Dict[str, Any] = load_config(cfg_path)
+    cfg["compile"] = args.compile  # so model factory can read it
 
-	# Prepare experiment dirs locally
-	exp_dir = local_base
-	ckpt_dir = os.path.join(exp_dir, "checkpoints")
-	log_dir = os.path.join(exp_dir, "logs")
-	result_dir = os.path.join(exp_dir, "results")
-	for d in (exp_dir, ckpt_dir, log_dir, result_dir):
-		os.makedirs(d, exist_ok=True)
+    # ---------------------------------------------------------------------- #
+    # Reproducibility seeding                                                #
+    # ---------------------------------------------------------------------- #
+    seed = cfg.get("seed", 42)
+    random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
-	# Copy used config
-	dest_cfg = os.path.join(exp_dir, "used_config.yaml")
-	if not cfg_path.endswith(dest_cfg):
-		shutil.copy2(cfg_path, dest_cfg)
-	logger.info(f"Experiment directory: {exp_dir}")
+    if args.deterministic:
+        torch.use_deterministic_algorithms(True, warn_only=True)
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        log.info("Deterministic mode enabled.")
 
-	# --- Stage 2: Handle remote classes_file & data_root ----------
-	classes_file = cfg["classes_file"]
-	if classes_file.startswith("gs://"):
-		tmp_cls = os.path.join(tempfile.gettempdir(), opts.experiment, "grouped_classes.txt")
-		os.makedirs(os.path.dirname(tmp_cls), exist_ok=True)
-		download_blob(classes_file, tmp_cls)
-		classes_file = tmp_cls
-	data_root = cfg["data_root"]
-	if data_root.startswith("gs://"):
-		tmp_data = os.path.join(tempfile.gettempdir(), opts.experiment, "data_root")
-		download_dir(data_root, tmp_data)
-		data_root = tmp_data
+    # ---------------------------------------------------------------------- #
+    # Experiment directories                                                 #
+    # ---------------------------------------------------------------------- #
+    use_cloud, out_base = False, args.output_dir
+    aip_model = os.getenv("AIP_MODEL_DIR")
+    if aip_model:
+        out_base, use_cloud = str(Path(aip_model).parent), True
 
-	# After downloading, override cfg for downstream code:
-	cfg["classes_file"] = classes_file
-	cfg["data_root"] = data_root
+    if out_base and out_base.startswith("gs://"):
+        use_cloud, local_base = True, Path(tempfile.gettempdir(), args.experiment)
+    else:
+        local_base = Path(out_base) if out_base else Path("experiments", args.experiment)
 
-	# Device
-	device = get_device()
-	logger.info(f"Using device: {device}")
+    ckpt_dir, log_dir, result_dir = [local_base / d for d in ("checkpoints", "logs", "results")]
+    for d in (ckpt_dir, log_dir, result_dir): d.mkdir(parents=True, exist_ok=True)
 
-	# Load classes and data paths
-	classes = load_classes(classes_file)
-	train_imgs = os.path.join(data_root, "train/images")
-	train_lbls = os.path.join(data_root, "train/labels")
-	val_imgs = os.path.join(data_root, "val/images")
-	val_lbls = os.path.join(data_root, "val/labels")
-	test_imgs = os.path.join(data_root, "test/images")
-	test_lbls = os.path.join(data_root, "test/labels")
+    dest_cfg = local_base / "used_config.yaml"
+    if not str(cfg_path).endswith(str(dest_cfg)): shutil.copy2(cfg_path, dest_cfg)
+    log.info("Experiment directory: %s", local_base)
 
-	# Dataset & Dataloader
-	is_detr = (cfg["model_type"].lower() == "deformable_detr")
-	requires_shift_for_viz = not is_detr
-	coll = collate_fn_detr if is_detr else collate_fn
-	mps_safe = (device.type == "mps")
-	train_transform = get_train_transform(is_detr, mps_safe, seed)
-	test_transform = get_simple_transform()
+    # ---------------------------------------------------------------------- #
+    # Remote classes / dataset download                                      #
+    # ---------------------------------------------------------------------- #
+    classes_file = cfg["classes_file"]
+    if classes_file.startswith("gs://"):
+        tmp_cls = Path(tempfile.gettempdir(), args.experiment, "classes.txt")
+        tmp_cls.parent.mkdir(parents=True, exist_ok=True)
+        _download_blob(classes_file, tmp_cls)
+        classes_file = str(tmp_cls)
 
-	train_ds = CustomYOLODataset(train_imgs, train_lbls, classes_file, train_transform, is_detr)
-	val_ds = CustomYOLODataset(val_imgs, val_lbls, classes_file, test_transform, is_detr)
+    data_root = cfg["data_root"]
+    if data_root.startswith("gs://"):
+        dr = Path(tempfile.gettempdir(), args.experiment, "data_root")
+        _download_dir(data_root, dr)
+        data_root = str(dr)
 
-	g = torch.Generator().manual_seed(seed)
-	dl_kwargs = {
-		"batch_size": cfg.get("batch_size", 2),
-		"shuffle": True,
-		"num_workers": cfg.get("num_workers", 0),
-		"pin_memory": (device.type == "cuda"),
-		"collate_fn": coll,
-		"generator": g,
-	}
-	if cfg.get("num_workers", 0) > 0:
-		dl_kwargs.update({"prefetch_factor": 2, "persistent_workers": True})
+    cfg.update({"classes_file": classes_file, "data_root": data_root})
 
-	train_loader = DataLoader(train_ds, **dl_kwargs)
-	val_loader = DataLoader(val_ds, **{**dl_kwargs, "shuffle": False})
+    # ---------------------------------------------------------------------- #
+    device = get_device(); log.info("Using device: %s", device)
+    classes = load_classes(classes_file)
+    paths = lambda split: (Path(data_root, f"{split}/images"),
+                           Path(data_root, f"{split}/labels"))
+    train_imgs, train_lbls = paths("train")
+    val_imgs, val_lbls     = paths("val")
+    test_imgs, test_lbls   = paths("test")
 
-	# Model, optimizer, scheduler
-	model_type = cfg["model_type"].lower()
-	num_classes = len(classes) + (0 if is_detr else 1)
-	model = get_detection_model(model_type, num_classes, config=cfg)
-	if device.type == "mps" and model_type == "fasterrcnn":
-		logger.warning(
-			"ROI ops unsupported on MPS – placing Faster R-CNN on CPU, "
-			"and moving batches to CPU as well."
-		)
-		run_device = torch.device("cpu")
-	else:
-		run_device = device
-	model = model.to(run_device)
-	# torch.compile only helps on CUDA right now
-	if run_device.type == "cuda":
-		model = torch.compile(model)
-	optim = get_optimizer(model, cfg)
-	sched = get_scheduler(optim, cfg)
+    is_detr  = cfg["model_type"].lower() == "deformable_detr"
+    collate  = collate_fn_detr if is_detr else collate_fn
+    mps_safe = device.type == "mps"
 
-	cfg["log_dir"] = log_dir
+    train_tf = get_train_transform(is_detr, mps_safe, seed)
+    test_tf  = get_simple_transform()
 
-	# Train & collect metrics
-	metrics_out = train_model(model, train_loader, val_loader, run_device, optim, sched, cfg)
-	(train_losses, val_losses, map50s, mar100s, f1s,
-	 maps, map75s, mar1s, mar10s, m_s, m_m, m_l,
-	 r_s, r_m, r_l) = metrics_out
+    train_ds = YOLODataset(train_imgs, train_lbls, classes_file,
+                           mode="train", transforms=train_tf,
+                           normalize_boxes=is_detr, shift_labels=not is_detr)
+    val_ds   = YOLODataset(val_imgs,   val_lbls,   classes_file,
+                           mode="val",  transforms=test_tf,
+                           normalize_boxes=is_detr, shift_labels=not is_detr)
 
-	# Plot key curves
-	plot_curve(train_losses, "Train Loss", "Train Loss", os.path.join(result_dir, "train_loss.png"))
-	plot_curve(val_losses, "Val Loss", "Val Loss", os.path.join(result_dir, "val_loss.png"))
-	plot_curve(map50s, "mAP@.50", "mAP@.50", os.path.join(result_dir, "map50.png"))
-	plot_curve(mar100s, "mAR@100", "mAR@100", os.path.join(result_dir, "mar100.png"))
+    workers = cfg.get("num_workers", DEFAULT_NUM_WORKERS)
+    dl_kwargs = dict(batch_size=cfg.get("batch_size", 2),
+                     num_workers=workers,
+                     pin_memory=(device.type == "cuda"),
+                     collate_fn=collate,
+                     shuffle=True)
+    if args.deterministic:
+        dl_kwargs.update(worker_init_fn=lambda wid: _seed_worker(wid, seed),
+                         generator=torch.Generator().manual_seed(seed))
+    if workers:
+        dl_kwargs.update(prefetch_factor=2, persistent_workers=True)
 
-	# Save metrics CSV
-	metrics_dict = {
-		"epoch": list(range(1, len(train_losses) + 1)),
-		"train_loss": train_losses,
-		"val_loss": val_losses,
-		"mAP@.50": map50s,
-		"mAR@100": mar100s,
-		"F1": f1s,
-		"mAP@[.50:.95]": maps,
-		"mAP@.75": map75s,
-		"mAR@1": mar1s,
-		"mAR@10": mar10s,
-		"mAP_small": m_s,
-		"mAP_medium": m_m,
-		"mAP_large": m_l,
-		"mAR_small": r_s,
-		"mAR_medium": r_m,
-		"mAR_large": r_l,
-	}
-	save_metrics_csv(os.path.join(log_dir, "metrics.csv"), metrics_dict)
+    train_loader = DataLoader(train_ds, **dl_kwargs)
+    val_loader   = DataLoader(val_ds,   **{**dl_kwargs, "shuffle": False})
 
-	# Save model checkpoint
-	ckpt_path = os.path.join(ckpt_dir, f"{model_type}_model.pth")
-	torch.save(model.state_dict(), ckpt_path)
-	logger.info(f"Model checkpoint saved at: {ckpt_path}")
+    # ---------------------------------------------------------------------- #
+    model_type = cfg["model_type"].lower()
+    num_classes = len(classes) + (0 if is_detr else 1)
+    model = get_detection_model(model_type, num_classes, cfg)
 
-	# Optional: run test‐set visualization
-	if os.path.isdir(test_imgs) and os.path.isdir(test_lbls):
-		test_ds = TestDataset(test_imgs, test_lbls,
-							  classes_file, transforms=test_transform,
-							  normalize_boxes=is_detr,
-							  shift_labels=requires_shift_for_viz)
-		test_loader = DataLoader(test_ds,
-								 batch_size=1, shuffle=False,
-								 num_workers=0,
-								 collate_fn=lambda x: x[0])
-		out_vis = os.path.join(result_dir, "test_results.png")
-		evaluate_and_visualize(
-			model, test_loader, classes, run_device, out_vis,
-			threshold=cfg.get("eval_threshold", 0.5),
-			model_type=model_type
-		)
-	else:
-		logger.info("Test set not found; skipping inference‐viz.")
+    run_device = torch.device("cpu") if (device.type == "mps" and model_type == "fasterrcnn") else device
+    if run_device.type == "cuda" and cfg["compile"]:
+        model = torch.compile(model)
+    model = model.to(run_device)
 
-	# If using cloud, upload all artifacts at end
-	if use_cloud and out_base and out_base.startswith("gs://"):
-		upload_dir(ckpt_dir, f"{out_base}/checkpoints")
-		upload_dir(log_dir, f"{out_base}/logs")
-		upload_dir(result_dir, f"{out_base}/results")
-		bucket_name, prefix = out_base[5:].split("/", 1)
-		client = storage.Client()
-		blob = client.bucket(bucket_name).blob(f"{prefix}/used_config.yaml")
-		blob.upload_from_filename(dest_cfg)
-		logger.info(f"Uploaded experiment results to {out_base}")
+    optim = get_optimizer(model, cfg)
+    sched = get_scheduler(optim, cfg)
+    cfg["log_dir"] = str(log_dir)
+
+    # ---------------------------------------------------------------------- #
+    metrics = train_model(model, train_loader, val_loader, run_device, optim, sched, cfg)
+    (train_losses, val_losses,
+     map50s, mar100s, f1s,
+     maps, map75s, mar1s, mar10s,
+     m_s, m_m, m_l,
+     r_s, r_m, r_l) = metrics
+
+    # ---------------- plotting + CSV -------------------------------------- #
+    plot_curve(train_losses, "Train Loss", "Train Loss", result_dir / "train_loss.png")
+    plot_curve(val_losses,   "Val Loss",   "Val Loss",   result_dir / "val_loss.png")
+    plot_curve(map50s,       "mAP@.50",    "mAP@.50",    result_dir / "map50.png")
+    plot_curve(mar100s,      "mAR@100",    "mAR@100",    result_dir / "mar100.png")
+
+    save_metrics_csv(log_dir / "metrics.csv", {
+        "epoch": list(range(1, len(train_losses)+1)),
+        "train_loss": train_losses, "val_loss": val_losses,
+        "mAP@.50": map50s, "mAR@100": mar100s, "F1": f1s,
+        "mAP@[.50:.95]": maps, "mAP@.75": map75s,
+        "mAR@1": mar1s, "mAR@10": mar10s,
+        "mAP_small": m_s, "mAP_medium": m_m, "mAP_large": m_l,
+        "mAR_small": r_s, "mAR_medium": r_m, "mAR_large": r_l,
+    })
+
+    # ---------------- checkpoint & vis ------------------------------------ #
+    ckpt = ckpt_dir / f"{model_type}_model.pth"
+    torch.save(model.state_dict(), ckpt); log.info("Saved model → %s", ckpt)
+
+    if test_imgs.is_dir() and test_lbls.is_dir():
+        vis_ds = YOLODataset(test_imgs, test_lbls, classes_file,
+                             mode="test", transforms=test_tf,
+                             normalize_boxes=is_detr, shift_labels=not is_detr)
+        vis_loader = DataLoader(vis_ds, batch_size=1, shuffle=False, num_workers=0,
+                                collate_fn=lambda x: x[0])
+        evaluate_and_visualize(model, vis_loader, classes, run_device,
+                               str(result_dir / "test_results.png"),
+                               threshold=cfg.get("eval_threshold", 0.5),
+                               model_type=model_type)
+
+    # ---------------- optional async cloud upload ------------------------- #
+    def _async_upload():
+        _upload_dir(ckpt_dir,  f"{out_base}/checkpoints")
+        _upload_dir(log_dir,   f"{out_base}/logs")
+        _upload_dir(result_dir,f"{out_base}/results")
+        storage.Client().bucket(out_base[5:].split('/',1)[0]).blob(
+            f"{out_base.split('/',1)[1]}/used_config.yaml").upload_from_filename(dest_cfg)
+        log.info("Uploaded artifacts to %s", out_base)
+
+    if use_cloud and args.async_upload and str(out_base).startswith("gs://"):
+        threading.Thread(target=_async_upload, daemon=True).start()
+    elif use_cloud and str(out_base).startswith("gs://"):
+        _async_upload()
 
 
 if __name__ == "__main__":
-	main()
+    main()
+

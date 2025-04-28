@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
 import csv
 import logging
 import os
-from functools import lru_cache
-from typing import Sequence, Tuple, Optional
+from typing import Any, Mapping, Sequence, Tuple
 
 import albumentations as A
 import cv2
@@ -10,39 +12,60 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torchvision.transforms as T
-import torchvision.transforms.v2 as TV
 import yaml
 from albumentations.pytorch import ToTensorV2
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+###############################################################################
+# Configuration & logging helpers
+###############################################################################
+
+#: Default number of worker processes for ``torch.utils.data.DataLoader`` when
+#: the YAML config omits *num_workers*.
+DEFAULT_NUM_WORKERS: int = max(2, (os.cpu_count() or 2) // 2)
 
 
-def load_config(path: str) -> dict:
-    """Load a YAML file and return it as a dictionary."""
-    with open(path, "r") as f:
-        cfg = yaml.safe_load(f)
-    logger.info("Loaded config %s", path)
-    return cfg
+def setup_logging(level: int = logging.INFO) -> None:
+    """Initialise the root *and* library loggers.
 
+    * Call this **once** at program start (e.g. in ``train.py``) **before** any
+      sub‑modules log.
+    * Guard against double‑initialisation when unit‑tests import this module
+      repeatedly.
+    """
+    root = logging.getLogger()
+    if root.handlers:  # already configured in this process – do nothing
+        return
+
+    fmt = "%(asctime)s [%(levelname)s] %(name)s ‑ %(message)s"
+    logging.basicConfig(level=level, format=fmt)  # adds a *StreamHandler*
+
+    # Silence noisy third‑party libraries at INFO by default
+    for noisy in ("matplotlib", "PIL", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+###############################################################################
+# Device helpers
+###############################################################################
 
 def get_device() -> torch.device:
-    """
-    Return the preferred `torch.device` following this order:
+    """Return the preferred :pyclass:`torch.device` following this order:
 
-    1. Honour `DEVICE` environment variable (if valid),
+    1. Environment variable ``DEVICE`` (if valid),
     2. CUDA,
-    3. Apple-Metal (MPS),
+    3. Apple‑Metal (MPS),
     4. CPU.
     """
     override = os.getenv("DEVICE")
     if override:
         try:
             dev = torch.device(override)
-            logger.info("Using device override: %s", dev)
+            logging.getLogger(__name__).info("Using device override: %s", dev)
             return dev
         except Exception:
-            logger.warning("Invalid DEVICE override '%s' – ignoring.", override)
+            logging.getLogger(__name__).warning(
+                "Invalid DEVICE override '%s' – ignoring.", override
+            )
 
     if torch.cuda.is_available():
         return torch.device("cuda")
@@ -51,9 +74,33 @@ def get_device() -> torch.device:
     return torch.device("cpu")
 
 
+def auto_amp_supported(device: torch.device) -> bool:
+    """Return ``True`` if *device* supports **native* Automatic Mixed Precision.
+
+    CUDA (sm >= 7.x) and Apple‑Silicon (MPS) both do; CPU currently does not.
+    """
+    return device.type in {"cuda", "mps"}
+
+
+###############################################################################
+# YAML + config helpers
+###############################################################################
+
+def load_config(path: str) -> dict[str, Any]:
+    """Load a YAML file and return it as a dictionary."""
+    with open(path, "r", encoding="utf‑8") as f:
+        cfg = yaml.safe_load(f)
+    logging.getLogger(__name__).info("Loaded config %s", path)
+    return cfg
+
+
+###############################################################################
+# Transform builders
+###############################################################################
+
 def get_simple_transform(
-    mean: Optional[Sequence[float]] = None,
-    std: Optional[Sequence[float]] = None,
+    mean: Sequence[float] | None = None,
+    std: Sequence[float] | None = None,
 ) -> T.Compose:
     """Plain ToTensor + Normalize transform."""
     mean = mean or (0.485, 0.456, 0.406)
@@ -61,7 +108,7 @@ def get_simple_transform(
     return T.Compose([T.ToTensor(), T.Normalize(mean=mean, std=std)])
 
 
-_BASE_AUGS = [
+_BASE_AUGS: list[A.BasicTransform] = [
     A.HorizontalFlip(p=0.5),
     A.RandomBrightnessContrast(0.1, 0.1, p=0.3),
     A.CLAHE(clip_limit=2.0, p=0.2),
@@ -74,20 +121,8 @@ def get_train_transform(
     mps_safe: bool,
     seed: int | None = None,
 ) -> A.Compose:
-    """
-    Build one Albumentations pipeline shared by all detectors.
-
-    Parameters
-    ----------
-    is_detr  : True for Deformable-DETR (YOLO boxes), False for FR-CNN/Retina.
-    mps_safe : Skip affine + rotate on Apple-Metal to avoid shader crashes.
-    seed     : Optional deterministic seed for reproducibility.
-
-    Returns
-    -------
-    albumentations.Compose
-    """
-    ops = list(_BASE_AUGS)  # copy to avoid global mutation
+    """Build one Albumentations pipeline shared by all detectors."""
+    ops: list[A.BasicTransform] = list(_BASE_AUGS)  # shallow‑copy
 
     if not mps_safe:  # add heavier geometric augments on CUDA/CPU
         ops.insert(1, A.Affine(translate_percent=0.1, scale=(0.85, 1.15), p=0.5))
@@ -104,7 +139,6 @@ def get_train_transform(
             fill=0,
         )
     )
-
     ops.append(ToTensorV2())
 
     fmt = "yolo" if is_detr else "pascal_voc"
@@ -120,6 +154,10 @@ def get_train_transform(
     )
 
 
+###############################################################################
+# Plotting + CSV helpers
+###############################################################################
+
 def plot_curve(
     values: Sequence[float],
     ylabel: str,
@@ -128,7 +166,7 @@ def plot_curve(
     figsize: Tuple[int, int] = (8, 6),
     marker: str = "o",
 ) -> None:
-    """Plot a 1-D curve and save it to *output_path*."""
+    """Plot *values* vs epoch and save the figure to *output_path*."""
     try:
         fig, ax = plt.subplots(figsize=figsize)
         ax.plot(range(1, len(values) + 1), values, marker=marker)
@@ -138,23 +176,27 @@ def plot_curve(
         ax.grid(True)
         fig.savefig(output_path, bbox_inches="tight")
         plt.close(fig)
-        logger.debug("Saved plot '%s' → %s", title, output_path)
+        logging.getLogger(__name__).debug("Saved plot '%s' → %s", title, output_path)
     except Exception as exc:  # pragma: no cover
-        logger.error("Failed to plot '%s': %s", title, exc)
+        logging.getLogger(__name__).error("Failed to plot '%s': %s", title, exc)
 
 
-def save_metrics_csv(csv_path: str, metrics: dict) -> None:
-    """Write epoch-level metrics (dict of equal-length lists) to CSV."""
+def save_metrics_csv(csv_path: str, metrics: Mapping[str, Sequence[Any]]) -> None:
+    """Write epoch‑level *metrics* (dict of equal‑length lists) to CSV."""
     keys = list(metrics.keys())
-    with open(csv_path, "w", newline="") as f:
+    with open(csv_path, "w", newline="", encoding="utf‑8") as f:
         writer = csv.writer(f)
         writer.writerow(keys)
         writer.writerows(zip(*(metrics[k] for k in keys)))
-    logger.debug("Saved metrics CSV → %s", csv_path)
+    logging.getLogger(__name__).debug("Saved metrics CSV → %s", csv_path)
 
+
+###############################################################################
+# Model helpers
+###############################################################################
 
 def freeze_batchnorm(model: nn.Module, backbone_only: bool = True) -> nn.Module:
-    """Set BatchNorm2d layers to eval + disable grads."""
+    """Set all ``BatchNorm2d`` layers to eval mode and disable their grads."""
     mods = (
         model.backbone.modules()
         if backbone_only and hasattr(model, "backbone")
@@ -167,21 +209,27 @@ def freeze_batchnorm(model: nn.Module, backbone_only: bool = True) -> nn.Module:
             for p in m.parameters():
                 p.requires_grad = False
             frozen += 1
-    logger.info("Frozen %d BatchNorm2d layers.", frozen)
+    logging.getLogger(__name__).info("Frozen %d BatchNorm2d layers.", frozen)
     return model
 
 
-def compute_total_loss(loss_dict) -> torch.Tensor:
-    """
-    Sum a dict of loss tensors or return the tensor directly.
+###############################################################################
+# Loss helpers
+###############################################################################
+
+def compute_total_loss(loss_dict: Any) -> torch.Tensor:
+    """Return a scalar loss from various possible *loss_dict* formats.
+
+    * ``dict`` of tensors – sums the (already scalar) tensors.
+    * bare ``torch.Tensor`` – returned untouched.
+    * HF ``ModelOutput`` – uses its ``loss`` attribute.
     """
     if isinstance(loss_dict, dict):
-        total = torch.zeros((), device=next(iter(loss_dict.values())).device)
-        for v in loss_dict.values():
-            total += v.sum() if isinstance(v, torch.Tensor) else torch.as_tensor(v)
-        return total
+        return sum(torch.as_tensor(v).sum() for v in loss_dict.values())
     if isinstance(loss_dict, torch.Tensor):
         return loss_dict
-    if hasattr(loss_dict, "loss"):  # for HF models
-        return loss_dict.loss
-    raise ValueError(f"Cannot compute total loss from object of type {type(loss_dict)}")
+    if hasattr(loss_dict, "loss"):
+        return torch.as_tensor(loss_dict.loss)
+    raise TypeError(
+        f"Cannot compute total loss from object of type {type(loss_dict).__name__}"
+    )
