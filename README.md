@@ -248,10 +248,10 @@ This section describes running training experiments locally using `src/training/
 **Example Local Training Command:**
 ```bash
 python src/training/train.py \
-  model=deformable_detr \         # detector to train
-  data=tiles_base \               # which dataset group in configs/data/
-  train=cpu \                     # training profile (cpu, gpu, etc.)
-  experiment=detr_local_run1      # output sub-folder under experiments/
+  model=retinanet \           # detector to train
+  data=tiles_base_pilot \     # dataset group in configs/data/
+  train=cpu_pilot \           # training profile (CPU high-mem)
+  experiment=retina_local     # sub-folder under experiments/
 ```
 
 ## Cloud Training Workflow (GCP)
