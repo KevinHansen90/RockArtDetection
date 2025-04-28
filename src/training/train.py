@@ -13,221 +13,251 @@ import random
 import sys
 from pathlib import Path
 from typing import Any, Dict
+import shutil
 
 import hydra
 import numpy as np
 import torch
-from omegaconf import DictConfig
 from torch.utils.data import DataLoader
+from omegaconf import DictConfig
+
+try:
+	import wandb
+except ImportError:
+	wandb = None
 
 # ── project root on path ──────────────────────────────────────────────────
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
+	sys.path.insert(0, str(_ROOT))
 
 # ── helpers ───────────────────────────────────────────────────────────────
 from src.training.utils import (
-    DEFAULT_NUM_WORKERS,
-    get_cfg_dict,
-    get_device,
-    get_simple_transform,
-    plot_curve,
-    save_metrics_csv,
-    setup_logging,
+	DEFAULT_NUM_WORKERS,
+	get_cfg_dict,
+	get_device,
+	get_simple_transform,
+	plot_curve,
+	save_metrics_csv,
+	setup_logging,
 )
 from src.transforms import build_train as _build_train_tf
 from src.training.engine import train_model
 from src.models.detection_models import get_detection_model, get_optimizer, get_scheduler
 from src.datasets.yolo_dataset import (
-    YOLODataset,
-    collate_fn,
-    collate_fn_detr,
-    load_classes,
+	YOLODataset,
+	collate_fn,
+	collate_fn_detr,
+	load_classes,
 )
 from src.training.evaluate import evaluate_and_visualize
 
 setup_logging()
 log = logging.getLogger("train")
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Core training body (expects a flat Python dict)
 # ─────────────────────────────────────────────────────────────────────────────
 def run_training(cfg: Dict[str, Any]) -> None:
-    # 1) Reproducibility --------------------------------------------------
-    seed = cfg.get("seed", 42)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+	# 0) ------------------------------------------------------------------
+	#   Handle optional Weights & Biases
+	# --------------------------------------------------------------------
+	wandb_enabled = cfg.get("wandb", {}).get("enabled", False)
+	if wandb_enabled:
+		assert wandb is not None, (
+			"wandb enabled in config but the package isn't installed. "
+			"Run `pip install wandb~=0.16.5`."
+		)
+		wandb.init(
+			project=cfg["wandb"].get("project", "rockart-detection"),
+			entity=cfg["wandb"].get("entity"),
+			name=cfg["wandb"].get("name"),
+			mode=cfg["wandb"].get("mode", "online"),
+			config=cfg,
+		)
 
-    # 2) Experiment directories ------------------------------------------
-    exp_root = _ROOT / "experiments" / cfg.get("experiment", "run")
-    ckpt_dir, log_dir, result_dir = [
-        exp_root / sub for sub in ("checkpoints", "logs", "results")
-    ]
-    for d in (ckpt_dir, log_dir, result_dir):
-        d.mkdir(parents=True, exist_ok=True)
-    log.info("Experiment dir: %s", exp_root)
+	# 1) Reproducibility --------------------------------------------------
+	seed = cfg.get("seed", 42)
+	random.seed(seed)
+	np.random.seed(seed)
+	torch.manual_seed(seed)
+	if torch.cuda.is_available():
+		torch.cuda.manual_seed_all(seed)
 
-    # 3) Dataset paths ----------------------------------------------------
-    data_root = cfg["data_root"]
-    classes_file = cfg["classes_file"]
-    classes = load_classes(classes_file)
+	# 2) Experiment directories ------------------------------------------
+	exp_root = _ROOT / "experiments" / cfg.get("experiment", "run")
+	ckpt_dir, log_dir, result_dir = [
+		exp_root / sub for sub in ("checkpoints", "logs", "results")
+	]
+	for d in (ckpt_dir, log_dir, result_dir):
+		d.mkdir(parents=True, exist_ok=True)
+	log.info("Experiment dir: %s", exp_root)
 
-    def split(part: str):
-        return Path(data_root, f"{part}/images"), Path(data_root, f"{part}/labels")
+	# 3) Dataset paths ----------------------------------------------------
+	data_root = cfg["data_root"]
+	classes_file = cfg["classes_file"]
+	classes = load_classes(classes_file)
 
-    train_imgs, train_lbls = split("train")
-    val_imgs, val_lbls = split("val")
-    test_imgs, test_lbls = split("test")
+	def split(part: str):
+		return Path(data_root, f"{part}/images"), Path(data_root, f"{part}/labels")
 
-    # 4) Device & transforms ---------------------------------------------
-    device = get_device()
-    if cfg["model_type"].lower() == "fasterrcnn" and device.type == "mps":
-        log.warning("Faster R-CNN not fully supported on MPS – falling back to CPU.")
-        device = torch.device("cpu")
+	train_imgs, train_lbls = split("train")
+	val_imgs, val_lbls = split("val")
+	test_imgs, test_lbls = split("test")
 
-    log.info("Device: %s", device)
-    is_detr = cfg["model_type"].lower() == "deformable_detr"
+	# 4) Device & transforms ---------------------------------------------
+	device = get_device()
+	if cfg["model_type"].lower() == "fasterrcnn" and device.type == "mps":
+		log.warning("Faster R-CNN not fully supported on MPS – falling back to CPU.")
+		device = torch.device("cpu")
 
-    # New GPU-aware transform
-    train_tf = _build_train_tf(is_detr, device, seed)
-    test_tf = get_simple_transform()
+	log.info("Device: %s", device)
+	is_detr = cfg["model_type"].lower() == "deformable_detr"
 
-    # 5) Datasets & DataLoaders ------------------------------------------
-    train_ds = YOLODataset(
-        train_imgs,
-        train_lbls,
-        classes_file,
-        mode="train",
-        transforms=train_tf,
-        normalize_boxes=is_detr,
-        shift_labels=not is_detr,
-    )
-    val_ds = YOLODataset(
-        val_imgs,
-        val_lbls,
-        classes_file,
-        mode="val",
-        transforms=test_tf,
-        normalize_boxes=is_detr,
-        shift_labels=not is_detr,
-    )
+	train_tf = _build_train_tf(is_detr, device, seed)
+	test_tf = get_simple_transform()
 
-    workers = cfg.get("num_workers", DEFAULT_NUM_WORKERS)
-    collate = collate_fn_detr if is_detr else collate_fn
-    dl_kw = dict(
-        batch_size=cfg.get("batch_size", 2),
-        shuffle=True,
-        num_workers=workers,
-        pin_memory=device.type == "cuda",
-        collate_fn=collate,
-        generator=torch.Generator().manual_seed(seed),
-    )
-    if workers:
-        dl_kw.update(prefetch_factor=2, persistent_workers=True)
+	# 5) Datasets & DataLoaders ------------------------------------------
+	train_ds = YOLODataset(
+		train_imgs, train_lbls, classes_file,
+		mode="train", transforms=train_tf,
+		normalize_boxes=is_detr, shift_labels=not is_detr,
+	)
+	val_ds = YOLODataset(
+		val_imgs, val_lbls, classes_file,
+		mode="val", transforms=test_tf,
+		normalize_boxes=is_detr, shift_labels=not is_detr,
+	)
 
-    train_loader = DataLoader(train_ds, **dl_kw)
-    val_loader = DataLoader(val_ds, **{**dl_kw, "shuffle": False})
+	workers = cfg.get("num_workers", DEFAULT_NUM_WORKERS)
+	collate = collate_fn_detr if is_detr else collate_fn
+	dl_kw = dict(
+		batch_size=cfg.get("batch_size", 2),
+		shuffle=True,
+		num_workers=workers,
+		pin_memory=device.type == "cuda",
+		collate_fn=collate,
+		generator=torch.Generator().manual_seed(seed),
+	)
+	if workers:
+		dl_kw.update(prefetch_factor=2, persistent_workers=True)
 
-    # 6) Model, optimiser, scheduler -------------------------------------
-    num_classes = len(classes) + (0 if is_detr else 1)
-    model = get_detection_model(cfg["model_type"], num_classes, cfg).to(device)
-    optim = get_optimizer(model, cfg)
-    sched = get_scheduler(optim, cfg)
-    cfg["log_dir"] = str(log_dir)
+	train_loader = DataLoader(train_ds, **dl_kw)
+	val_loader = DataLoader(val_ds, **{**dl_kw, "shuffle": False})
 
-    # 7) Train ------------------------------------------------------------
-    (
-        train_losses,
-        val_losses,
-        map50s,
-        mar100s,
-        f1s,
-        maps,
-        map75s,
-        mar1s,
-        mar10s,
-        m_s,
-        m_m,
-        m_l,
-        r_s,
-        r_m,
-        r_l,
-    ) = train_model(model, train_loader, val_loader, device, optim, sched, cfg)
+	# 6) Model, optimiser, scheduler -------------------------------------
+	num_classes = len(classes) + (0 if is_detr else 1)
+	model = get_detection_model(cfg["model_type"], num_classes, cfg).to(device)
+	optim = get_optimizer(model, cfg)
+	sched = get_scheduler(optim, cfg)
+	cfg["log_dir"] = str(log_dir)
 
-    # 8) Curves & CSV -----------------------------------------------------
-    plot_curve(train_losses, "Train Loss", "Train Loss", result_dir / "train_loss.png")
-    plot_curve(val_losses, "Val Loss", "Val Loss", result_dir / "val_loss.png")
-    plot_curve(map50s, "mAP@.50", "mAP@.50", result_dir / "map50.png")
-    plot_curve(mar100s, "mAR@100", "mAR@100", result_dir / "mar100.png")
-    save_metrics_csv(
-        result_dir / "metrics.csv",
-        {
-            "epoch": list(range(1, len(train_losses) + 1)),
-            "train_loss": train_losses,
-            "val_loss": val_losses,
-            "mAP@.50": map50s,
-            "mAR@100": mar100s,
-            "F1": f1s,
-            "mAP@[.50:.95]": maps,
-            "mAP@.75": map75s,
-            "mAR@1": mar1s,
-            "mAR@10": mar10s,
-            "mAP_small": m_s,
-            "mAP_medium": m_m,
-            "mAP_large": m_l,
-            "mAR_small": r_s,
-            "mAR_medium": r_m,
-            "mAR_large": r_l,
-        },
-    )
+	# 7) Train ------------------------------------------------------------
+	(
+		train_losses, val_losses,
+		map50s, mar100s, f1s,
+		maps, map75s, mar1s, mar10s,
+		m_s, m_m, m_l,
+		r_s, r_m, r_l,
+		lr0s, lr1s, epoch_times,
+	) = train_model(model, train_loader, val_loader, device, optim, sched, cfg)
 
-    # 9) Checkpoint & test-set visualisation -----------------------------
-    torch.save(model.state_dict(), ckpt_dir / f"{cfg['model_type']}_model.pth")
-    if test_imgs.is_dir():
-        test_ds = YOLODataset(
-            test_imgs,
-            test_lbls,
-            classes_file,
-            mode="test",
-            transforms=test_tf,
-            normalize_boxes=is_detr,
-            shift_labels=not is_detr,
-        )
-        test_loader = DataLoader(
-            test_ds,
-            batch_size=1,
-            shuffle=False,
-            num_workers=0,
-            collate_fn=lambda x: x[0],
-        )
-        evaluate_and_visualize(
-            model,
-            test_loader,
-            classes,
-            device,
-            result_dir / "test_results.png",
-            threshold=cfg.get("eval_threshold", 0.5),
-            model_type=cfg["model_type"],
-        )
+	# 8) Curves & CSV -----------------------------------------------------
+	plot_curve(train_losses, "Train Loss", "Train Loss", result_dir / "train_loss.png")
+	plot_curve(val_losses, "Val Loss", "Val Loss", result_dir / "val_loss.png")
+	plot_curve(map50s, "mAP@.50", "mAP@.50", result_dir / "map50.png")
+	plot_curve(mar100s, "mAR@100", "mAR@100", result_dir / "mar100.png")
+
+	save_metrics_csv(
+		result_dir / "metrics.csv",
+		{
+			"epoch": list(range(1, len(train_losses) + 1)),
+			"train_loss": train_losses,
+			"val_loss": val_losses,
+			"mAP@.50": map50s,
+			"mAR@100": mar100s,
+			"F1": f1s,
+			"mAP@[.50:.95]": maps,
+			"mAP@.75": map75s,
+			"mAR@1": mar1s,
+			"mAR@10": mar10s,
+			"mAP_small": m_s,
+			"mAP_medium": m_m,
+			"mAP_large": m_l,
+			"mAR_small": r_s,
+			"mAR_medium": r_m,
+			"mAR_large": r_l,
+			"lr_group0": lr0s,
+			"lr_group1": lr1s,
+			"epoch_time": epoch_times,
+		},
+	)
+
+	# 8-b) Log metrics to W&B per epoch ----------------------------------
+	if wandb_enabled:
+		for idx in range(len(train_losses)):
+			wandb.log(
+				{
+					"epoch": idx + 1,
+					"train_loss": train_losses[idx],
+					"val_loss": val_losses[idx],
+					"mAP@.50": map50s[idx],
+					"mAR@100": mar100s[idx],
+					"lr_group0": lr0s[idx],
+					"lr_group1": lr1s[idx],
+					"epoch_time_s": epoch_times[idx],
+				},
+				step=idx + 1,
+			)
+
+	# 9) Checkpoint & test-set visualisation -----------------------------
+	torch.save(model.state_dict(), ckpt_dir / f"{cfg['model_type']}_model.pth")
+	if test_imgs.is_dir():
+		test_ds = YOLODataset(
+			test_imgs, test_lbls, classes_file,
+			mode="test", transforms=test_tf,
+			normalize_boxes=is_detr, shift_labels=not is_detr,
+		)
+		test_loader = DataLoader(
+			test_ds, batch_size=1, shuffle=False,
+			num_workers=0, collate_fn=lambda x: x[0],
+		)
+		evaluate_and_visualize(
+			model, test_loader, classes, device,
+			result_dir / "test_results.png",
+			threshold=cfg.get("eval_threshold", 0.5),
+			model_type=cfg["model_type"],
+		)
+
+	# 10) Finish W&B ------------------------------------------------------
+	if wandb_enabled:
+		wandb.finish()
+		# delete the local buffer to save disk space
+		wandb_dir = os.environ.get("WANDB_DIR", "./wandb")
+		# avoid nuking if intentionally pointed WANDB_DIR at a shared path
+		if Path(wandb_dir).exists():
+			try:
+				shutil.rmtree(wandb_dir)
+				log.info("Cleaned local W&B folder %s", wandb_dir)
+			except Exception as e:
+				log.warning("Could not remove %s: %s", wandb_dir, e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Hydra entry-point
 # ─────────────────────────────────────────────────────────────────────────────
 @hydra.main(
-    config_path=str(_ROOT / "configs"),
-    config_name="defaults",
-    version_base="1.3",
+	config_path=str(_ROOT / "configs"),
+	config_name="defaults",
+	version_base="1.3",
 )
 def main(cfg: DictConfig) -> None:
-    """Hydra entry-point → flatten config → start training."""
-    flat = get_cfg_dict(cfg)
-    flat["experiment"] = cfg.get("experiment", "run")
-    run_training(flat)
+	"""Hydra entry-point → flatten config → start training."""
+	flat = get_cfg_dict(cfg)
+	flat["experiment"] = cfg.get("experiment", "run")
+	run_training(flat)
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()
+	main()

@@ -356,7 +356,7 @@ gsutil -m cp -r data/tiles gs://$BUCKET/data/tiles/
 export DATA_YAML=base_pilot           # 10 % subset
 export EXPERIMENT=pilot_yolov5_base_cpu
 
-envsubst '$DATA_YAML $EXPERIMENT' \
+envsubst '$DATA_YAML $EXPERIMENT $WANDB_API_KEY' \
   < job_templates/yolov5-pilot-cpu.json | \
 gcloud ai custom-jobs create \
   --region=us-central1 \
@@ -371,7 +371,7 @@ for FILTER in bilateral unsharp laplacian clahe; do
   export DATA_YAML=${FILTER}_pilot
   export EXPERIMENT=pilot_yolov5_${FILTER}_gpu
 
-  envsubst '$DATA_YAML $EXPERIMENT' \
+  envsubst '$DATA_YAML $EXPERIMENT $WANDB_API_KEY' \
     < job_templates/yolov5-pilot-gpu.json | \
   gcloud ai custom-jobs create \
     --region=us-central1 \
@@ -390,7 +390,7 @@ for MODEL in fasterrcnn retinanet deformable_detr; do
   export TRAIN_PROFILE=cpu_pilot
   export EXPERIMENT=pilot_${MODEL}_cpu
 
-  envsubst '$MODEL $DATA $TRAIN_PROFILE $EXPERIMENT' \
+  envsubst '$MODEL $DATA $TRAIN_PROFILE $EXPERIMENT $WANDB_API_KEY' \
     < job_templates/pilot-cpu.json | \
   gcloud ai custom-jobs create \
     --region=us-central1 \
@@ -408,7 +408,7 @@ for MODEL in fasterrcnn retinanet deformable_detr; do
     export TRAIN_PROFILE=gpu_t4_pilot
     export EXPERIMENT=pilot_${MODEL}_${FILTER}_gpu
 
-    envsubst '$MODEL $DATA $TRAIN_PROFILE $EXPERIMENT' \
+    envsubst '$MODEL $DATA $TRAIN_PROFILE $EXPERIMENT $WANDB_API_KEY' \
       < job_templates/pilot-gpu.json | \
     gcloud ai custom-jobs create \
       --region=us-central1 \
