@@ -1,140 +1,187 @@
-#!/usr/bin/env python3
-
-import os
 import csv
-import yaml
 import logging
+import os
+from functools import lru_cache
+from typing import Sequence, Tuple, Optional
+
+import albumentations as A
+import cv2
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
 import torchvision.transforms as T
+import torchvision.transforms.v2 as TV
+import yaml
+from albumentations.pytorch import ToTensorV2
 
-# Logger
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
 def load_config(path: str) -> dict:
-    """Read and parse a YAML config file, raising on errors."""
-    try:
-        with open(path, 'r') as f:
-            cfg = yaml.safe_load(f)
-        logger.info(f"Loaded config from {path}")
-        return cfg
-    except Exception as e:
-        logger.error(f"Failed to load config: {e}")
-        raise
+    """Load a YAML file and return it as a dictionary."""
+    with open(path, "r") as f:
+        cfg = yaml.safe_load(f)
+    logger.info("Loaded config %s", path)
+    return cfg
 
 
 def get_device() -> torch.device:
     """
-    Determine compute device:
-    - Honor DEVICE env var if set (e.g., cuda:0, cpu, mps)
-    - Otherwise prefer CUDA, then MPS, then CPU
+    Return the preferred `torch.device` following this order:
+
+    1. Honour `DEVICE` environment variable (if valid),
+    2. CUDA,
+    3. Apple-Metal (MPS),
+    4. CPU.
     """
-    override = os.getenv('DEVICE')
+    override = os.getenv("DEVICE")
     if override:
         try:
-            device = torch.device(override)
-            logger.info(f"Using device override: {device}")
-            return device
+            dev = torch.device(override)
+            logger.info("Using device override: %s", dev)
+            return dev
         except Exception:
-            logger.warning(f"Invalid DEVICE override '{override}', falling back.")
+            logger.warning("Invalid DEVICE override '%s' – ignoring.", override)
+
     if torch.cuda.is_available():
-        return torch.device('cuda')
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return torch.device('mps')
-    return torch.device('cpu')
+        return torch.device("cuda")
+    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
 
 
-def get_simple_transform(mean=None, std=None) -> T.Compose:
+def get_simple_transform(
+    mean: Optional[Sequence[float]] = None,
+    std: Optional[Sequence[float]] = None,
+) -> T.Compose:
+    """Plain ToTensor + Normalize transform."""
+    mean = mean or (0.485, 0.456, 0.406)
+    std = std or (0.229, 0.224, 0.225)
+    return T.Compose([T.ToTensor(), T.Normalize(mean=mean, std=std)])
+
+
+_BASE_AUGS = [
+    A.HorizontalFlip(p=0.5),
+    A.RandomBrightnessContrast(0.1, 0.1, p=0.3),
+    A.CLAHE(clip_limit=2.0, p=0.2),
+    A.LongestMaxSize(max_size=1024, p=1.0),
+]
+
+
+def get_train_transform(
+    is_detr: bool,
+    mps_safe: bool,
+    seed: int | None = None,
+) -> A.Compose:
     """
-    Return a basic transform: ToTensor + Normalize.
-    Defaults to ImageNet stats if mean/std not provided.
+    Build one Albumentations pipeline shared by all detectors.
+
+    Parameters
+    ----------
+    is_detr  : True for Deformable-DETR (YOLO boxes), False for FR-CNN/Retina.
+    mps_safe : Skip affine + rotate on Apple-Metal to avoid shader crashes.
+    seed     : Optional deterministic seed for reproducibility.
+
+    Returns
+    -------
+    albumentations.Compose
     """
-    mean = mean or [0.485, 0.456, 0.406]
-    std  = std  or [0.229, 0.224, 0.225]
-    return T.Compose([
-        T.ToTensor(),
-        T.Normalize(mean=mean, std=std)
-    ])
+    ops = list(_BASE_AUGS)  # copy to avoid global mutation
+
+    if not mps_safe:  # add heavier geometric augments on CUDA/CPU
+        ops.insert(1, A.Affine(translate_percent=0.1, scale=(0.85, 1.15), p=0.5))
+        ops.insert(2, A.RandomRotate90(p=0.25))
+
+    # Always ensure H and W are divisible by 32 for detector backbones
+    ops.append(
+        A.PadIfNeeded(
+            min_height=None,
+            min_width=None,
+            pad_height_divisor=32,
+            pad_width_divisor=32,
+            border_mode=cv2.BORDER_CONSTANT,
+            fill=0,
+        )
+    )
+
+    ops.append(ToTensorV2())
+
+    fmt = "yolo" if is_detr else "pascal_voc"
+    return A.Compose(
+        ops,
+        bbox_params=A.BboxParams(
+            format=fmt,
+            label_fields=["class_labels"],
+            min_visibility=0.4,
+            check_each_transform=False,
+        ),
+        seed=seed,
+    )
 
 
 def plot_curve(
-    values: list,
+    values: Sequence[float],
     ylabel: str,
     title: str,
     output_path: str,
-    figsize: tuple = (8, 6),
-    marker: str = 'o'
+    figsize: Tuple[int, int] = (8, 6),
+    marker: str = "o",
 ) -> None:
-    """
-    Plot a sequence of values and save to file.
-    """
+    """Plot a 1-D curve and save it to *output_path*."""
     try:
         fig, ax = plt.subplots(figsize=figsize)
-        ax.plot(range(1, len(values)+1), values, marker=marker)
-        ax.set_xlabel('Epoch')
+        ax.plot(range(1, len(values) + 1), values, marker=marker)
+        ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
         ax.set_title(title)
         ax.grid(True)
-        fig.savefig(output_path)
+        fig.savefig(output_path, bbox_inches="tight")
         plt.close(fig)
-        logger.info(f"Saved plot '{title}' to {output_path}")
-    except Exception as e:
-        logger.error(f"Failed to plot '{title}': {e}")
+        logger.debug("Saved plot '%s' → %s", title, output_path)
+    except Exception as exc:  # pragma: no cover
+        logger.error("Failed to plot '%s': %s", title, exc)
 
 
-def save_metrics_csv(csv_path: str, metrics: dict):
-    """
-    Save epoch‐level metrics (all keys in metrics dict) to CSV.
-    metrics is a dict of lists, all of same length.
-    """
-    # Header is the dict keys
+def save_metrics_csv(csv_path: str, metrics: dict) -> None:
+    """Write epoch-level metrics (dict of equal-length lists) to CSV."""
     keys = list(metrics.keys())
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(keys)
-        for i in range(len(metrics[keys[0]])):
-            row = [metrics[k][i] for k in keys]
-            writer.writerow(row)
-    from tqdm import tqdm; tqdm.write(f"Saved metrics CSV to {csv_path}")
+        writer.writerows(zip(*(metrics[k] for k in keys)))
+    logger.debug("Saved metrics CSV → %s", csv_path)
 
 
 def freeze_batchnorm(model: nn.Module, backbone_only: bool = True) -> nn.Module:
-    """
-    Freeze all BatchNorm2d layers.
-    If backbone_only, only freeze layers under model.backbone.
-    """
-    modules = model.backbone.modules() if backbone_only and hasattr(model, 'backbone') else model.modules()
+    """Set BatchNorm2d layers to eval + disable grads."""
+    mods = (
+        model.backbone.modules()
+        if backbone_only and hasattr(model, "backbone")
+        else model.modules()
+    )
     frozen = 0
-    for m in modules:
+    for m in mods:
         if isinstance(m, nn.BatchNorm2d):
             m.eval()
             for p in m.parameters():
                 p.requires_grad = False
             frozen += 1
-    logger.info(f"Frozen {frozen} BatchNorm2d layers.")
+    logger.info("Frozen %d BatchNorm2d layers.", frozen)
     return model
 
 
 def compute_total_loss(loss_dict) -> torch.Tensor:
     """
-    Sum losses when model returns a dict of tensors.
-    If a single Tensor is returned, return it directly.
+    Sum a dict of loss tensors or return the tensor directly.
     """
     if isinstance(loss_dict, dict):
-        total = torch.tensor(0.0, device=next(iter(loss_dict.values())).device)
-        for k, v in loss_dict.items():
-            if isinstance(v, torch.Tensor):
-                total = total + v.sum()
-            else:
-                total = total + torch.tensor(v)
+        total = torch.zeros((), device=next(iter(loss_dict.values())).device)
+        for v in loss_dict.values():
+            total += v.sum() if isinstance(v, torch.Tensor) else torch.as_tensor(v)
         return total
     if isinstance(loss_dict, torch.Tensor):
         return loss_dict
-    # Fallback: try attribute 'loss'
-    try:
+    if hasattr(loss_dict, "loss"):  # for HF models
         return loss_dict.loss
-    except Exception:
-        raise ValueError(f"Cannot compute total loss from object: {loss_dict}")
+    raise ValueError(f"Cannot compute total loss from object of type {type(loss_dict)}")

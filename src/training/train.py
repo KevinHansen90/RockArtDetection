@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.training.utils import (
-	load_config, get_device, get_simple_transform,
+	load_config, get_device, get_simple_transform, get_train_transform,
 	plot_curve, save_metrics_csv
 )
 from src.training.engine import train_model
@@ -171,10 +171,12 @@ def main():
 	is_detr = (cfg["model_type"].lower() == "deformable_detr")
 	requires_shift_for_viz = not is_detr
 	coll = collate_fn_detr if is_detr else collate_fn
-	transform = get_simple_transform()
+	mps_safe = (device.type == "mps")
+	train_transform = get_train_transform(is_detr, mps_safe, seed)
+	test_transform = get_simple_transform()
 
-	train_ds = CustomYOLODataset(train_imgs, train_lbls, classes_file, transform, is_detr)
-	val_ds = CustomYOLODataset(val_imgs, val_lbls, classes_file, transform, is_detr)
+	train_ds = CustomYOLODataset(train_imgs, train_lbls, classes_file, train_transform, is_detr)
+	val_ds = CustomYOLODataset(val_imgs, val_lbls, classes_file, test_transform, is_detr)
 
 	g = torch.Generator().manual_seed(seed)
 	dl_kwargs = {
@@ -194,9 +196,18 @@ def main():
 	# Model, optimizer, scheduler
 	model_type = cfg["model_type"].lower()
 	num_classes = len(classes) + (0 if is_detr else 1)
-	model = get_detection_model(model_type, num_classes, config=cfg).to(device)
-	# optional: compile + fuse for faster kernels on GPU (no effect on CPU)
-	if device.type == "cuda":
+	model = get_detection_model(model_type, num_classes, config=cfg)
+	if device.type == "mps" and model_type == "fasterrcnn":
+		logger.warning(
+			"ROI ops unsupported on MPS – placing Faster R-CNN on CPU, "
+			"and moving batches to CPU as well."
+		)
+		run_device = torch.device("cpu")
+	else:
+		run_device = device
+	model = model.to(run_device)
+	# torch.compile only helps on CUDA right now
+	if run_device.type == "cuda":
 		model = torch.compile(model)
 	optim = get_optimizer(model, cfg)
 	sched = get_scheduler(optim, cfg)
@@ -204,7 +215,7 @@ def main():
 	cfg["log_dir"] = log_dir
 
 	# Train & collect metrics
-	metrics_out = train_model(model, train_loader, val_loader, device, optim, sched, cfg)
+	metrics_out = train_model(model, train_loader, val_loader, run_device, optim, sched, cfg)
 	(train_losses, val_losses, map50s, mar100s, f1s,
 	 maps, map75s, mar1s, mar10s, m_s, m_m, m_l,
 	 r_s, r_m, r_l) = metrics_out
@@ -244,7 +255,7 @@ def main():
 	# Optional: run test‐set visualization
 	if os.path.isdir(test_imgs) and os.path.isdir(test_lbls):
 		test_ds = TestDataset(test_imgs, test_lbls,
-							  classes_file, transforms=transform,
+							  classes_file, transforms=test_transform,
 							  normalize_boxes=is_detr,
 							  shift_labels=requires_shift_for_viz)
 		test_loader = DataLoader(test_ds,
@@ -253,7 +264,7 @@ def main():
 								 collate_fn=lambda x: x[0])
 		out_vis = os.path.join(result_dir, "test_results.png")
 		evaluate_and_visualize(
-			model, test_loader, classes, device, out_vis,
+			model, test_loader, classes, run_device, out_vis,
 			threshold=cfg.get("eval_threshold", 0.5),
 			model_type=model_type
 		)
