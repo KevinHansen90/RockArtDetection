@@ -41,6 +41,12 @@ except ImportError:  # pragma: no cover
 # Helpers
 # --------------------------------------------------------------------------- #
 def load_classes(classes_file: str) -> list[str]:
+    if classes_file.startswith("gs://"):
+        from tempfile import gettempdir
+        cache = Path(gettempdir()) / "grouped_classes.txt"
+        if not cache.exists():
+            _download_blob(classes_file, str(cache))
+        classes_file = cache
     with open(classes_file, "r") as f:
         return [ln.strip() for ln in f if ln.strip()]
 

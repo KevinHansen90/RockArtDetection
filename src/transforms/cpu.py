@@ -44,6 +44,7 @@ def build_train(is_detr: bool, seed: int | None = None) -> A.Compose:  # noqa: D
 			label_fields=["class_labels"],
 			min_visibility=0.4,
 			check_each_transform=False,
+			filter_invalid_bboxes=True,
 		),
 		seed=seed,
 	)

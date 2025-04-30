@@ -6,4 +6,5 @@ RUN pip install --upgrade pip \
     && pip install -r requirements.txt \
     && pip install google-cloud-storage
 COPY src/ src/
+COPY configs/ configs/
 ENTRYPOINT ["python", "src/training/train.py"]

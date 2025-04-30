@@ -38,6 +38,7 @@ This project combines **classical** image processing with **modern** deep learni
 project/
 ├── configs/                   # Hydra configuration tree
 │   ├── data/                  # Dataset variants (base_pilot, bilateral_full, …)
+│   ├── hydra/
 │   ├── model/                 # Detector-specific hyper-parameters
 │   ├── train/                 # Hardware / loop profiles (cpu_pilot, gpu_t4_pilot, …)
 │   ├── runtime/               # One-off CLI toggles (amp.yaml, debug.yaml, …)

@@ -85,13 +85,34 @@ def run_training(cfg: Dict[str, Any]) -> None:
 	if torch.cuda.is_available():
 		torch.cuda.manual_seed_all(seed)
 
-	# 2) Experiment directories ------------------------------------------
-	exp_root = _ROOT / "experiments" / cfg.get("experiment", "run")
-	ckpt_dir, log_dir, result_dir = [
-		exp_root / sub for sub in ("checkpoints", "logs", "results")
-	]
+	# ----------------------------------------------------------------------
+	# 2) Experiment directories
+	# ----------------------------------------------------------------------
+	run_name = cfg.get("experiment", "run")
+
+	vertex_out = os.getenv("AIP_STORAGE_URI")
+	if not vertex_out:
+		model_dir = os.getenv("AIP_MODEL_DIR")
+		if model_dir:
+			vertex_out = model_dir.rsplit("/model", 1)[0]
+
+	if vertex_out:  # running on Vertex
+		if vertex_out.startswith("gs://"):
+			vertex_out = "/gcs/" + vertex_out[len("gs://"):]
+		exp_root = Path(vertex_out)
+		if exp_root.name != run_name:
+			exp_root = exp_root / run_name
+	else:  # local run
+		exp_root = _ROOT / "experiments" / run_name
+
+	os.environ["AIP_MODEL_DIR"] = str(exp_root)
+	os.environ["AIP_STORAGE_URI"] = str(exp_root)
+
+	ckpt_dir, log_dir, result_dir = [exp_root / sub
+									 for sub in ("checkpoints", "logs", "results")]
 	for d in (ckpt_dir, log_dir, result_dir):
 		d.mkdir(parents=True, exist_ok=True)
+
 	log.info("Experiment dir: %s", exp_root)
 
 	# 3) Dataset paths ----------------------------------------------------
@@ -100,7 +121,14 @@ def run_training(cfg: Dict[str, Any]) -> None:
 	classes = load_classes(classes_file)
 
 	def split(part: str):
-		return Path(data_root, f"{part}/images"), Path(data_root, f"{part}/labels")
+		if data_root.startswith("gs://"):
+			# preserve double slash
+			imgs = f"{data_root}/{part}/images"
+			lbls = f"{data_root}/{part}/labels"
+		else:  # local filesystem
+			imgs = Path(data_root) / part / "images"
+			lbls = Path(data_root) / part / "labels"
+		return imgs, lbls
 
 	train_imgs, train_lbls = split("train")
 	val_imgs, val_lbls = split("val")
@@ -213,7 +241,7 @@ def run_training(cfg: Dict[str, Any]) -> None:
 
 	# 9) Checkpoint & test-set visualisation -----------------------------
 	torch.save(model.state_dict(), ckpt_dir / f"{cfg['model_type']}_model.pth")
-	if test_imgs.is_dir():
+	if not str(test_imgs).startswith("gs://") and Path(test_imgs).is_dir():
 		test_ds = YOLODataset(
 			test_imgs, test_lbls, classes_file,
 			mode="test", transforms=test_tf,
@@ -230,13 +258,16 @@ def run_training(cfg: Dict[str, Any]) -> None:
 			model_type=cfg["model_type"],
 		)
 
-	# 10) Finish W&B ------------------------------------------------------
+	# ----------------------------------------------------------------------
+	# 10) Finish W&B
+	# ----------------------------------------------------------------------
 	if wandb_enabled:
 		wandb.finish()
-		# delete the local buffer to save disk space
-		wandb_dir = os.environ.get("WANDB_DIR", "./wandb")
-		# avoid nuking if intentionally pointed WANDB_DIR at a shared path
-		if Path(wandb_dir).exists():
+
+		# delete the *local* buffer to save disk space
+		wandb_dir = Path(os.environ.get("WANDB_DIR", "./wandb")).resolve()
+		# never delete data that lives on the /gcs mount
+		if wandb_dir.exists() and not str(wandb_dir).startswith("/gcs/"):
 			try:
 				shutil.rmtree(wandb_dir)
 				log.info("Cleaned local W&B folder %s", wandb_dir)
