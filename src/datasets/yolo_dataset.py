@@ -42,8 +42,7 @@ except ImportError:  # pragma: no cover
 # --------------------------------------------------------------------------- #
 def load_classes(classes_file: str) -> list[str]:
     if classes_file.startswith("gs://"):
-        from tempfile import gettempdir
-        cache = Path(gettempdir()) / "grouped_classes.txt"
+        cache = Path(tempfile.gettempdir()) / "grouped_classes.txt"
         if not cache.exists():
             _download_blob(classes_file, str(cache))
         classes_file = cache
@@ -58,11 +57,11 @@ def _download_blob(gcs_uri: str, local_path: str) -> None:
     storage.Client().bucket(bucket_name).blob(blob_name).download_to_filename(local_path)
 
 
-def collate_fn(batch):        # Faster-RCNN / Retina
+def collate_fn(batch):         # Faster-RCNN / Retina
     return tuple(zip(*batch))
 
 
-def collate_fn_detr(batch):   # DETR
+def collate_fn_detr(batch):    # DETR
     images, targets = zip(*batch)
     if nested_tensor_from_tensor_list is not None:
         nested = nested_tensor_from_tensor_list(list(images))
@@ -107,15 +106,19 @@ class YOLODataset(Dataset):
             if storage is None:
                 raise RuntimeError("google-cloud-storage missing.")
             blobs = storage.Client().list_blobs(bucket, prefix=prefix)
-            self.image_files = sorted(Path(b.name).name for b in blobs if b.name.lower().endswith(".jpg"))
+            self.image_files = sorted(
+                Path(b.name).name for b in blobs if b.name.lower().endswith(".jpg")
+            )
         else:
-            self.image_files = sorted(f for f in os.listdir(images_dir) if f.lower().endswith(".jpg"))
+            self.image_files = sorted(
+                f for f in os.listdir(images_dir) if f.lower().endswith(".jpg")
+            )
 
         self._cache_dir = Path(tempfile.gettempdir()) / "yolo_stream_cache"
         self._cache_dir.mkdir(exist_ok=True)
 
     # ------------------------------------------------------------------ #
-    def __len__(self):  # noqa: D401
+    def __len__(self) -> int:
         return len(self.image_files)
 
     # ------------------------------------------------------------------ #
@@ -127,7 +130,9 @@ class YOLODataset(Dataset):
             return Image.open(local).convert("RGB")
         return Image.open(os.path.join(self.images_dir, fname)).convert("RGB")
 
-    def _read_label_file(self, stem: str) -> List[Tuple[int, float, float, float, float]]:
+    def _read_label_file(
+        self, stem: str
+    ) -> List[Tuple[int, float, float, float, float]]:
         path = (
             self._cache_dir / f"{stem}.txt"
             if self.labels_dir.startswith("gs://")
@@ -165,29 +170,46 @@ class YOLODataset(Dataset):
 
         # -------- transforms ------------------------------------------
         if self.transforms is not None:
-            if isinstance(self.transforms, A.Compose):          # Albumentations CPU
-                out = self.transforms(image=np.array(pil), bboxes=boxes, class_labels=labels)
+            if isinstance(self.transforms, A.Compose):  # Albumentations CPU
+                out = self.transforms(
+                    image=np.array(pil), bboxes=boxes, class_labels=labels
+                )
                 img_tensor = out["image"]
                 boxes, labels = list(out["bboxes"]), list(out["class_labels"])
-            elif self.transforms.__class__.__module__.startswith("torchvision.transforms.v2"):
+            elif self.transforms.__class__.__module__.startswith(
+                "torchvision.transforms.v2"
+            ):
                 dev = get_pipeline_device(self.transforms)
                 img_t = F.to_tensor(pil).to(dev, non_blocking=True) if dev else F.to_tensor(pil)
                 sample = {
                     "image": img_t,
                     "boxes": torch.as_tensor(boxes, dtype=torch.float32, device=dev),
-                    "labels": torch.as_tensor(labels, dtype=torch.int64,  device=dev),
+                    "labels": torch.as_tensor(labels, dtype=torch.int64, device=dev),
                 }
                 out = self.transforms(sample)
                 img_tensor = out["image"]
                 boxes = out["boxes"].cpu().tolist() if dev else out["boxes"].tolist()
                 labels = out["labels"].cpu().tolist() if dev else out["labels"].tolist()
-            else:                                              # Classic TorchVision
+            else:  # Classic TorchVision
                 img_tensor = self.transforms(pil)
         else:
             img_tensor = F.to_tensor(pil)
 
         if img_tensor.dtype == torch.uint8:
             img_tensor = img_tensor.float().div_(255)
+
+        # -------- final degenerate-box filter --------------------------
+        clean_boxes, clean_labels = [], []
+        for b, l in zip(boxes, labels):
+            if len(b) == 4:
+                x1, y1, x2, y2 = map(float, b)
+                if (x2 - x1) > 1e-3 and (y2 - y1) > 1e-3:
+                    clean_boxes.append(b)
+                    clean_labels.append(l)
+            else:  # DETR cxcywh branch is always valid
+                clean_boxes.append(b)
+                clean_labels.append(l)
+        boxes, labels = clean_boxes, clean_labels
 
         # -------- outputs ---------------------------------------------
         if self.mode in {"train", "val"}:
@@ -201,7 +223,8 @@ class YOLODataset(Dataset):
                 "iscrowd": torch.zeros(len(labels), dtype=torch.int64),
                 "class_labels": labels_t,
                 "area": (
-                    (boxes_t[:, 3] - boxes_t[:, 1]) * (boxes_t[:, 2] - boxes_t[:, 0])
+                    (boxes_t[:, 3] - boxes_t[:, 1])
+                    * (boxes_t[:, 2] - boxes_t[:, 0])
                 )
                 if boxes_t.numel()
                 else torch.tensor([]),
