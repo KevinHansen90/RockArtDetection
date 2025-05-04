@@ -1,141 +1,81 @@
-\chapter{Resultados}
+%======================================================================
+\chapter{Resultados}\label{ch:resultados}
+%======================================================================
 
-En este capítulo se presentan los resultados obtenidos tras la implementación de los modelos y técnicas descritos en los capítulos anteriores. Se analizan las combinaciones de modelos de detección y clasificación que mostraron un mejor desempeño en la identificación y agrupación de imágenes de arte rupestre, específicamente animales.
-
-\section{Resultados de Detección de Imágenes}
-
-El primer paso consistió en la detección de imágenes de animales dentro del conjunto de datos de arte rupestre. Se probaron diferentes modelos de detección, entre los cuales destacan:
-
-\begin{itemize}
-    \item \textbf{YOLOv5}: Un modelo de detección en tiempo real que equilibra precisión y velocidad \cite{jocher2020ultralytics}.
-    \item \textbf{Faster R-CNN}: Un modelo basado en regiones propuestas que ofrece alta precisión pero a un costo computacional mayor \cite{ren2015faster}.
-\end{itemize}
-
-Tras entrenar y evaluar ambos modelos, se obtuvieron los siguientes resultados en términos de \textit{Mean Average Precision} (mAP) y \textit{Intersection over Union} (IoU):
-
-\begin{table}[!ht]
-    \centering
-    \begin{tabular}{lcc}
-        \hline
-        \textbf{Modelo} & \textbf{mAP @ IoU=0.5} & \textbf{Tiempo de Inferencia (ms)} \\
-        \hline
-        YOLOv5 & 78.5\% & 12 \\
-        Faster R-CNN & 81.2\% & 45 \\
-        \hline
-    \end{tabular}
-    \caption{Resultados de detección de imágenes para diferentes modelos.}
-    \label{tab}
-\end{table}
-
-Aunque Faster R-CNN obtuvo una mAP ligeramente superior, YOLOv5 demostró ser significativamente más rápido en el tiempo de inferencia. Dada la necesidad de procesar grandes volúmenes de datos y la importancia de la eficiencia computacional, se seleccionó YOLOv5 como el modelo preferido para la detección de imágenes de animales en el conjunto de datos.
-
-\section{Resultados de Agrupamiento de Imágenes}
-
-Una vez detectadas y recortadas las imágenes de animales, se procedió a aplicar métodos de aprendizaje no supervisado para agruparlas según similitudes en sus características visuales. Se combinaron cuatro modelos de extracción de características con cuatro algoritmos de agrupamiento, totalizando 16 combinaciones.
-
-\subsection{Evaluación de las Combinaciones}
-
-Para cada combinación, se evaluó el desempeño utilizando el coeficiente de silueta promedio, que mide la cohesión y separación de los clusters formados \cite{rousseeuw1987silhouettes}. Los resultados se presentan en la Tabla \ref{average_silhouette}.
-
-\begin{table}[!ht]
-    \centering
-    \begin{tabular}{lcccc}
-        \hline
-        \textbf{Modelo} & \textbf{K-Means} & \textbf{Aglomerativo} & \textbf{DBSCAN} & \textbf{Espectral} \\
-        \hline
-        ResNet18 & \textbf{0.65} & 0.62 & 0.54 & 0.60 \\
-        VGG16 & 0.58 & 0.56 & 0.50 & 0.55 \\
-        DenseNet121 & 0.63 & \textbf{0.64} & 0.52 & 0.59 \\
-        InceptionV3 & 0.57 & 0.55 & 0.48 & 0.53 \\
-        \hline
-    \end{tabular}
-    \caption{Coeficiente de silueta promedio para cada combinación de modelo y algoritmo de clustering.}
-    \label{average_silhouette}
-\end{table}
-
-Los resultados indican que las combinaciones de ResNet18 con K-Means y DenseNet121 con Clustering Aglomerativo obtuvieron los coeficientes de silueta más altos, sugiriendo una mejor cohesión interna y separación entre clusters.
-
-\subsection{Análisis de los Mejores Resultados}
-
-\subsubsection{ResNet18 con K-Means}
-
-El análisis detallado de esta combinación mostró que el número óptimo de clusters es 4, según el coeficiente de silueta y el método del codo (Figuras \ref{fig:silhouette_resnet18_kmeans} y \ref{fig:elbow_resnet18_kmeans}).
-
-\begin{figure}[!ht]
-    \centering
-    \includegraphics[width=0.7\textwidth]{Images/silhouette_resnet18_kmeans.png}
-    \caption{Análisis del coeficiente de silueta para ResNet18 con K-Means.}
-    \label{fig:silhouette_resnet18_kmeans}
-\end{figure}
-
-\begin{figure}[!ht]
-    \centering
-    \includegraphics[width=0.7\textwidth]{Images/elbow_resnet18_kmeans.png}
-    \caption{Método del codo para ResNet18 con K-Means.}
-    \label{fig:elbow_resnet18_kmeans}
-\end{figure}
-
-\begin{figure}[!ht]
-    \centering
-    \includegraphics[width=\textwidth]{Images/cluster_0.jpg}
-    \caption{Collages de clusters obtenidos con ResNet18 y K-Means.}
-    \label{fig:clusters_resnet18_kmeans}
-\end{figure}
-
-Los clusters identificados corresponden a:
+\section{Estructura general}
+En este capítulo se presentan los hallazgos cuantitativos y cualitativos obtenidos a partir de los dos experimentos principales:
 
 \begin{enumerate}
-    \item Animales de perfil con cuernos largos.
-    \item Animales en posición frontal sin cuernos.
-    \item Animales pequeños con extremidades delgadas.
-    \item Animales estilizados con adornos o patrones complejos.
+  \item \textbf{Detección Supervisada de Motivos}
+  \item \textbf{Agrupamiento No Supervisado de Motivos}
 \end{enumerate}
 
-\subsubsection{DenseNet121 con Clustering Aglomerativo}
+Cada bloque de resultados conserva la lógica de las fases descritas en el capítulo de Materiales y Métodos para facilitar la lectura cruzada.
 
-Esta combinación también mostró un alto coeficiente de silueta (0.64). El análisis jerárquico permitió identificar subgrupos dentro de los clusters principales, proporcionando una comprensión más detallada de las relaciones entre las imágenes (Figura \ref{fig:silhouette_densenet121_agglomerative}).
+%----------------------------------------------------------------------
+\section{Detección Supervisada de Motivos}
 
-\begin{figure}[!ht]
-    \centering
-    \includegraphics[width=\textwidth]{Images/silhouette_densenet121_agglomerative.png}
-    \caption{Dendrograma resultante del Clustering Aglomerativo con DenseNet121.}
-    \label{fig:silhouette_densenet121_agglomerative}
-\end{figure}
-
-Los clusters formados presentan similitudes con los obtenidos mediante ResNet18 y K-Means, confirmando la consistencia en la agrupación de las imágenes.
-
-\subsection{Comparación con el Modelo de Clasificación Actual}
-
-Se compararon los clusters obtenidos con las categorías definidas por el modelo de clasificación supervisado implementado previamente. Los resultados mostraron que:
-
+\subsection{Fase 1 — Pilotaje inicial}
 \begin{itemize}
-    \item El \textbf{87\%} de las imágenes agrupadas en un mismo cluster por ResNet18 y K-Means pertenecían a la misma categoría definida por el modelo supervisado.
-    \item Se identificaron posibles nuevas subcategorías dentro de las clases existentes, sugiriendo la presencia de variaciones estilísticas o temáticas no consideradas inicialmente.
-    \item Los métodos no supervisados detectaron agrupaciones basadas en características visuales sutiles, proporcionando información valiosa para refinar las categorías del modelo supervisado.
+  \item Tabla con la evolución de \texttt{train\_loss}, \texttt{val\_loss}, mAP$_{0.5}$ y mAR$_{100}$ (una fila por época y modelo).
+  \item Gráficas de las curvas de pérdida y métricas para las cuatro arquitecturas.
+  \item Discusión breve: estabilidad de la convergencia, sobre–ajuste detectado, sensibilidad a la LR.
 \end{itemize}
 
-Estos hallazgos demuestran que los métodos de aprendizaje no supervisado pueden complementar y mejorar los modelos supervisados, al descubrir patrones y relaciones no evidentes.
-
-\section{Discusión}
-
-Los resultados obtenidos indican que la combinación de \textbf{ResNet18 con K-Means} es la más efectiva para la clasificación no supervisada de las imágenes de animales en el arte rupestre. Esto puede atribuirse a:
-
+\subsection{Fase 2 — Comparación de Preprocesamientos}
 \begin{itemize}
-    \item \textbf{Capacidad de ResNet18 para extraer características discriminativas}: Su arquitectura con conexiones residuales facilita el aprendizaje de representaciones profundas y diferenciadoras \cite{he2016deep}.
-    \item \textbf{Eficiencia y simplicidad de K-Means}: Al ser un algoritmo de partición sencillo y escalable, K-Means es capaz de agrupar eficazmente los vectores de características generados \cite{macqueen1967some}.
+  \item Tabla resumen (\textit{modelo} × \textit{preproc}) con el mejor mAP$_{0.5}$ alcanzado.
+  \item Box plots o violin plots que muestren la dispersión por técnica.
+  \item Breve análisis de qué filtros benefician más a cada arquitectura y por qué.
 \end{itemize}
 
-La utilización de DenseNet121 con Clustering Aglomerativo también mostró resultados prometedores, destacando la importancia de explorar diferentes combinaciones de modelos y algoritmos.
-Además, la comparación con el modelo de clasificación supervisado revela que los métodos no supervisados pueden identificar patrones adicionales y ofrecer perspectivas nuevas sobre la categorización de las imágenes.
-
-\section{Conclusiones}
-
-La aplicación de métodos de aprendizaje no supervisado ha permitido:
-
+\subsection{Fase 3 — Selección de Configuraciones Óptimas}
 \begin{itemize}
-    \item \textbf{Identificar agrupaciones coherentes} de imágenes de animales en el arte rupestre, basadas en características visuales extraídas mediante modelos profundos.
-    \item \textbf{Descubrir posibles nuevas categorías o subcategorías}, enriqueciendo la comprensión del conjunto de datos y aportando información para futuros estudios.
-    \item \textbf{Complementar el modelo de clasificación supervisado}, ofreciendo una herramienta adicional para mejorar su precisión y alcance.
+  \item Ranking de las tres combinaciones elegidas (modelo + preproc) con sus métricas finales.
+  \item Justificación de la elección basándose en el equilibrio precisión/recuperación.
 \end{itemize}
 
-Estos resultados demuestran el valor de integrar técnicas de aprendizaje no supervisado en el análisis de datos complejos y confirman que la combinación de ResNet18 con K-Means es la más efectiva en este contexto.
+\subsection{Fase 4 — Entrenamiento Integral}
+\begin{itemize}
+  \item Tabla con mAP$_{0.5}$ y mAR$_{100}$ promedios por conjunto (\textit{train}, \textit{val}, \textit{test}).
+  \item Ejemplos cualitativos: figuras etiquetadas correctamente vs.\ errores típicos.
+\end{itemize}
+
+\subsection{Fase 5 — Validación Experta}
+\begin{itemize}
+  \item Tabla de observaciones de la arqueóloga: aciertos, falsos positivos, falsos negativos.
+  \item Comentarios sobre superposiciones críticas, bajo contraste y erosión.
+  \item Conclusiones preliminares sobre utilidad del modelo en trabajo de campo.
+\end{itemize}
+
+%----------------------------------------------------------------------
+\section{Agrupamiento No Supervisado de Motivos}
+
+\subsection{Calidad Interna de Clusters}
+\begin{itemize}
+  \item Tabla con Silhouette, Davies–Bouldin y Calinski–Harabasz normalizados para las 16 combinaciones \textit{extractor} × \textit{algoritmo}.
+  \item Gráfica \textit{elbow} (K–Means, Agglomerative y Spectral) mostrando la variación de los índices entre $k=2$ y $k=10$.
+  \item Discusión sobre el número óptimo de clusters sugerido por cada métrica.
+\end{itemize}
+
+\subsection{Comparación con Clasificación Arqueológica}
+\begin{itemize}
+  \item Matriz de confusión entre clusters y las 6 categorías zoomórficas manuales.
+  \item Métricas de homogeneidad y completitud para las tres configuraciones mejor puntuadas.
+  \item Ejemplos visuales (collages) de clusters “puros” vs.\ mezclados.
+\end{itemize}
+
+\subsection{Síntesis de Resultados No Supervisados}
+\begin{itemize}
+  \item Resumen de qué configuraciones agrupan mejor motivos similares.
+  \item Comentarios de la arqueóloga sobre la coherencia semántica de los conglomerados.
+\end{itemize}
+
+%----------------------------------------------------------------------
+\section{Comparación Cruzada y Costes Computacionales}
+
+\begin{itemize}
+  \item Tabla de tiempo de entrenamiento/inferencia y uso de VRAM por modelo.
+  \item Discusión sobre la relación coste–beneficio entre arquitecturas y técnicas de preprocesamiento.
+  \item Implicaciones para la adopción práctica en proyectos arqueológicos.
+\end{itemize}

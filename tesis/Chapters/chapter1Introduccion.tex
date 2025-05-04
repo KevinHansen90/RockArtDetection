@@ -16,28 +16,35 @@ En este contexto, diversos trabajos entre 2018 y 2024 han examinado el uso de t�
 La meta es ajustar metodologías originalmente diseñadas para “imágenes cotidianas” y aprovecharlas para identificar y clasificar de forma automatizada los motivos rupestres.
 Este trabajo adopta y adapta dichas técnicas, con miras a establecer un flujo de procesamiento que permita reducir la subjetividad y hacer más eficiente la interpretación de estas expresiones culturales.
 
-\section{Estructura del Documento}
+\section{Estructura del Documento}\label{sec:estructura_documento}
 
-El presente documento se organiza de la siguiente forma:
+A continuación se resume la función de cada capítulo:
 
-En el capítulo de Introducción, se plantea como problema de investigación la necesidad de desarrollar herramientas computacionales que permitan mejorar la clasificación del arte rupestre en el sitio arqueológico Cueva de las Manos.
-Para abordar esta problemática, se establecen como objetivos principales la identificación y clasificación de los elementos presentes en las pinturas rupestres, utilizando técnicas de procesamiento de imágenes, modelos pre-entrenados para detección de objetos y algoritmos de agrupamiento.
-Estos métodos permitirán superar los desafíos asociados a la naturaleza abstracta y superpuesta de las pinturas.
+\paragraph{Capítulo 1 — Introducción.}
+Plantea el problema de investigación en torno a la clasificación automática del arte rupestre de Cueva de las Manos.
+Explica el contexto teórico mediante un Estado de la Cuestión que revisa el modelo actual de clasificación, las técnicas de pre-procesamiento, los avances de \textit{machine learning} en arqueología, los detectores de objetos y los métodos de clusterización.
+Delimita las limitaciones del conjunto de datos y las restricciones técnicas (modelos disponibles, recursos computacionales y ventana temporal del proyecto), destacando sus implicaciones para trabajos futuros.
 
-El Estado de la Cuestión se revisa a lo largo del primer capítulo, donde se discute el modelo actual de clasificación del arte rupestre y se analiza cómo el aprendizaje automático \textit{machine learning} puede ofrecer una solución para mejorar la precisión y objetividad en este campo.
-Además, se abordan los avances en la clasificación de imágenes y el reconocimiento de objetos, resaltando las aplicaciones recientes de estas tecnologías en otros campos afines.
+\paragraph{Capítulo 2 — Materiales y Métodos.}
+Describe la recolección y el \emph{tiling} de las imágenes, las cinco variantes de pre-procesamiento aplicadas y la definición de los conjuntos \textit{train/val/test}.
+Detalla la configuración de los cuatro detectores (Faster R-CNN, RetinaNet, YOLOv5 y Deformable DETR), incluidos los perfiles de entrenamiento local y en Vertex AI.
+Explica el diseño factorial de los experimentos de agrupamiento basados en cuatro \emph{feature extractors}, así como el flujo de trabajo reproducible mediante Hydra.
 
-En Limitaciones del Estudio, se exponen las limitaciones del conjunto de datos, su representatividad y calidad.
-Además se establecen las limitaciones técnicas y temporales sobre las que se trabaja, en base a los recursos disponibles, tanto tecnológicos como tiempos de colaboración de los involucrados.
-Esto permite evaluar implicaciones para trabajos futuros que abren líneas de investigación para mejorar o complementar lo realizado en el trabajo.
+\paragraph{Capítulo 3 — Resultados.}
+Presenta las métricas obtenidas, con especial énfasis en \(\mathrm{mAP}_{50}\) y \(\mathrm{mAR}\), para cada combinación de modelo y pre-procesamiento.
+Compara el desempeño en las matrices \(4\times5\) (modelos × pre-procesos) y \(4\times4\) (modelos × extractores), apoyándose en tablas de ranking y diagramas de calor.
+Incluye ejemplos visuales que ilustran aciertos y fallos representativos de cada detector.
 
-La metodología se detalla en el capítulo de Materiales y Métodos, que incluye el tipo de investigación y diseño de estudio adoptado.
-Se especifican la población y la muestra, que consisten en un conjunto de imágenes del arte rupestre de Cueva de las Manos.
-También se describen las técnicas e instrumentos empleados para el procesamiento y análisis de estas imágenes, así como el plan de análisis de los datos resultantes.
+\paragraph{Capítulo 4 — Problemas y Soluciones.}
+Documenta los obstáculos encontrados a lo largo del proyecto, desde incompatibilidades de formato y errores de compilación hasta ajustes finos de hiper-parámetros.
+Expone la solución aplicada a cada incidencia y demuestra su eficacia mediante evidencias empíricas, asegurando la trazabilidad de las mejoras.
 
-Los capítulos de Resultados y Conclusiones, presentan los avances realizados respecto al problema inicial planteado, así como también cómo seguir con esta línea de investigación a futuro.
+\paragraph{Capítulo 5 — Conclusiones.}
+Sintetiza los hallazgos principales, evaluando el impacto de las técnicas de pre-procesamiento, la elección de modelo y la estrategia de entrenamiento sobre la tarea de detección.
+Discute las limitaciones que aún persisten y propone líneas concretas de investigación futura para perfeccionar los resultados alcanzados.
 
-Finalmente, la última sección del trabajo contiene todas las referencias bibliográficas utilizadas, siguiendo las normativas académicas correspondientes.
+\bigskip
+Al final del documento se incluyen la \textbf{Bibliografía}, con todas las fuentes citadas siguiendo las normativas académicas correspondientes.
 
 En esta sección se presenta el problema que se aborda en el estudio.
 Se comienza con la Determinación del Problema, donde se describe la situación actual en relación con los procesos de detección y clasificación de arte rupestre.
@@ -55,7 +62,7 @@ A pesar de su utilidad, DStretch ha sido criticado por su falta de actualizacion
 
 En Argentina, el reconocido arqueólogo Carlos Aschero ha desarrollado un modelo para la clasificación estilística de los motivos rupestres basado en reglas y descripciones escritas~\cite{aschero2012}.
 Este modelo agrupa las pinturas según las similitudes en las características morfológicas, pero puede dejar algunos elementos sin una clasificación definitiva.
-El modelo actual propuesto por Aschero ha sido de gran utilidad para los científicos; sin embargo, presenta limitaciones por ser demasiado taxativo~\cite{aschero2000}.
+El modelo actual propuesto por Aschero ha sido de gran utilidad para los científicos. Sin embargo, presenta limitaciones por ser demasiado taxativo~\cite{aschero2000}.
 
 Dada la naturaleza de los estudios arqueológicos, que a menudo se realizan en lotes, es esencial un proceso automatizado para una clasificación precisa y para evitar clasificaciones diferentes de los mismos dibujos~\cite{aschero1998}.
 
@@ -93,6 +100,10 @@ Se propone realizar las siguientes actividades:
 
 \subsection{Justificación del estudio}
 
+\begin{center}
+\fbox{%
+  \parbox{0.95\linewidth}{%
+    \textbf{BORRADOR — no revisar aún}\\[6pt]%
 La presente investigación responde a la necesidad de mejorar y automatizar el proceso de clasificación estilística del arte rupestre, en particular en el caso aplicado de Cueva de las Manos.
 El modelo actual propuesto por el arqueólogo Aschero ha sido de gran utilidad, pero presenta limitaciones en cuanto a la precisión de su clasificación~\cite{aschero2000}.
 Además, es importante considerar que los estudios arqueológicos suelen procesarse en forma de lotes o campañas, en las que primero se recopilan los datos durante un período específico y luego se procesan en un momento posterior.
@@ -106,14 +117,31 @@ Además, se explorarán otras posibilidades de procesamiento de imágenes, como 
 
 Con el avance de las tecnologías y, en particular, de los modelos de clasificación de imágenes, es necesario desarrollar modelos específicos para el arte rupestre, dado que los modelos generales aún no cuentan con bases de datos suficientemente amplias de este tipo de imágenes para ser útiles para los arqueólogos.
 Por lo tanto, un modelo especializado que surja de esta investigación sería de gran valor, proporcionando una solución accesible y eficaz para los desafíos actuales en el campo de la arqueología~\cite{aschero2018}.
+  }%
+}
+\end{center}
 
-\section{Estado de la Cuestión}
+\section{Estado de la Cuestión}\label{sec:estado_cuestion}
+
+Este capítulo presenta un panorama sintético de los trabajos previos que sustentan la investigación.
+En primer lugar se describe el modelo de clasificación actualmente empleado por la comunidad arqueológica para tipificar el arte rupestre, subrayando sus fortalezas y limitaciones.
+A continuación se examinan las principales técnicas de preprocesamiento de imágenes que la literatura propone para realzar pigmentos y bordes, paso previo a cualquier análisis automatizado.
+Seguidamente se introduce la adopción de \emph{machine learning} en estudios de arte rupestre, destacando cómo ha evolucionado desde enfoques exploratorios hasta sistemas integrados de detección y análisis.
+El capítulo continúa con un repaso crítico de los detectores de objetos más influyentes, atendiendo a su idoneidad para identificar trazos pictográficos degradados y superpuestos.
+Finalmente se revisan los modelos de clusterización que facilitan la agrupación estilística o cronológica de motivos, completando así la base conceptual y metodológica sobre la que se apoya el resto del trabajo.
 
 \subsection{Modelo Actual de Clasificación}
 
+\begin{center}
+\fbox{%
+  \parbox{0.95\linewidth}{%
+    \textbf{BORRADOR — no revisar aún}\\[6pt]%
 En la Cueva de las Manos, el paradigma empleado para agrupar las expresiones rupestres se fundamenta en la clasificación estilística de Gradin y Aschero.
 Este enfoque considera primordialmente la forma, el tamaño, la posición y otros atributos visuales de los motivos~\cite{gradin1978,gradin1979,aschero2010,aschero2012,aschero2018,aschero2018b}.
 Sin embargo, la erosión de las pinturas, la adición de nuevas capas en distintas épocas y las variaciones en la calidad de la iluminación han evidenciado la rigidez de dicho modelo, que no siempre logra encasillar ciertos motivos más ambiguos o incompletos.
+  }%
+}
+\end{center}
 
 \subsection{Técnicas de Preprocesamiento}
 
@@ -129,7 +157,7 @@ A continuación, se presentan cuatro técnicas de preprocesamiento que han demos
 \end{itemize}
 
 Estas técnicas pueden aplicarse de manera individual o encadenarse en secuencias concretas (por ejemplo, primero CLAHE para potenciar el contraste local y después un filtrado bilateral para reducir ruido), adaptándose a las necesidades de cada imagen.
-Diversos flujos de trabajo en arte rupestre aplican procesos similares —como convertir a escala de grises, aplicar CLAHE y luego un filtrado bilateral— para, posteriormente, proceder a la clasificación manual o automatizada~\cite{xiao2020,li2022}.
+Diversos flujos de trabajo en arte rupestre aplican procesos similares, como convertir a escala de grises, aplicar CLAHE y luego un filtrado bilateral, para posteriormente, proceder a la clasificación manual o automatizada~\cite{xiao2020,li2022}.
 
 \subsubsection{CLAHE (Contrast Limited Adaptive Histogram Equalization)}
 
@@ -161,7 +189,7 @@ El principal cuidado radica en no abusar de los parámetros (radio de desenfoque
 
 La pirámide Laplaciana es una representación multi-escala de la imagen propuesta por Burt y Adelson, que se construye a partir de una pirámide Gaussiana y calcula las diferencias entre cada nivel consecutivo~\cite{bai2023,zhou2019}.
 Este enfoque descompone la imagen en distintos rangos de frecuencias, permitiendo manipular, de manera diferenciada, tanto los detalles finos como las estructuras de mayor tamaño.
-En la práctica, se puede enfatizar la capa que contiene los detalles intermedios —donde a menudo se ubican los contornos de figuras rupestres— y atenuar otras escalas que corresponden al ruido o a variaciones de iluminación a gran escala~\cite{paris2008}.
+En la práctica, se puede enfatizar la capa que contiene los detalles intermedios, donde a menudo se ubican los contornos de figuras rupestres, y atenuar otras escalas que corresponden al ruido o a variaciones de iluminación a gran escala~\cite{paris2008}.
 Esta estrategia otorga una ventaja significativa frente a filtros de realce de bordes de única escala (como el enmascarado de enfoque), ya que ofrece un control más preciso sobre cada nivel de detalle.
 Aunque en el campo del arte rupestre no abunden publicaciones que mencionen explícitamente las pirámides Laplacianas, muchas técnicas de \textit{image fusion} y de \textit{Reflectance Transformation Imaging} (\textit{RTI}) aplican procesos conceptualmente similares para fusionar o realzar características visibles a diferentes distancias~\cite{zhou2019}.
 La principal desventaja de este método radica en su complejidad, pues exige un mayor número de parámetros y pasos de procesamiento que las técnicas anteriores.
@@ -233,7 +261,8 @@ Horn \textit{et al.} (2022) destacan la dificultad de clasificar correctamente m
 Para abordar estos vacíos, se proponen estrategias que van desde la estandarización de la toma fotográfica y la curaduría de datos hasta la adopción de \textit{Transformers} como \textit{Deformable DETR}, que podrían manejar mejor la superposición y la variabilidad contextual~\cite{zhu2021}.
 
 Finalmente, la comunidad arqueológica podría beneficiarse de la publicación de conjuntos de datos abiertos y con anotaciones detalladas, tal como señalan Tsigkas \textit{et al.}~\cite{tsigkas2020}.
-Esto facilita la replicación de resultados, la comparación de enfoques y la mejora continua de los modelos. Asimismo, la integración de conocimiento experto —por ejemplo, proporciones o patrones culturales específicos de una región— abre la puerta a futuras líneas de investigación que combinen la detección automatizada con ontologías arqueológicas, reduciendo la brecha entre la visión por computadora y la interpretación antropológica.
+Esto facilita la replicación de resultados, la comparación de enfoques y la mejora continua de los modelos.
+Asimismo, la integración de conocimiento experto, por ejemplo, proporciones o patrones culturales específicos de una región, abre la puerta a futuras líneas de investigación que combinen la detección automatizada con ontologías arqueológicas, reduciendo la brecha entre la visión por computadora y la interpretación antropológica.
 En conjunto, el panorama actual muestra resultados alentadores, pero también evidencia la necesidad de optimizar la clasificación en presencia de solapamientos extremos, degradaciones severas y diferencias estilísticas entre distintas tradiciones pictóricas.
 
 \subsection{Modelos de Detección de Objetos}
@@ -241,13 +270,43 @@ En conjunto, el panorama actual muestra resultados alentadores, pero también ev
 La literatura reciente (2018–2024) pone de manifiesto el interés por adaptar \emph{modelos de última generación}, originalmente desarrollados para “imágenes cotidianas”, al dominio del arte rupestre y otras aplicaciones arqueológicas.
 En particular, sobresalen cuatro enfoques que han demostrado resultados prometedores en escenarios de bajo contraste y alta complejidad: \textbf{YOLOv5}, \textbf{Faster R-CNN}, \textbf{RetinaNet} y \textbf{Deformable DETR}.
 A continuación, se discuten sus características, la forma en que se han empleado en contextos similares al arte rupestre y las ventajas y limitaciones que presentan en la práctica.
-Como se ilustra en la Tabla (COMPLETAR), diversos estudios han experimentado con estas arquitecturas para analizar grandes volúmenes de imágenes, detectar motivos muy degradados o incluso descubrir rasgos desconocidos en los sitios arqueológicos~\cite{horn2022,jalandoni2022,suhaimi2023}.
+
+\begin{table}[htbp]
+\centering
+\caption{Etapas comunes y diferencias principales entre detectores de una etapa, dos etapas y basados en transformers.}
+\label{tab:detector_stages}
+\renewcommand{\arraystretch}{1.2} % espacio vertical opcional
+\begin{tabular}{|p{2.9cm}|p{3.2cm}|p{4.0cm}|p{4.0cm}|}
+\hline
+\textbf{Tipo de detector} &
+\textbf{Extracción de características} &
+\textbf{Generación de regiones / consultas} &
+\textbf{Refinamiento y cabezas de predicción} \\ \hline
+Una etapa: &
+CNN con pirámide de características (FPN). &
+No hay etapa separada; la red dispara \emph{anchors} densos en cada celda y escala. &
+Cabeza única que produce simultáneamente clasificación y regresión; usa Pérdida Focal para clases desbalanceadas. \\
+(YOLO, RetinaNet) & & & \\ \hline
+Dos etapas &
+CNN\,+\,FPN. &
+\emph{Region Proposal Network} (RPN) genera unas pocas miles de propuestas por imagen. &
+ROIAlign extrae \emph{features} por propuesta y una segunda cabeza refina la caja y clasifica la región. \\
+(Faster R-CNN) & & & \\ \hline
+Transformers &
+CNN inicial; características se convierten en secuencia. &
+Conjunto fijo de \emph{object queries} interactúa en encoder–decoder; no se usan \emph{anchors}. &
+MLP por consulta predice clase y caja; elimina NMS y emplea una pérdida de asignación bipartita (húngara). \\
+(DETR, Deformable DETR) & & & \\ \hline
+\end{tabular}
+\end{table}
+
+Como se ilustra en la Tabla~\ref{tab:detector_stages}, diversos estudios han experimentado con estas arquitecturas para analizar grandes volúmenes de imágenes, detectar motivos muy degradados o incluso descubrir rasgos desconocidos en los sitios arqueológicos~\cite{horn2022,jalandoni2022,suhaimi2023}.
 
 \paragraph{Modelos de una sola etapa (One-Stage).}
 La familia YOLO (\textit{You Only Look Once}) configura detectores de una sola etapa que formulan la detección de objetos como un problema de regresión directa, estimando simultáneamente las cajas delimitadoras y las probabilidades de clase en un solo paso de inferencia.
 \textbf{YOLOv5}, introducido en 2020, se ha popularizado por su velocidad de procesamiento, su precisión aceptable y la facilidad de ajuste (\textit{fine-tuning}).
 Estas cualidades lo vuelven atractivo para examinar grandes conjuntos de imágenes o fotografías de alta resolución en campo, donde la velocidad de detección es un factor crítico~\cite{li2022}.
-En contextos arqueológicos y de arte rupestre, uno de los principales beneficios de YOLOv5 —y de otros detectores de una sola etapa— radica en que suelen requerir menos muestras para entrenar en comparación con modelos de dos etapas~\cite{suhaimi2023}.
+En contextos arqueológicos y de arte rupestre, uno de los principales beneficios de YOLOv5 radica en que suelen requerir menos muestras para entrenar en comparación con modelos de dos etapas~\cite{suhaimi2023}.
 Por ejemplo, Davis \textit{et al.} (2021) hallan que, aunque un modelo one-stage puede exhibir una ligera disminución en la precisión frente a arquitecturas más complejas, resulta más rápido y manejable en situaciones donde escasean los datos etiquetados~\cite{davis2021}.
 Estudios previos demuestran la eficacia de YOLO incluso en versiones anteriores.
 Tsigkas \textit{et al.}~\cite{tsigkas2020}, aplicando YOLOv2 para detectar carvados en piedra caliza en Grecia, subrayan la solidez del modelo frente a fondos ruidosos o “en la naturaleza” (sin marcadores o calibraciones adicionales).
@@ -259,16 +318,16 @@ Estos ejemplos evidencian que la propuesta de YOLOv5 puede ser valiosa para el a
 
 \paragraph{Modelos de dos etapas (Two-Stage).}
 \textit{Faster R-CNN}~\cite{ren2015faster} se considera uno de los detectores de referencia en términos de exactitud (\textit{accuracy}).
-Su funcionamiento consta de dos etapas: en primer lugar, genera propuestas de región (\textit{region proposals}) que tienen alta probabilidad de contener objetos; posteriormente, clasifica cada propuesta y refina las cajas delimitadoras.
+Su funcionamiento consta de dos etapas: en primer lugar, genera propuestas de región (\textit{region proposals}) que tienen alta probabilidad de contener objetos. Posteriormente, clasifica cada propuesta y refina las cajas delimitadoras.
 Esta aproximación, si bien exige más recursos computacionales y tiempo de entrenamiento que los modelos de una sola etapa, ofrece un mayor rendimiento al identificar objetos pequeños o muy degradados, características frecuentes en el arte rupestre~\cite{suhaimi2023,horn2022ai}.
 En diversos proyectos arqueológicos se opta por \textit{Faster R-CNN} precisamente debido a su precisión.
 Horn \textit{et al.}~\cite{horn2022} utilizan variantes de R-CNN para la detección de petroglifos escandinavos, entrenando el modelo con datos derivados de escaneos láser 3D que se proyectan en mapas de profundidad en 2D.
 Gracias a estos \emph{depth maps}, las figuras talladas aparecen como relieves distintivos que el detector aprende a reconocer.
 Este trabajo demuestra la viabilidad de \textit{Faster R-CNN} en un contexto donde el desgaste y la variedad de estilos complican la detección.
-El uso de distintas visualizaciones —imágenes de profundidad monocanal y modelos RGB sombreados— mejora la identificación de carvados, lo cual sugiere que la combinación de múltiples canales de información resulta benéfica para discriminar motivos erosionados~\cite{horn2022ai,horn2022}.
+El uso de distintas visualizaciones (imágenes de profundidad monocanal y modelos RGB sombreados) mejora la identificación de carvados, lo cual sugiere que la combinación de múltiples canales de información resulta benéfica para discriminar motivos erosionados~\cite{horn2022ai,horn2022}.
 Más recientemente, Suhaimi \textit{et al.} (2023) comparan directamente \textit{Faster R-CNN} con un detector de una sola etapa (\textit{YOLO}) sobre el mismo conjunto de datos de arte rupestre.
 Como era previsible, \textit{Faster R-CNN} logra mayor precisión y tasa de verdaderos positivos, mientras que \textit{YOLO} ofrece una velocidad de procesamiento superior~\cite{suhaimi2023}.
-Para grandes volúmenes de imágenes de alta resolución (por ejemplo, extensas paredes rocosas con miles de fotografías), un modelo más lento podría volverse poco práctico; sin embargo, la solidez de \textit{Faster R-CNN} para no pasar por alto motivos débiles o sutiles lo convierte en una alternativa muy valiosa cuando se prioriza reducir los \textit{falsos negativos}.
+Para grandes volúmenes de imágenes de alta resolución (por ejemplo, extensas paredes rocosas con miles de fotografías), un modelo más lento podría volverse poco práctico. Sin embargo, la solidez de \textit{Faster R-CNN} para no pasar por alto motivos débiles o sutiles lo convierte en una alternativa muy valiosa cuando se prioriza reducir los \textit{falsos negativos}.
 Además de \textit{Faster R-CNN}, otras variantes de R-CNN cobran importancia en arqueología. \textit{Mask R-CNN}~\cite{he2017mask} incorpora un componente de segmentación para delinear con precisión la silueta de cada objeto.
 Aunque su uso en arte rupestre es relativamente incipiente, algunos autores experimentan con segmentaciones más detalladas para extraer la forma completa de grabados o pinturas, lo que podría mejorar la documentación y estudio de los motivos~\cite{horn2022,suhaimi2023}.
 En resumen, \textit{Faster R-CNN} representa el extremo de “alta exactitud” en el espectro de detectores.
@@ -278,24 +337,24 @@ Estudios como los de Davis \textit{et al.} (2021) y Suhaimi \textit{et al.} (202
 \paragraph{Transformers para Detección.}
 \textit{DETR} (\textit{Detection Transformer}), presentado en 2020, introduce un paradigma novedoso de detección basado en arquitecturas \textit{Transformer}~\cite{carion2020end}.
 En lugar de recurrir a anclas (\textit{anchors}) o propuestas de región, plantea la detección como un problema de predicción de conjuntos (\textit{set prediction}).
-Sin embargo, la versión original de \textit{DETR} muestra inconvenientes en la convergencia —que puede requerir cientos de épocas de entrenamiento— y cierta dificultad para detectar objetos muy pequeños, justamente un desafío común en el arte rupestre.
+Sin embargo, la versión original de \textit{DETR} muestra inconvenientes en la convergencia, que puede requerir cientos de épocas de entrenamiento, y cierta dificultad para detectar objetos muy pequeños, justamente un desafío común en el arte rupestre.
 Para mitigar estos problemas, Zhu \textit{et al.}~\cite{zhu2021} proponen \textit{Deformable DETR}, que introduce un mecanismo de atención deformable para enfocarse únicamente en puntos de muestreo relevantes alrededor de referencias espaciales.
 Dicho enfoque reduce la complejidad computacional y mejora la captura de detalles finos, acelerando la convergencia y potenciando la detección de objetos de escala reducida.
 De este modo, \textit{Deformable DETR} alcanza desempeños comparables a los de los detectores basados en redes convolucionales (\textit{CNN}), preservando las ventajas de un entrenamiento \textit{end-to-end}.
 Aunque hasta la fecha no se reportan implementaciones específicas de \textit{Deformable DETR} en arte rupestre, las características del modelo resultan atractivas para este dominio.
 En primer lugar, la atención global de los \textit{Transformers} podría ser útil para desambiguar formas muy degradadas, aprovechando la relación contextual entre distintos elementos en la escena.
-En segundo lugar, la salida en forma de conjunto (\textit{set-based prediction}) facilita manejar solapamientos; cada motivo puede asignarse a una ranura de detección distinta sin que la supresión no máxima (\textit{NMS}) unifique objetos que se superponen ligeramente.
+En segundo lugar, la salida en forma de conjunto (\textit{set-based prediction}) facilita manejar solapamientos. Cada motivo puede asignarse a una ranura de detección distinta sin que la supresión no máxima (\textit{NMS}) unifique objetos que se superponen ligeramente.
 Finalmente, la integración nativa de múltiples escalas en la atención deformable se ajusta a la necesidad de detectar tanto motivos grandes como símbolos ínfimos en una misma pared~\cite{zhu2021,idjaton2022}.
 No obstante, los modelos \textit{Transformer} suelen demandar un mayor volumen de datos para entrenarse con eficacia, lo cual representa un reto en arte rupestre, donde suelen escasear las anotaciones y el número de imágenes disponibles.
 Investigaciones recientes en arqueología recurren a estrategias de aumento (\textit{data augmentation}) y a la generación de datos sintéticos para paliar esta carencia~\cite{idjaton2022}.
-Así, \textit{Deformable DETR} asoma como una vía prometedora, capaz de enfrentar la complejidad intrínseca del arte rupestre —bajo contraste, superposición, formas irregulares—, siempre y cuando se cuente con datos suficientes o mecanismos de transferencia (\textit{transfer learning}) bien planteados.
+Así, \textit{Deformable DETR} asoma como una vía prometedora, capaz de enfrentar la complejidad intrínseca del arte rupestre (bajo contraste, superposición, formas irregulares), siempre y cuando se cuente con datos suficientes o mecanismos de transferencia (\textit{transfer learning}) bien planteados.
 Por consiguiente, se espera que en un futuro próximo la comunidad de estudios arqueológicos explore de manera más extensa los enfoques \textit{Transformer}-basados, una vez que dispongan de conjuntos de entrenamiento adecuados y recursos de cómputo que soporten su mayor complejidad.
 
 \subsubsection*{Consideraciones Generales}
 
 La elección de un modelo de detección suele balancear múltiples factores: la disponibilidad de imágenes anotadas, las restricciones computacionales, el nivel de superposición entre motivos y la magnitud del deterioro de las pinturas o carvados.
 Los modelos de una sola etapa (YOLOv5, \textit{RetinaNet}) ofrecen una solución rápida y eficiente cuando el conjunto de datos es limitado, en tanto que los modelos de dos etapas (\textit{Faster R-CNN}) y aquellos basados en \textit{Transformers} (\textit{Deformable DETR}) pueden lograr mayor precisión a costa de un mayor consumo de recursos y tiempo de entrenamiento~\cite{horn2022,davis2021,jalandoni2022,li2022,tsigkas2020}.
-En cualquier caso, la intervención experta sigue siendo fundamental para filtrar falsos positivos —producidos, por ejemplo, por manchas naturales o grietas en la roca— y validar la interpretación final de los resultados.
+En cualquier caso, la intervención experta sigue siendo fundamental para filtrar falsos positivos, producidos por ejemplo, por manchas naturales o grietas en la roca, y validar la interpretación final de los resultados.
 Asimismo, la aplicación de técnicas de preprocesamiento que realcen el contraste o de postprocesamiento (por ejemplo, supresión de detecciones redundantes o agrupamiento semántico) contribuye a mejorar la confiabilidad de las detecciones en el campo de la arqueología y del arte rupestre.
 
 \subsection{Modelos de Clusterización}
@@ -308,12 +367,12 @@ Este enfoque podría ayudar a detectar grupos que no han sido contemplados en cl
 \subsubsection{Arquitecturas CNN para la Extracción de Características de Estilo }
 La clasificación de motivos rupestres a menudo depende de taxonomías rígidas definidas por expertos, lo que puede subestimar la complejidad y diversidad estilística de los diseños.
 Investigaciones recientes en visión por computadora proponen combinar \textit{deep Convolutional Neural Networks} (CNN) para la extracción de características con algoritmos no supervisados de \textit{clustering}, a fin de agrupar los motivos según su estilo visual sin basarse estrictamente en etiquetas predefinidas~\cite{gairola2020}.
-Este enfoque resulta prometedor para capturar diferencias sutiles en la calidad de las líneas, la textura o las formas —aspectos críticos para el análisis estilístico en arqueología— y, a la vez, reduce la dependencia de taxonomías humanas potencialmente subjetivas o limitadas.
+Este enfoque resulta prometedor para capturar diferencias sutiles en la calidad de las líneas, la textura o las formas (aspectos críticos para el análisis estilístico en arqueología) y, a la vez, reduce la dependencia de taxonomías humanas potencialmente subjetivas o limitadas.
 Distintos modelos de CNN preentrenados en grandes conjuntos de datos (por ejemplo, \textit{ImageNet}) ofrecen una sólida base para la extracción de rasgos relevantes en imágenes degradadas o de bajo contraste, escenario común en el arte rupestre~\cite{guerin2018}.
 A continuación, se describen algunas arquitecturas populares que han sido exploradas en el periodo 2018–2024 para la clasificación no supervisada de imágenes artísticas y arqueológicas:
 
 \paragraph{VGG16/VGG19.}
-Estas redes de gran profundidad —originalmente planteadas para clasificación en \textit{ImageNet}— constan de capas convolucionales secuenciales.
+Estas redes de gran profundidad (originalmente planteadas para clasificación en \textit{ImageNet}) constan de capas convolucionales secuenciales.
 Los descriptores derivados de mapas de características (\textit{feature maps}), así como las matrices de Gram empleadas en \textit{Neural Style Transfer}, han evidenciado su eficacia para representar texturas y patrones de trazos característicos de un estilo pictórico~\cite{gairola2020}.
 Chu y Wu (2018), por ejemplo, utilizan VGG para mejorar la clasificación de estilos de pintura~\cite{gairola2020}.
 Aunque su gran número de parámetros puede suponer un reto en términos computacionales, las \textit{features} de VGG tienden a capturar con detalle la textura local y el color, rasgos valiosos en el estudio de motivos rupestres o pinturas arqueológicas.
@@ -339,7 +398,7 @@ Este hallazgo refuerza la idea de que el análisis de estilo en arte rupestre re
 \paragraph{Resumen de las Arquitecturas CNN.}
 Diversos estudios coinciden en que las CNN preentrenadas ofrecen \textit{representaciones} útiles para el clustering en dominios con datos limitados o sin etiquetas~\cite{guerin2018,gairola2020}.
 Cada arquitectura presenta ventajas: VGG enfatiza la textura, ResNet y DenseNet combinan forma y detalle, mientras que Inception maneja patrones multi-escala.
-En arte rupestre, donde las imágenes pueden lucir tenues o erosionadas, una estrategia combinada —por ejemplo, concatenar \textit{features} de distintas capas o emplear \textit{Gram matrices}— puede capturar tanto la geometría global como la variabilidad de pigmentación.
+En arte rupestre, donde las imágenes pueden lucir tenues o erosionadas, una estrategia combinada, por ejemplo, concatenar \textit{features} de distintas capas o emplear \textit{Gram matrices}, puede capturar tanto la geometría global como la variabilidad de pigmentación.
 El \textit{fine-tuning} sobre imágenes arqueológicas suele incrementar la sensibilidad de la red a los rasgos estilísticos específicos, resultando especialmente provechoso si se dispone de un número moderado de ejemplos etiquetados.
 
 \subsubsection*{Evaluación de la Calidad del Clustering}
@@ -356,13 +415,13 @@ De esta forma, la combinación de CNNs para la extracción de características c
 
 \subsubsection{Métodos de Agrupamiento No Supervisado para la Clasificación Estilística }
 
-Una vez extraídos los vectores de características mediante redes convolucionales (CNN), es posible aplicar algoritmos de \textit{clustering} no supervisado para agrupar los motivos —o las obras de arte— en función de su similitud visual.
+Una vez extraídos los vectores de características mediante redes convolucionales (CNN), es posible aplicar algoritmos de \textit{clustering} no supervisado para agrupar los motivos en función de su similitud visual.
 En la literatura reciente se han empleado cuatro métodos de uso común para la clasificación por estilo:
 
 \paragraph{K-Means Clustering.}
 \textit{K-Means} es un algoritmo ampliamente utilizado que particiona los datos en $K$ \textit{clusters} minimizando la varianza intra-\textit{cluster}~\cite{guerin2018,dangeti2024}.
 Su simplicidad y escalabilidad lo convierten en un referente para la evaluación de la calidad de las \textit{features} extraídas. Guérin \textit{et al.} obtienen resultados notables (p.ej., una exactitud de \textgreater 60\% sin etiquetas) al aplicar \textit{K-Means} sobre descriptores profundos en conjuntos de imágenes como Pascal VOC~\cite{guerin2018}.
-En experimentos de estilo artístico, se emplea \textit{K-Means} para contrastar distintos tipos de \textit{features} —por ejemplo, salidas de \textit{DenseNet} o matrices de Gram— y comparar su eficacia en la formación de \textit{clusters} coherentes~\cite{dangeti2024}.
+En experimentos de estilo artístico, se emplea \textit{K-Means} para contrastar distintos tipos de \textit{features}, por ejemplo, salidas de \textit{DenseNet} o matrices de Gram, y comparar su eficacia en la formación de \textit{clusters} coherentes~\cite{dangeti2024}.
 La principal fortaleza de \textit{K-Means} radica en su eficiencia y facilidad de uso, si bien supone ciertos supuestos (forma aproximadamente esférica de los \textit{clusters} y tamaño similar) que pueden no cumplirse en la práctica.
 Además, el valor de $K$ debe fijarse de antemano o determinarse empleando índices de validez de \textit{clusters}.
 Pese a estas limitaciones, estudios recientes reportan que, cuando las \textit{features} de la CNN son suficientemente discriminativas, \textit{K-Means} puede incluso superar a métodos de \textit{deep clustering} más complejos~\cite{dangeti2024}.
@@ -371,7 +430,8 @@ Pese a estas limitaciones, estudios recientes reportan que, cuando las \textit{f
 El \textit{clustering} aglomerativo construye una jerarquía de \textit{clusters} al iniciar cada dato como un \textit{cluster} individual y fusionarlos sucesivamente según un criterio de enlace (\textit{linkage})~\cite{guerin2018,parisotto2022}.
 Diversas investigaciones en patrimonio cultural aprovechan la flexibilidad de este enfoque, pues la estructura jerárquica puede revelar relaciones a múltiples escalas (por ejemplo, subestilos dentro de una tradición pictórica mayor).
 Guérin \textit{et al.} reportan un desempeño competitivo con \textit{features} de CNN y el método de enlace de Ward, llegando en ocasiones a superar a \textit{K-Means}~\cite{guerin2018}.
-Una ventaja clave del \textit{clustering} aglomerativo es que no requiere especificar a priori el número de \textit{clusters}; el usuario puede “cortar” el dendrograma en el nivel deseado o analizar la estructura de la jerarquía. No obstante, su complejidad computacional ($O(n^2)$) puede volverse problemática en conjuntos de datos grandes.
+Una ventaja clave del \textit{clustering} aglomerativo es que no requiere especificar a priori el número de \textit{clusters}.
+El usuario puede “cortar” el dendrograma en el nivel deseado o analizar la estructura de la jerarquía. No obstante, su complejidad computacional ($O(n^2)$) puede volverse problemática en conjuntos de datos grandes.
 Para muestras de tamaño moderado, es una solución sólida que, además, puede capturar \textit{clusters} con formas no convexas.
 
 \paragraph{DBSCAN (Clustering Basado en Densidad).}
@@ -402,7 +462,7 @@ La decisión sobre qué método de \textit{clustering} utilizar depende en gran 
 \textit{K-Means} y el \textit{clustering} aglomerativo ofrecen un punto de partida sólido, especialmente si las \textit{features} obtenidas de la CNN ya distinguen con claridad los estilos.
 \textit{Spectral clustering} puede gestionar separaciones más complejas siempre y cuando se definan apropiadamente las similitudes, mientras que \textit{DBSCAN} tiende a requerir un ajuste de parámetros cuidadoso en espacios de alta dimensión.
 Finalmente, \textit{DEC} y otros métodos de \textit{deep clustering} representan la vanguardia cuando se busca la máxima coherencia en la formación de \textit{clusters}, aunque al coste de mayor complejidad de entrenamiento.
-Cualquiera que sea la elección, la experiencia coincide en que un buen \textit{embedding} inicial —derivado de redes profundas preentrenadas o afinadas (\textit{fine-tuned})— constituye la base esencial para lograr agrupaciones estilísticamente relevantes en el arte rupestre~\cite{guerin2018,gultepe2018,dangeti2024}.
+Cualquiera que sea la elección, la experiencia coincide en que un buen \textit{embedding} inicial (derivado de redes profundas preentrenadas o afinadas (\textit{fine-tuned})), constituye la base esencial para lograr agrupaciones estilísticamente relevantes en el arte rupestre~\cite{guerin2018,gultepe2018,dangeti2024}.
 
 \subsubsection{Criterios de Evaluación de la Calidad del Clustering }
 Evaluar el rendimiento de un \textit{clustering} no supervisado en el contexto de la clasificación estilística resulta complejo, pues a menudo no existe una “verdadera” forma de agrupar las obras (o los motivos) según su estilo~\cite{dangeti2024}.
@@ -499,9 +559,12 @@ El principal reto sigue siendo la interpretación de los \textit{clusters}, dond
 
 \section{Limitaciones del Conjunto de Datos}
 
+El valor analítico de cualquier modelo de detección depende en gran medida de la idoneidad del conjunto de datos utilizado para entrenarlo.
+En este apartado se identifican los principales condicionantes inherentes al conjunto de imágenes de la Cueva de las Manos, agrupados en función de la forma en que afectan a la selección de muestras, su calidad fotográfica y la cobertura de anotaciones disponibles.
+
 \subsection{Selección de Imágenes}
 
-El conjunto de datos analizado está formado por 686 imágenes seleccionadas por la arqueóloga Agustina Papú y su equipo durante campañas de 2019 a 2023 en la zona del Río Pinturas, Santa Cruz (Argentina).
+El conjunto de datos analizado está formado por 683 imágenes seleccionadas por la arqueóloga Agustina Papú y su equipo durante campañas de 2019 a 2023 en la zona del Río Pinturas, Santa Cruz (Argentina).
 Aunque se trata de un número significativo, la elección manual de imágenes para representar la totalidad de las paredes de la cueva puede introducir sesgos.
 Además, la diversidad de configuraciones de toma (iluminación, posición de la cámara, etc.) podría limitar la comparabilidad entre las muestras.
 
@@ -511,6 +574,9 @@ Las fotografías presentan una calidad variable, influida por factores como la i
 Estos problemas podrían mermar la eficacia de los modelos de detección de objetos, que dependen de rasgos visuales nítidos para identificar y localizar con precisión los motivos.
 
 \section{Limitaciones Técnicas y de Tiempo}
+
+Además de las restricciones propias de los datos, el proyecto se ve influido por factores operativos que determinan el alcance de los experimentos: la elección de modelos preentrenados, la disponibilidad de la experta para validar anotaciones, la duración total de la investigación y los recursos de hardware accesibles.
+Las siguientes subsecciones describen cómo cada uno de estos elementos condiciona la metodología y los resultados obtenidos.
 
 \subsection{Selección de Modelos Preentrenados}
 
@@ -550,7 +616,7 @@ El estudio se realiza utilizando los recursos computacionales disponibles, que c
 
 Las limitaciones descritas, tanto en los datos como en los aspectos técnicos y temporales, señalan diversas rutas para el desarrollo de estudios futuros.
 Ampliar el conjunto de datos y colaborar durante más tiempo con expertos permitiría conseguir etiquetas más detalladas y una mayor variedad de ejemplos, incrementando la capacidad de generalización de los modelos.
-Asimismo, se podría explorar el uso de \emph{datasets} especializados en la detección de objetos camuflados —por ejemplo, COD— para enfrentar mejor el bajo contraste y la superposición de figuras característica del arte rupestre.
+Asimismo, se podría explorar el uso de \emph{datasets} especializados en la detección de objetos camuflados para enfrentar mejor el bajo contraste y la superposición de figuras característica del arte rupestre.
 
 En el plano metodológico, resultaría provechoso implementar procesos de preprocesamiento más avanzados (p.ej., técnicas de restauración de imágenes dañadas) y entrenar modelos de detección y clasificación específicos para arte rupestre.
 Esto, sumado a la incorporación de arquitecturas de \textit{transformers} o el refinamiento de algoritmos de agrupamiento, podría dar resultados todavía más precisos y arrojar nuevas perspectivas sobre la evolución artística y simbólica de las sociedades prehistóricas.

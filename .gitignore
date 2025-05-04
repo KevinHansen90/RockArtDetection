@@ -136,4 +136,5 @@ configs/
 tesis/Images
 job_templates
 wandb/
+outputs/
 

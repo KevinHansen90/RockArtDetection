@@ -1,1 +1,199 @@
-\chapter{Problemas y Soluciones}
+%--------------------------------------------------------------------
+\chapter{Problemas y Soluciones}\label{ch:problemas_y_soluciones}
+%--------------------------------------------------------------------
+\noindent
+En este capítulo se documentan, de forma sistemática, los
+inconvenientes encontrados a lo largo del \emph{fine-tuning} de
+cuatro detectores de objetos
+(\textbf{Faster~R-CNN}, \textbf{RetinaNet}, \textbf{YOLOv5} y
+\textbf{Deformable DETR}) sobre cinco variantes de pre-procesamiento
+de datos y, adicionalmente, los experimentos de
+agrupamiento con cuatro \emph{feature extractors} cruzados con los
+mismos cuatro modelos.
+Cada sección describe el \emph{problema}, la
+\emph{solución propuesta} y la
+\emph{evidencia empírica} que justifica su adopción.
+
+\section{Estructura del Capítulo}
+\begin{itemize}
+    \item \textbf{Sección~\ref{sec:datos}} – Problemas relacionados con los \emph{datos} y el \emph{pre-procesamiento}.
+    \item \textbf{Sección~\ref{sec:modelos}} – Retos ligados a la \emph{configuración de modelos} y sus hiper-parámetros.
+    \item \textbf{Sección~\ref{sec:entrenamiento_local}} – Limitaciones y soluciones en el \emph{entrenamiento local}.
+    \item \textbf{Sección~\ref{sec:vertex_ai}} – Despliegue y optimización de \emph{Vertex AI Custom Jobs}.
+    \item \textbf{Sección~\ref{sec:tracking}} – Monitoreo, \emph{experiment tracking} y gestión de artefactos.
+    \item \textbf{Sección~\ref{sec:comparacion}} – Metodología de comparación cruzada y lecciones sobre desempeño.
+    \item \textbf{Sección~\ref{sec:sintesis}} – Síntesis de hallazgos y recomendaciones futuras.
+\end{itemize}
+
+%====================================================================
+\section{Datos y Pre-procesamiento}\label{sec:datos}
+%====================================================================
+
+\subsection{Tiling y Solapamiento de Imágenes}
+\begin{itemize}
+   \item \textbf{Problema:} generación de \emph{tiles} con solapamientos
+         inconsistentes que producían duplicados en \texttt{val}/\texttt{test}.
+   \item \textbf{Solución:} script de tiling parametrizado
+         (\texttt{--overlap 100\,px}) y validación post-procesamiento
+         con \texttt{pandas}.
+   \item \textbf{Incluir:} tabla con distribución final
+         \textit{train/val/test} y diagrama de flujo del nuevo script.
+\end{itemize}
+
+\subsection{Agrupamiento y Mapeo de Etiquetas}
+\begin{itemize}
+   \item \textbf{Problema:} pérdida de correspondencia entre
+         \texttt{grouped\_labels.txt} y anotaciones YOLO v5
+         durante la conversión COCO\,\(\rightarrow\)\,YOLO.
+   \item \textbf{Solución:} rutina de auditoría que compara
+         hashes MD5 de las listas de clases y
+         aborta el pipeline cuando detecta desalineación.
+   \item \textbf{Incluir:} pseudocódigo y ejemplo de \textbf{diff}.
+\end{itemize}
+
+\subsection{Desbalance de Clases y Objetos Pequeños}
+\begin{itemize}
+   \item \textbf{Problema:} baja \(\text{mAP}_{50}\)
+         en clases minoritarias; cajas muy pequeñas ignoradas.
+   \item \textbf{Solución:} \(\alpha=0.25,\gamma=2\) en Focal Loss
+         (RetinaNet) y reducción de \texttt{score\_thresh}
+         a 0.05 en DETR.
+   \item \textbf{Incluir:} gráfico de barras antes/después del rebalanceo.
+\end{itemize}
+
+\subsection{Técnicas de Mejora de Contraste}
+\begin{enumerate}
+  \renewcommand{\labelenumi}{\alph{enumi})}
+  \renewcommand{\theenumi}{\alph{enumi}}
+  \item CLAHE
+  \item Bilateral Filtering
+  \item Unsharp Masking
+  \item Laplacian Pyramid
+  \item Base (\emph{sin filtro})
+\end{enumerate}
+\textbf{Problema:} incremento del \emph{noise floor} en filtros
+agresivos.
+\textbf{Solución:} documentación de un pipeline
+configurable vía Hydra
+(\texttt{data=tiles\_base\_pilot}, \texttt{tiles\_unsharp\_pilot}, \dots).
+
+%====================================================================
+\section{Configuración de Modelos}\label{sec:modelos}
+%====================================================================
+
+\subsection{Selección y Congelación de \emph{Backbones}}
+\begin{itemize}
+   \item \textbf{Problema:} \emph{over-fitting} prematuro en DETR
+         con \texttt{freeze\_backbone=false}.
+   \item \textbf{Solución:} congelar primeras capas durante
+         \(N=3\) épocas, luego \emph{fine-tuning} completo.
+\end{itemize}
+
+\subsection{Ajuste de \emph{Anchors}}
+\textbf{Problema:} cajas sistemáticamente
+desplazadas al extremo inferior izquierdo (RetinaNet, YOLOv5).
+\textbf{Solución:} recalcular \emph{anchors}
+con \texttt{yolo detect anchor\_auto} y
+escala de FPN adaptada al tamaño promedio de las
+pictografías (\(\approx 60\times60\,\text{px}\)).
+
+\subsection{Programación de Tasas de Aprendizaje}
+\begin{itemize}
+   \item CosineAnnealingLR (DETR) con
+         \(T_\mathrm{max}=10\), \(\eta_\mathrm{min}=10^{-6}\).
+   \item One-cycle (YOLOv5) para alcanzar
+         \texttt{lr\_max=0.01}.
+   \item \textbf{Incluir:} gráfica de LR por época.
+\end{itemize}
+
+%====================================================================
+\section{Entrenamiento Local}\label{sec:entrenamiento_local}
+%====================================================================
+\subsection{Limitaciones de Hardware}
+M1 Pro (32 GB RAM) sin \emph{CUDA}:
+\begin{itemize}
+   \item Ajuste de \texttt{batch\_size=2} y
+         \texttt{grad\_accum\_steps=8}.
+   \item Uso de backend \texttt{torch.mps} y
+         caída segura a CPU con \texttt{try/except}.
+\end{itemize}
+
+\subsection{Perfil \texttt{cpu\_pilot}}
+Resumen de flags Hydra → \texttt{train=cpu\_pilot}.
+\textbf{Incluir:} tabla comparativa de duración
+por época y consumo de RAM.
+
+%====================================================================
+\section{Entrenamiento en la Nube (Vertex AI)}\label{sec:vertex_ai}
+%====================================================================
+\subsection{Plantillas \texttt{Custom Job}}\label{ssec:job_templates}
+\begin{itemize}
+   \item Variables de entorno (\verb|$MODEL $DATA_YAML $EXPERIMENT|).
+   \item Uso de \texttt{envsubst} para inyectar
+         parámetros en \texttt{*.json}.
+\end{itemize}
+
+\subsection{Organización de Salidas}\label{ssec:dirs}
+\begin{itemize}
+   \item \textbf{Problema:} duplicación de carpetas
+         \texttt{model/}\,$\rightarrow$\,\textit{experiments/model/exp/...}.
+   \item \textbf{Solución:} normalizar
+         \verb|exp_root = Path(vertex_out)| y eliminar nivel redundante.
+\end{itemize}
+
+\subsection{Gestión de Dependencias y Pesos Pre-entrenados}
+Descarga determinista de
+\texttt{ultralytics>=8.3.121} y
+almacenamiento en caché de \texttt{*.pt} en GCS.
+
+%====================================================================
+\section{Experiment Tracking y Monitoreo}\label{sec:tracking}
+%====================================================================
+\subsection{Weights \& Biases en la Nube}
+\begin{itemize}
+   \item \textbf{Problema:} archivos \texttt{wandb/}
+         persistentes en contenedores.
+   \item \textbf{Solución:} limpieza post-run
+         via \texttt{ENTRYPOINT} y subida
+         directa de \(\text{mAP}\), curvas PR y ejemplos a la API.
+\end{itemize}
+
+\subsection{Métricas Comparables}\label{ssec:metricas}
+Normalizar número de épocas (10 ép. para
+todos los detectores base) y tamaño de lote
+efectivo 16 para comparación justa.
+
+%====================================================================
+\section{Comparación Cruzada de Modelos}\label{sec:comparacion}
+%====================================================================
+\subsection{Diseño \(4\times5\) y \(4\times4\)}
+Gráfico de matriz:
+modelos × pre-procesamientos;
+modelos × \emph{feature extractors}.
+
+\subsection{Análisis de Desempeño}
+\begin{itemize}
+    \item ¿Por qué YOLOv5 aventaja al resto?
+    \item Re‐entrenos sugeridos para Faster R-CNN, RetinaNet y DETR.
+    \item Impacto de mayor número de épocas vs.
+          arquitectura \emph{one-stage}.
+\end{itemize}
+
+%====================================================================
+\section{Síntesis y Lecciones Aprendidas}\label{sec:sintesis}
+%====================================================================
+\subsection{Impacto de los Pre-procesamientos}
+Mapa de calor de variación en \(\text{mAP}_{50}\).
+
+\subsection{Trade-offs por Arquitectura}
+Tabla resumen con:
+parámetros, fps, \(\text{mAP}\), costo USD/h.
+
+\subsection{Recomendaciones para Trabajos Futuros}
+\begin{itemize}
+    \item Probar Focal-T DETR con \emph{flash-attention}.
+    \item Automatizar búsqueda de \emph{anchors} con
+          \emph{AutoAnchor} para RetinaNet.
+    \item Incrementar dataset sintético mediante
+          \emph{Copy-Paste Augmentation}.
+\end{itemize}
