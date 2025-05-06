@@ -483,16 +483,16 @@ This workflow uses the generated object detection datasets to explore stylistic 
 
 **Example Command (Extracting 'Animal' ID 0, resizing):**
 ```bash
-python src/preprocessing/crop_motifs.py \
+python src/clustering/crop_motifs.py \
     --images data/tiles/base/train/images \
     --labels data/tiles/base/train/labels \
-    --output data/clustering/cropped \
+    --output data/clustering/ \
     --class-id 0 \
     --image-ext .jpg \
     --resize-dim 224
 ```
 
-**Output:** A directory containing individual image files for each extracted motif (e.g., `data/clustering/cropped/`).
+**Output:** A directory containing individual image files for each extracted motif (e.g., `data/clustering`).
 
 ### 2. Feature Extraction & Clustering
 

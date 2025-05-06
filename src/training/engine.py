@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import torch
 from torch.backends import cudnn
@@ -165,8 +164,15 @@ def evaluate_on_dataset(
 # ─────────────────
 # Training routine
 # ─────────────────
-def train_model(model, train_loader, val_loader, device, optimizer, scheduler, config):
+def train_model(model, train_loader, val_loader, device, optimizer, scheduler, config, wandb_run=None):
     config = get_cfg_dict(config)
+
+    # ─── freeze-N-epochs settings ──────────────────────────────────────
+    freeze_epochs = config.get("freeze_epochs", 0)  # e.g. 2
+    # keep a handle on backbone parameters for (un)freezing
+    bb_params = list(model.backbone.parameters()) if hasattr(model, "backbone") else []
+    # remember the original backbone LR so we can restore it later
+    init_backbone_lr = optimizer.param_groups[0]["lr"]
 
     classes = load_classes(config["classes_file"])
     num_epochs = config.get("num_epochs", 10)
@@ -194,10 +200,25 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
     map50s, mar100s, f1s = [], [], []
     maps, map75s, mar1s, mar10s = [], [], [], []
     m_s, m_m, m_l, r_s, r_m, r_l = [], [], [], [], [], []
-    lr0s, lr1s, epoch_times = [], [], []
+    lr_backbones, lr_heads, epoch_times = [], [], []
 
     global_step = 0
     for epoch in range(num_epochs):
+        # ─── dynamic backbone freeze/unfreeze ──────────────────────
+        if epoch < freeze_epochs:
+            # backbone frozen ⇒ 0 LR & disable grads
+            optimizer.param_groups[0]["lr"] = 0.0
+            for p in bb_params:
+                p.requires_grad = False
+        elif epoch == freeze_epochs:
+            # first epoch *after* freeze ⇒ restore LR & grads
+            optimizer.param_groups[0]["lr"] = init_backbone_lr
+            for p in bb_params:
+                p.requires_grad = True
+            # if you have a scheduler, reset its base LR for group-0
+            if scheduler is not None and hasattr(scheduler, "base_lrs"):
+                scheduler.base_lrs[0] = init_backbone_lr
+
         start_t = time.time()
         model.train()
         running_loss = 0.0
@@ -212,7 +233,13 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
             stepped = accum.backward(loss_val)
 
             # advance warm-up schedule *only* after optimizer.step()
-            if warmup_sched and epoch < warmup_epochs and stepped:
+            # and *only* if the backbone is not currently frozen
+            if (
+                warmup_sched
+                and epoch < warmup_epochs
+                and stepped
+                and epoch >= freeze_epochs
+            ):
                 warmup_sched.step()
 
             running_loss += loss_val.item()
@@ -258,18 +285,33 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
         r_m.extend([rm])
         r_l.extend([rl])
 
-        lr0 = optimizer.param_groups[0]["lr"]
-        lr1 = optimizer.param_groups[1]["lr"] if len(optimizer.param_groups) > 1 else 0.0
-        lr0s.append(lr0)
-        lr1s.append(lr1)
+        lr_backbone = optimizer.param_groups[0]["lr"]
+        lr_head = optimizer.param_groups[1]["lr"]
+        lr_backbones.append(lr_backbone)
+        lr_heads.append(lr_head)
         epoch_sec = time.time() - start_t
         epoch_times.append(epoch_sec)
 
         if writer:
-            writer.add_scalar("LR/group0", lr0, global_step)
-            if len(optimizer.param_groups) > 1:
-                writer.add_scalar("LR/group1", lr1, global_step)
+            writer.add_scalar("LR/backbone", lr_backbone, global_step)
+            writer.add_scalar("LR/head", lr_head, global_step)
             writer.add_scalar("Time/epoch_sec", epoch_sec, epoch)
+
+        # ── live W&B logging ──────────────────────────────────────────
+        if wandb_run is not None:
+            wandb_run.log(
+                {
+                    "epoch": epoch + 1,
+                    "train_loss": train_losses[-1],
+                    "val_loss": v_loss,
+                    "mAP@.50": m50,
+                    "mAR@100": mar100,
+                    "lr_backbone": lr_backbone,
+                    "lr_head": lr_head,
+                    "epoch_time_s": epoch_sec,
+                },
+                step=epoch + 1,
+            )
 
         if scheduler:
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
@@ -296,7 +338,7 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
         r_s,
         r_m,
         r_l,
-        lr0s,
-        lr1s,
+        lr_backbones,
+        lr_heads,
         epoch_times,
     )

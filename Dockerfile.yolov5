@@ -1,21 +1,23 @@
 # Dockerfile.yolov5
 FROM pytorch/pytorch:2.2.2-cuda11.8-cudnn8-runtime
+
 ENV PYTHONUNBUFFERED=1
-
 WORKDIR /app
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      git \
-      libgl1-mesa-glx \
-      libglib2.0-0 \
- && rm -rf /var/lib/apt/lists/*
 
-# Shallow clone of the default (master/main) branch
-RUN git clone --depth 1 https://github.com/ultralytics/yolov5.git yolov5_repo  # from README :contentReference[oaicite:6]{index=6}
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        git \
+        libgl1-mesa-glx \
+        libglib2.0-0 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir wandb
+
+RUN git clone --depth 1 https://github.com/ultralytics/yolov5.git /app/yolov5_repo
 
 WORKDIR /app/yolov5_repo
-RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -r requirements.txt \
- && pip install --no-cache-dir gcsfs
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir gcsfs
 
 ENTRYPOINT ["python", "train.py"]
