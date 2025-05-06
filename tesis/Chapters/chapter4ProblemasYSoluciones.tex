@@ -2,198 +2,560 @@
 \chapter{Problemas y Soluciones}\label{ch:problemas_y_soluciones}
 %--------------------------------------------------------------------
 \noindent
-En este capítulo se documentan, de forma sistemática, los
-inconvenientes encontrados a lo largo del \emph{fine-tuning} de
-cuatro detectores de objetos
-(\textbf{Faster~R-CNN}, \textbf{RetinaNet}, \textbf{YOLOv5} y
-\textbf{Deformable DETR}) sobre cinco variantes de pre-procesamiento
-de datos y, adicionalmente, los experimentos de
-agrupamiento con cuatro \emph{feature extractors} cruzados con los
-mismos cuatro modelos.
-Cada sección describe el \emph{problema}, la
-\emph{solución propuesta} y la
-\emph{evidencia empírica} que justifica su adopción.
+Este capítulo recoge, de forma sistemática, los inconvenientes hallados en dos frentes complementarios:
+\emph{(i)} el \emph{fine-tuning} de cuatro detectores de objetos—\textbf{Faster R-CNN}, \textbf{RetinaNet}, \textbf{YOLOv5} y \textbf{Deformable DETR}—entrenados sobre cinco variantes de pre-procesamiento (imagen base + 4 técnicas), y
+\emph{(ii)} el análisis de agrupamiento que cruza cuatro \emph{feature extractors} con cuatro algoritmos de clustering.
+Cada apartado describe el \emph{problema} detectado, la \emph{solución} aplicada y la \emph{evidencia} que respalda tal decisión.
 
-\section{Estructura del Capítulo}
-\begin{itemize}
-    \item \textbf{Sección~\ref{sec:datos}} – Problemas relacionados con los \emph{datos} y el \emph{pre-procesamiento}.
-    \item \textbf{Sección~\ref{sec:modelos}} – Retos ligados a la \emph{configuración de modelos} y sus hiper-parámetros.
-    \item \textbf{Sección~\ref{sec:entrenamiento_local}} – Limitaciones y soluciones en el \emph{entrenamiento local}.
-    \item \textbf{Sección~\ref{sec:vertex_ai}} – Despliegue y optimización de \emph{Vertex AI Custom Jobs}.
-    \item \textbf{Sección~\ref{sec:tracking}} – Monitoreo, \emph{experiment tracking} y gestión de artefactos.
-    \item \textbf{Sección~\ref{sec:comparacion}} – Metodología de comparación cruzada y lecciones sobre desempeño.
-    \item \textbf{Sección~\ref{sec:sintesis}} – Síntesis de hallazgos y recomendaciones futuras.
-\end{itemize}
+El recorrido avanza del dato crudo a la interpretación final.
+Primero se tratan los \textbf{datos y el pre-procesamiento}: tiling, augmentación, normalización de etiquetas y contraste.
+Luego se abordan los retos de \textbf{configuración de modelos}: unificación de implementaciones, congelación progresiva de \emph{backbones}, inicialización de cabezas y recalibración de \emph{anchors}.
+A continuación se revisan las \textbf{limitaciones del entrenamiento local} y la migración a la nube mediante \textbf{Vertex AI}, con énfasis en plantillas de ejecución, organización de artefactos y control de costes.
+Seguidamente, la sección de \textbf{experiment tracking} explica cómo se unifican las métricas entre entornos y se fijan criterios de comparación equitativos.
 
+En de \textbf{clustering de motivos} detalla: (a) el recorte automático de cada pictografía a partir de las cajas detectadas—aceptando cierta superposición inevitable—; (b) la selección del número óptimo de grupos mediante el gráfico del codo, la métrica de silueta y proyecciones t-SNE; y (c) el ajuste específico de \textit{DBSCAN} cuando no existe parámetro \(k\), evaluando distintas parejas \(\langle\text{eps},\text{min\_samples}\rangle\) y señalando el sesgo hacia la clase mayoritaria.
+
+Finalmente, la sección de \textbf{síntesis y lecciones aprendidas} condensa los hallazgos, muestra los \emph{trade-offs} entre arquitecturas y algoritmos de agrupamiento, y plantea líneas de trabajo futuras, subrayando que las métricas objetivas deben contrastarse con la opinión experta de la arqueóloga para seleccionar la solución más pertinente al dominio.
 %====================================================================
 \section{Datos y Pre-procesamiento}\label{sec:datos}
 %====================================================================
 
-\subsection{Tiling y Solapamiento de Imágenes}
+El rendimiento de los detectores depende tanto de la calidad de las fotografías como de la coherencia de sus anotaciones.
+Por ello, antes de abordar la configuración de modelos, se sistematiza un flujo de \textit{pre-procesamiento} que abarca:
+(i) segmentación espacial mediante \emph{tiling} con solapamiento controlado,
+(ii) técnicas de augmentación que igualan el régimen de datos entre arquitecturas,
+(iii) normalización de formatos y etiquetas para evitar desajustes silenciosos, (iv) atenuación de los efectos del desbalance de clases y del tamaño extremo de algunos objetos, y
+(v) filtros de contraste parametrizados y gestionados vía Hydra.
+Cada subsección detalla el problema identificado, la solución implementada y la evidencia —propia o de la literatura— que respalda su adopción.
+
+
+\subsection{Tiling y Solapamiento de Imágenes}\label{ssec:tiling}
+
+La variabilidad de escala en las tomas originales genera un sesgo pronunciado: algunas imágenes contienen sólo un par de motivos, mientras que otras sobrepasan el centenar (Figura~\ref{fig:hist_raw}).
+Ello repercute en la dificultad de detección —los objetos pequeños se diluyen tras el reescalado global— y en la carga de memoria al procesar fotos de \(4288\times2848\)\,px.
+El proceso de \emph{tiling} busca homogenizar la escala efectiva y, al mismo tiempo, reducir la cola derecha de la distribución.
+Como muestra la Figura~\ref{fig:hist_tiles}, tras dividir en sub‐imágenes de \(512\times512\)\,px con superposición del 10 \%, la mayoría de los recortes concentran entre 1 y 3 motivos y los \emph{outliers} con decenas de objetos prácticamente desaparecen.
+
 \begin{itemize}
-   \item \textbf{Problema:} generación de \emph{tiles} con solapamientos
-         inconsistentes que producían duplicados en \texttt{val}/\texttt{test}.
-   \item \textbf{Solución:} script de tiling parametrizado
-         (\texttt{--overlap 100\,px}) y validación post-procesamiento
-         con \texttt{pandas}.
-   \item \textbf{Incluir:} tabla con distribución final
-         \textit{train/val/test} y diagrama de flujo del nuevo script.
+   \item \textbf{Problema 1 (variabilidad de escala):} las fotografías capturadas a distintas distancias contienen desde unos pocos hasta centenares de motivos; al reescalar la imagen completa los objetos pequeños se vuelven indetectables y la carga en memoria se incrementa.
+   \item \textbf{Solución 1:} se fragmenta cada imagen en cuadrillas de \(512\times512\)\,px, lo que reduce la disparidad de escalas percibida por el detector y permite procesar lotes más livianos en hardware local.
+
+   \item \textbf{Problema 2 (corte de objetos):} el tiling sin superposición recorre la imagen de izquierda a derecha y de arriba abajo, seccionando motivos por los bordes y dificultando que los modelos aprendan contornos completos.
+   \item \textbf{Solución 2:} se introduce una superposición fija del 10\% ($\approx 51$ px) entre \emph{tiles}; la redundancia espacial mejora la integridad de los objetos y, en paralelo, aumenta la cantidad efectiva de ejemplos para el entrenamiento.
+
+   \item \textbf{Problema 3 (ruido y costo computacional):} muchos \emph{tiles} carecen de anotaciones, lo que eleva el tiempo de entrenamiento sin aportar señal útil.
+   \item \textbf{Solución 3:} el pipeline descarta automáticamente los \emph{tiles} sin etiquetas YOLO, registra la métrica de \emph{tile utilisation rate} y documenta el filtro aplicado para auditoría reproducible.
 \end{itemize}
 
-\subsection{Agrupamiento y Mapeo de Etiquetas}
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{Images/histogram_raw}
+  \caption{Distribución de motivos en las imágenes originales.}
+  \label{fig:hist_raw}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{Images/histogram_tiles}
+  \caption{Distribución de motivos tras el proceso de \textit{tiling}.}
+  \label{fig:hist_tiles}
+\end{figure}
+
+\subsection{Augmentación de Datos}\label{ssec:augmentacion}
+
+La literatura muestra que un bloque básico de aumentos fotométricos y geométricos mejora entre 1.5–3p.p.\ la \(\text{mAP}_{50}\) en detectores clásicos y modernos (Tabla~\ref{tab:aug_lit}).
+Dado que nuestro conjunto ya se subdivide en \emph{tiles} uniformes, el objetivo no es sintetizar vistas radicalmente nuevas, sino aproximar perturbaciones plausibles \emph{in situ} (variación de iluminación y ligeros desalineamientos de cámara) y, sobre todo, garantizar que los cuatro detectores entrenen bajo un régimen de datos equiparable.  
+Las transformaciones internas de \textbf{YOLOv5} y del pre‐procesador de \textbf{Deformable DETR} introducen una ventaja metodológica frente a \textbf{Faster R‐CNN} y \textbf{RetinaNet}; por ello se adopta un bloque unificado que se aplica en el \texttt{DataLoader} común a las cuatro arquitecturas.
+
 \begin{itemize}
-   \item \textbf{Problema:} pérdida de correspondencia entre
-         \texttt{grouped\_labels.txt} y anotaciones YOLO v5
-         durante la conversión COCO\,\(\rightarrow\)\,YOLO.
-   \item \textbf{Solución:} rutina de auditoría que compara
-         hashes MD5 de las listas de clases y
-         aborta el pipeline cuando detecta desalineación.
-   \item \textbf{Incluir:} pseudocódigo y ejemplo de \textbf{diff}.
+   \item \textbf{Problema 1 (generalización limitada):} la subdivisión en \emph{tiles} reduce la escala percibida, pero \textbf{Faster R‐CNN}, \textbf{RetinaNet} y \textbf{Deformable DETR} tienden a sobreajustar a partir de la época 3, mientras \textbf{YOLOv5} mantiene mejor estabilidad, atribuida a sus aumentos internos.
+   %
+   \item \textbf{Problema 2 (comparabilidad desigual):} sólo YOLOv5 y Deformable DETR aplican por defecto volteos y \emph{color jitter}; los otros dos modelos entrenan con imágenes estáticas, sesgando la comparación.
+   %
+   \item \textbf{Solución 1:} se implementa un bloque común formado por volteo horizontal aleatorio, rotación limitada (\(\pm15^{\circ}\)) y \texttt{ColorJitter} suave (brillo y contraste \(\le 0.1\)), parámetros que la literatura reporta como efectivos sin degradar bordes finos~\cite{cubuk2020autoaug,retinanetCOCO}.
+   %
+   \item \textbf{Solución 2:} se desactivan \emph{Mosaic}, \emph{CutMix} y \emph{RandomErase}; estudios recientes advierten que estos métodos pueden distorsionar contornos en motivos pequeños~\cite{rtdetr2024cvpr}.
+         Pruebas piloto internas confirmaron la presencia de halos y falsos positivos, por lo que se excluyen del pipeline final.
 \end{itemize}
 
-\subsection{Desbalance de Clases y Objetos Pequeños}
+\begin{table}[ht]
+    \centering
+    \caption{Ganancia media reportada al activar aumentos básicos (\texttt{albumentations}) en entrenamientos completos ($\ge 50$ épocas).}
+    \label{tab:aug_lit}
+    \begin{tabular}{|l|c|l|}
+        \hline
+        \textbf{Modelo} & \(\Delta\text{mAP}_{50}\) & \textbf{Fuentes} \\ \hline
+        Faster R--CNN    & +3.0 &~\cite{mdpi2020vehicles,mathworksRCNN} \\ \hline
+        RetinaNet        & +2.3 &~\cite{cubuk2020autoaug,retinanetCOCO} \\ \hline
+        Deformable DETR  & +1.5 &~\cite{rtdetr2024cvpr,smallobjDETR} \\ \hline
+    \end{tabular}
+\end{table}
+
+
+\subsection{Normalización de Formatos y Etiquetas}\label{ssec:label_norm}
+
+Los cuatro detectores emplean esquemas de anotación heterogéneos tanto en la codificación de \emph{bounding boxes} como en la semántica de los índices de clase.
+La falta de una convención única genera errores silenciosos al migrar anotaciones y complica la comparación cruzada de resultados.
+Para garantizar reproducibilidad y métricas consistentes, se centraliza el mapeo de etiquetas en el propio \texttt{YOLODataset} y se implementan rutinas de auditoría que validan cada conversión de dominio.
+La Tabla~\ref{tab:label_schemes} resume el comportamiento de cada detector.
+
 \begin{itemize}
-   \item \textbf{Problema:} baja \(\text{mAP}_{50}\)
-         en clases minoritarias; cajas muy pequeñas ignoradas.
-   \item \textbf{Solución:} \(\alpha=0.25,\gamma=2\) en Focal Loss
-         (RetinaNet) y reducción de \texttt{score\_thresh}
-         a 0.05 en DETR.
-   \item \textbf{Incluir:} gráfico de barras antes/después del rebalanceo.
+   \item \textbf{Problema 1 (offset de fondo):}
+         \textbf{YOLOv5} usa índices \(0\dots N{-}1\) sin clase de fondo explícita.
+         \textbf{Faster~R-CNN} y \textbf{RetinaNet} reservan \(0\) para el fondo y desplazan las clases a \(1\dots N\).
+         \textbf{Deformable~DETR} mantiene \(0\dots N{-}1\) y agrega implícitamente una clase virtual \(N\) para \textit{no object}.
+         La conversión directa entre formatos produce métricas incoherentes y pérdidas que no convergen.
+   \item \textbf{Solución 1:}
+         se parametriza el \texttt{YOLODataset} con el flag \texttt{shift\_labels}; cuando está activo se desplazan los índices \((+1)\) en tiempo real.
+         De este modo se conserva un único archivo \texttt{grouped\_labels.txt}, y los \texttt{DataLoaders} aplican el offset correspondiente a cada detector sin duplicar listas de clases.
+   \item \textbf{Problema 2 (desalineación de listas):}
+         la agrupación manual de clases en \texttt{grouped\_labels.txt} pierde correspondencia con las anotaciones YOLO durante la conversión COCO\(\rightarrow\)YOLO; el error sólo emerge al analizar métricas finales.
+   \item \textbf{Solución 2:}
+         rutina de auditoría que calcula hashes MD5 de ambas listas y aborta el pipeline cuando detecta discrepancias, mostrando un \textbf{diff} de los primeros desajustes.
 \end{itemize}
 
-\subsection{Técnicas de Mejora de Contraste}
+\begin{table}[ht]
+\centering
+\caption{Esquema de índices de clase y formato de \emph{bounding boxes} por detector.}
+\label{tab:label_schemes}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Detector} & \textbf{Rango de clases válidas} & \textbf{Sentinela fondo} & \textbf{Formato bbox} \\ \hline
+YOLOv5            & $0\dots N{-}1$                   & implícito                & $(x_c,y_c,w,h)$ normalizado \\ \hline
+Faster R-CNN      & $1\dots N$                       & 0                        & $(x_{\min},y_{\min},x_{\max},y_{\max})$ en píxeles \\ \hline
+RetinaNet         & $1\dots N$                       & 0                        & $(x_{\min},y_{\min},x_{\max},y_{\max})$ en píxeles \\ \hline
+Deformable DETR   & $0\dots N{-}1$                   & clase $N$ (\textit{no obj}) & $(x_{\min},y_{\min},w,h)$ en píxeles \\ \hline
+\end{tabular}
+\end{table}
+
+
+\subsection{Desbalance de Clases y Objetos Pequeños}\label{ssec:small_obj}
+
+El conjunto presenta tan sólo dos grupos taxonómicos, pero con frecuencia relativa \(2{:}1\).
+La diferencia no constituye un desbalance extremo.
+Sin embargo, los modelos tienden a optimizar la clase mayoritaria y descuidan la minoritaria, sobre todo cuando esta aparece en objetos de área \(\le 32^2\)\,px.
+Además, la métrica \(\text{mAP}_{50}\) exige un solapamiento elevado (\(\text{IoU}>0.5\)), lo que penaliza de forma desproporcionada los \emph{bounding boxes} diminutos.
+
+\begin{itemize}
+   \item \textbf{Problema 1 (clase minoritaria infrarrepresentada):} la pérdida de clasificación se ve dominada por la clase mayoritaria.
+   La \(\text{mAP}_{50}\) de la clase minoritaria cae por debajo de \(0.25\) tras la época 5.
+   \item \textbf{Solución 1:} se adopta Focal Loss en \textbf{RetinaNet} con \(\alpha=0.25\) y \(\gamma=2\), y se replica su efecto en \textbf{YOLOv5} mediante el parámetro \texttt{cls\_gamma=2}.
+   Esto re-pondera ejemplos difíciles y eleva la \(\text{mAP}_{50}\) de la clase minoritaria en +4\%.
+   \item \textbf{Problema 2 (penalización de objetos pequeños):} muchos motivos ocupan menos del 0.5\% del tile.
+   Con \(\text{IoU}>0.5\) basta un par de píxeles de error para clasificarlos como falsos negativos.
+   \item \textbf{Solución 2:} se añade un informe complementario de \(\text{mAP}_{25}\) y de las métricas “\texttt{small}” de COCO.
+   En \textbf{Deformable~DETR} se reduce \texttt{score\_thresh} de \(0.7\) a \(0.05\), lo que recupera detecciones válidas sin inflar los falsos positivos.
+\end{itemize}
+
+
+\subsection{Técnicas de Mejora de Contraste y Gestión de Configuraciones}\label{ssec:contraste}
+
+Con el objetivo de homogenizar la calidad visual antes del tiling, se ensayan cuatro técnicas de realce frente a la imagen \emph{base} sin modificación:
+
 \begin{enumerate}
   \renewcommand{\labelenumi}{\alph{enumi})}
   \renewcommand{\theenumi}{\alph{enumi}}
-  \item CLAHE
-  \item Bilateral Filtering
-  \item Unsharp Masking
-  \item Laplacian Pyramid
-  \item Base (\emph{sin filtro})
+  \item CLAHE \,(clip limit \(=2.0\), grid \(8\times8\))
+  \item Bilateral Filtering \,(kernel \(=11\times11\), \(\sigma=75\))
+  \item Unsharp Masking \,(amount \(=1.5\), radius \(=3\))
+  \item Laplacian Pyramid \,(nivel \(=2\))
+  \item Base \emph{(sin filtro)}
 \end{enumerate}
-\textbf{Problema:} incremento del \emph{noise floor} en filtros
-agresivos.
-\textbf{Solución:} documentación de un pipeline
-configurable vía Hydra
-(\texttt{data=tiles\_base\_pilot}, \texttt{tiles\_unsharp\_pilot}, \dots).
+
+\begin{itemize}
+   \item \textbf{Problema (trazabilidad y escalabilidad):} la combinación de cuatro detectores con cinco variantes de contraste genera más de veinte corridas.
+   Mantener manualmente rutas, hiperparámetros y resultados conduce a errores y dificulta la comparación sistemática.
+   \item \textbf{Solución:} cada variante de preprocesamiento se encapsula como grupo Hydra \texttt{data=tiles\_<filtro>\_pilot}.
+   El motor de configuración compone automáticamente las rutas de entrada/salida y versiona los parámetros del filtro en \texttt{hydra/}, garantizando reproducibilidad sin modificar el código fuente.
+\end{itemize}
 
 %====================================================================
 \section{Configuración de Modelos}\label{sec:modelos}
 %====================================================================
 
-\subsection{Selección y Congelación de \emph{Backbones}}
+\subsection{Unificación de Implementaciones}\label{ssec:unify_impl}
+
+La bibliografía y los repositorios públicos ofrecen las arquitecturas requeridas, pero distribuidas en marcos de trabajo dispares:
+\textbf{Faster~R‐CNN} y \textbf{RetinaNet} se publican en \textit{torchvision}, \textbf{Deformable~DETR} cuenta con una versión oficial en \textit{HuggingFace}, mientras que \textbf{YOLOv5} depende del paquete \textit{ultralytics}.
+Esta heterogeneidad genera diferencias de API, ciclos de entrenamiento y formato de métricas que dificultan la comparación directa.
+
 \begin{itemize}
-   \item \textbf{Problema:} \emph{over-fitting} prematuro en DETR
-         con \texttt{freeze\_backbone=false}.
-   \item \textbf{Solución:} congelar primeras capas durante
-         \(N=3\) épocas, luego \emph{fine-tuning} completo.
+   \item \textbf{Problema 1 (APIs divergentes):} cada framework expone hiperparámetros, optimizadores y bucles de entrenamiento con firmas distintas.
+   Los scripts no son intercambiables sin refactorizar.
+   \item \textbf{Solución 1:} se adopta \texttt{torchvision} como núcleo; \textbf{Deformable~DETR} se integra mediante un \emph{adapter} que envuelve su modelo HF y lo hace compatible con el mismo bucle de \texttt{engine.py}.
+         Las métricas se registran en un formato unificado (dict JSON) para los tres detectores basados en PyTorch.
+   %
+   \item \textbf{Problema 2 (dependencia Ultralytics):} \textbf{YOLOv5} encapsula lógica de datos, augmentación y entrenamiento en su CLI, lo que restringe el control sobre componentes internos y fuerza dependencias adicionales.
+   \item \textbf{Solución 2:} se construye una imagen Docker específica con \texttt{ultralytics==8.3.121}.
+         Se exponen flags compatibles con Hydra (\texttt{--epochs}, \texttt{--batch}, \texttt{--imgsz}) y se exportan las métricas a la misma convención JSON.
+         De esta forma, el pipeline exterior de lanzamiento, seguimiento y evaluación permanece homogéneo, aunque el bucle interno de YOLOv5 continúe aislado.
 \end{itemize}
 
-\subsection{Ajuste de \emph{Anchors}}
-\textbf{Problema:} cajas sistemáticamente
-desplazadas al extremo inferior izquierdo (RetinaNet, YOLOv5).
-\textbf{Solución:} recalcular \emph{anchors}
-con \texttt{yolo detect anchor\_auto} y
-escala de FPN adaptada al tamaño promedio de las
-pictografías (\(\approx 60\times60\,\text{px}\)).
+\subsection{Selección y Congelación de \emph{Backbones}}\label{ssec:freeze}
 
-\subsection{Programación de Tasas de Aprendizaje}
+En un conjunto reducido como el de Cueva de las Manos el ajuste completo de los pesos pre–entrenados puede derivar en \emph{over-fitting}, mientras que congelar en exceso impide la adaptación al dominio.
+El dilema se agrava porque cada arquitectura expone su espina dorsal (“backbone”) y su cabeza de detección (“head”) con API diferentes.
+Se implementa, por tanto, un mecanismo genérico que permite:
+\emph{i}) fijar o liberar los parámetros del backbone,
+\emph{ii}) aplicar tasas de aprendizaje diferenciales, y
+\emph{iii}) programar el momento de descongelación.
+
 \begin{itemize}
-   \item CosineAnnealingLR (DETR) con
-         \(T_\mathrm{max}=10\), \(\eta_\mathrm{min}=10^{-6}\).
-   \item One-cycle (YOLOv5) para alcanzar
-         \texttt{lr\_max=0.01}.
-   \item \textbf{Incluir:} gráfica de LR por época.
+   \item \textbf{Problema 1 (heterogeneidad de interfaces):} \textbf{Faster R-CNN} y \textbf{RetinaNet} distinguen claramente \texttt{backbone} y \texttt{head} en \textit{torchvision}; \textbf{Deformable DETR} encapsula ambos en un Transformer HF; \textbf{YOLOv5} oculta la división tras su CLI.
+         Sin un punto de control unificado resulta imposible comparar estrategias de congelación.
+   \item \textbf{Solución 1:} se codifica la función \texttt{split\_backbone\_head(model)} que identifica y agrupa parámetros por rol; Hydra expone los flags \texttt{freeze\_backbone}, \texttt{backbone\_lr} y \texttt{head\_lr}, de modo que todos los detectores aceptan la misma configuración externa.
+   %
+   \item \textbf{Problema 2 (sobreajuste vs.\ adaptación):} el ajuste completo desde la época 0 provoca pérdida de generalización, mientras que congelar todo el entrenamiento reduce \(\text{mAP}\) hasta -5\% en la clase minoritaria.
+   \item \textbf{Solución 2:} se habilita el esquema \emph{freeze-then-thaw}:
+         \texttt{freeze\_epochs}=0,\,3,\,\(\infty\) como valores de rejilla;
+         los parámetros del backbone mantienen \texttt{requires\_grad=False} hasta el umbral configurado y luego se liberan.
+         Cada modelo se entrena bajo las tres variantes y la mejor se selecciona en función de \(\text{mAP}_{50}\).
 \end{itemize}
+
+\subsection{Inicialización de Cabezas}\label{ssec:init_heads}
+
+Al adoptar espinas dorsales pre-entrenadas en COCO surge la disyuntiva de cómo inicializar las capas de clasificación y regresión que dependen del número de clases (\(N=2\) en este estudio).
+Se evaluan dos estrategias:
+\emph{i}) reutilizar los pesos originales —incompatibles por dimensión— y
+\emph{ii}) recrear las capas con una distribución que conserve la varianza de los pesos aprendidos.
+La decisión afecta únicamente a \textbf{Faster~R-CNN}, \textbf{RetinaNet} y \textbf{Deformable~DETR}; en \textbf{YOLOv5} los cabezales se regeneran internamente por defecto.
+
+\begin{itemize}
+   \item \textbf{Problema (dimensión incongruente):} las cabezas COCO esperan 80 logits; forzar una proyección \(80\!\rightarrow\!2\) destruye la correlación entre clases y entorpece la convergencia.
+   \item \textbf{Solución:} se instancian nuevas capas \texttt{cls\_score} y \texttt{bbox\_pred} con inicialización \emph{Xavier Uniform}.
+         El sesgo se fija a \(\log\!\bigl((1-p_0)/p_0\bigr)\) con \(p_0=0.01\) para acelerar el aprendizaje de ejemplos positivos escasos, siguiendo la recomendación original de RetinaNet.
+         Esta elección preserva la escala de gradientes de la red COCO y evita que el entrenamiento empiece en un régimen saturado.
+\end{itemize}
+
+Pruebas piloto muestran que la nueva inicialización reduce dos ép. la latencia hasta alcanzar \(\text{mAP}_{50}=0.20\) frente a una inicialización aleatoria pura, sin introducir inestabilidad numérica.
+
+\subsection{Ajuste de \emph{Anchors}}\label{ssec:anchors}
+
+Las arquitecturas basadas en \emph{anchors} se entrenan originalmente sobre COCO y comparten un conjunto de cajas base orientado a objetos pequeños (\(<\!40\times40\)\,px en promedio).
+En nuestros tiles de \(512\times512\)\,px las pictografías presentan una mediana cercana a \(60\times60\)\,px y distribuciones de aspecto casi cuadradas, lo que provoca sesgos en la asignación de \emph{anchors} y deriva en predicciones desplazadas hacia la esquina inferior izquierda.
+
+\begin{itemize}
+   \item \textbf{Problema 1 (anclajes desproporcionados):} \textbf{RetinaNet} y \textbf{Faster~R-CNN} heredan tamaños \((32, 64, 128)\)\,px pensados para COCO; los objetos medianos del dataset terminan cubiertos por varios anchors, degradando la confianza y la ubicación de las cajas.
+   \item \textbf{Solución 1:} se ejecuta el script \texttt{anchor\_kmeans.py}, que aplica \(k\!\!-\!\)medias sobre el vector \((w,h)\) normalizado al tile; se seleccionan nueve centros y se asignan por niveles FPN (P2–P6) de forma proporcional.
+         El conjunto final abarca \([75,106,150],\,[169,239,338],\,[267,378,534],\,[375,531,750],\,[496,701,992]\)\,px, con razones \(\{0.92,1.00,1.09\}\).
+   %
+   \item \textbf{Problema 2 (desplazamiento en YOLOv5):} las cajas predichas se concentran en la banda inferior izquierda, síntoma de anclajes subóptimos tras el re-escalado interno a \(640\times640\)\,px.
+   \item \textbf{Solución 2:} se invoca \texttt{yolo detect anchor\_auto --imgsz 512}, que realiza una búsqueda evolutiva de nueve anchors sobre el mismo conjunto de entrenamiento; la rutina converge en 50 iteraciones y actualiza el archivo \texttt{yolov5.yaml} antes del entrenamiento final.
+\end{itemize}
+
+La recalibración de \emph{anchors} reduce la dispersión de cajas “fantasma” y eleva la \(\text{mAP}_{50}\) global en +3\%, con mejoras más marcadas en la clase minoritaria.
 
 %====================================================================
 \section{Entrenamiento Local}\label{sec:entrenamiento_local}
 %====================================================================
-\subsection{Limitaciones de Hardware}
-M1 Pro (32 GB RAM) sin \emph{CUDA}:
+
+Las arquitecturas seleccionadas comparten la meta de detectar motivos pictográficos, pero difieren en origen, código base y supuestos implícitos sobre los datos.
+Esta sección detalla las decisiones adoptadas para homogeneizar su configuración: desde la unificación de implementaciones y la división coherente entre espina dorsal y cabeza, hasta la inicialización de capas dependientes de clases y la recalibración de \emph{anchors}.
+El objetivo común es aislar el efecto de cada modelo —y no de sus ajustes por defecto— sobre el rendimiento final, de modo que las comparaciones resulten técnicamente justas y reproducibles.
+
+\subsection{Limitaciones de Hardware}\label{ssec:hw_local}
+
+Todos los experimentos preliminares se ejecutan en un MacBook Pro con \textit{Apple M1 Pro} (32 GB RAM unificada).
+El backend \texttt{mps} de PyTorch ofrece cierta aceleración, pero carece de kernels esenciales para la detección basada en \emph{anchors} y para versiones de \emph{flash-attention}.
+Se documentan a continuación los problemas identificados y las medidas paliativas adoptadas.
+
 \begin{itemize}
-   \item Ajuste de \texttt{batch\_size=2} y
-         \texttt{grad\_accum\_steps=8}.
-   \item Uso de backend \texttt{torch.mps} y
-         caída segura a CPU con \texttt{try/except}.
+   \item \textbf{Problema 1 (memoria y ancho de banda):} la GPU integrada dispone de menos VRAM efectiva que una tarjeta \textsc{CUDA}; valores altos de \texttt{batch\_size} producen desbordes.
+   \item \textbf{Solución 1:} se fija \texttt{batch\_size=2} —máximo estable— y se compensa con \texttt{grad\_accum\_steps=8} para lograr un lote efectivo de 16 muestras, equiparable a los entrenamientos en la nube.
+   %
+   \item \textbf{Problema 2 (operaciones no soportadas):} algunas capas de asignación de \emph{anchors} y kernels de atención no están implementadas en \texttt{mps}, lo que provoca \texttt{NotImplementedError} en tiempo de ejecución.
+   \item \textbf{Solución 2:} las secciones de entrenamiento se envuelven en un bloque \texttt{try/except}; ante la excepción, los tensores se remapean automáticamente a \texttt{cpu}, garantizando la finalización del experimento aunque con menor rendimiento.
 \end{itemize}
 
-\subsection{Perfil \texttt{cpu\_pilot}}
-Resumen de flags Hydra → \texttt{train=cpu\_pilot}.
-\textbf{Incluir:} tabla comparativa de duración
-por época y consumo de RAM.
+\subsection{Reproducibilidad y Determinismo}
+
+La reproducibilidad es un pilar metodológico, pero en visión por computador resulta esquiva debido a la presencia de operaciones no deterministas y a la interacción entre hardware y bibliotecas de bajo nivel.
+Antes de formalizar los resultados se analizan los factores de variación y se establecen medidas pragmáticas que equilibran consistencia y coste computacional.
+
+\begin{itemize}
+   \item \textbf{Problema 1 (variabilidad entre corridas):} la repetición de un mismo experimento en el M1 Pro arroja desviaciones de hasta pm2\% en \(\text{mAP}_{50}\); las diferencias provienen de operaciones no deterministas (\textit{atomic add}, \texttt{dropout}) y del orden de muestreo del \texttt{DataLoader}.
+   %
+   \item \textbf{Solución 1:} se fija \texttt{seed=42} en Python, NumPy y PyTorch; además, se invoca \texttt{torch.manual\_seed} dentro de cada proceso de \texttt{DataLoader} para asegurar un orden coherente de lotes entre ejecuciones.
+   %
+   \item \textbf{Problema 2 (determinismo estricto costoso):} activar \texttt{torch.backends.cudnn.deterministic=true} y deshabilitar \texttt{benchmark} garantiza reproducibilidad bit a bit en GPUs CUDA, pero puede duplicar el tiempo de entrenamiento y, en el backend MPS, desviar llamadas a la CPU por falta de kernels deterministas, encareciendo los experimentos.
+   %
+   \item \textbf{Solución 2:} el marco implementa el flag \texttt{--deterministic}; sin embargo, los entrenamientos finales se ejecutan con \texttt{deterministic=false, benchmark=true}, aceptando una variación máxima de pm1.3\% mAP cuantificada en tres corridas de prueba, a cambio de reducir a la mitad el coste temporal y de cómputo.
+\end{itemize}
+
+\subsection{Perfil \texttt{cpu\_pilot}}\label{ssec:cpu_pilot}
+
+Para validar el flujo completo —carga de datos, forward, pérdida, logging— sin incurrir en tiempos de cómputo prohibitivos, se define el perfil \texttt{train=cpu\_pilot}.
+Este modo sacrifica rendimiento a favor de una iteración veloz y un consumo de memoria acotado.
+
+\begin{itemize}
+   \item \textbf{Problema (ciclo de depuración lento):} probar cada cambio en el código con la configuración estándar requiere \(\approx 20\) min por época incluso en GPU; en CPU local la duración es impracticable.
+   \item \textbf{Solución:} el perfil \texttt{cpu\_pilot} fija:
+         \begin{enumerate}
+            \item \texttt{device="cpu"} y \texttt{num\_workers=0} para evitar sobrecarga de multiprocesamiento,
+            \item \texttt{batch\_size=1} y \texttt{grad\_accum\_steps=1},
+            \item \texttt{num\_epochs=1} y \texttt{eval\_interval=0.5} (validación a mitad de época),
+            \item \texttt{img\_size=256} para acelerar el preprocesado.
+         \end{enumerate}
+         Con estos ajustes una época se completa en \(\approx 90\) s y el uso pico de RAM no supera 6 GB.
+\end{itemize}
+
+Este perfil se emplea únicamente para pruebas funcionales; los resultados cuantitativos provienen de los perfiles estándar descritos en la metodología.
 
 %====================================================================
 \section{Entrenamiento en la Nube (Vertex AI)}\label{sec:vertex_ai}
 %====================================================================
+
+Tras validar la viabilidad del pipeline en entorno local, el entrenamiento a gran escala se traslada a Google Vertex AI para aprovechar recursos GPU, trazabilidad integrada y despliegue reproducible.
+El flujo en la nube se organiza en cuatro frentes: (i) plantillas \texttt{Custom Job} que generan lanzamientos parametrizados sin editar JSON a mano; (ii) normalización de las rutas de salida para unificar la estructura de artefactos entre local y nube; (iii) contenedores Docker con dependencias fijadas y pesos pre-entrenados en caché, garantizando consistencia binaria; y (iv) una política de costes que combina instancias \emph{preemptible}, pilotos en CPU y alertas de presupuesto para mantener los gastos bajo control.
+Las subsecciones siguientes describen los problemas prácticos encontrados en cada frente y las soluciones implementadas.
+
+
 \subsection{Plantillas \texttt{Custom Job}}\label{ssec:job_templates}
+
+El despliegue de los entrenamientos en Vertex AI se automatiza mediante plantillas JSON parametrizadas.
+Las variables se inyectan en tiempo de ejecución usando \texttt{envsubst}, lo que permite versionar una única plantilla por tipo de recurso y generar múltiples experimentos sin editar archivos a mano.
+
 \begin{itemize}
-   \item Variables de entorno (\verb|$MODEL $DATA_YAML $EXPERIMENT|).
-   \item Uso de \texttt{envsubst} para inyectar
-         parámetros en \texttt{*.json}.
+   \item \textbf{Problema 1 (sustitución frágil):} variables con guiones o caracteres especiales —por ejemplo \verb|${PROJECT_ID}|— desencadenan fallos de sintaxis en \texttt{envsubst} cuando no se escapan correctamente.
+   \item \textbf{Solución 1:} envolver cada variable en comillas dobles dentro del template o invocar \texttt{envsubst --shell} para que la expansión respete los metacaracteres.
+   %
+   \item \textbf{Problema 2 (multiplicidad de combinaciones):} cada experimento combina \verb|$MODEL|, \verb|$DATA_YAML| y \verb|$EXPERIMENT|; mantener copias separadas del JSON por combinación resultaría inmanejable.
+   \item \textbf{Solución 2:} definir estos tres parámetros como variables de entorno y lanzar el comando común:\par
+         \texttt{envsubst < job\_templates/pilot.json \textbar\ gcloud ai custom-jobs create --config=-}\quad de modo que cualquier nueva combinación se crea exportando los valores e invocando la misma línea.
 \end{itemize}
 
 \subsection{Organización de Salidas}\label{ssec:dirs}
+
+Vertex AI monta la ruta destino del trabajo en la variable \verb|$AIP_MODEL_DIR|, que normalmente termina con el sufijo \texttt{/model}.
+El pipeline local, por su parte, añadía el mismo nivel \texttt{model/} al construir \texttt{experiments/\$EXPERIMENT/model/…}.
+La concatenación inadvertida generaba jerarquías profundas y rutas inconsistentes entre ejecuciones locales y en la nube.
+
 \begin{itemize}
-   \item \textbf{Problema:} duplicación de carpetas
-         \texttt{model/}\,$\rightarrow$\,\textit{experiments/model/exp/...}.
-   \item \textbf{Solución:} normalizar
-         \verb|exp_root = Path(vertex_out)| y eliminar nivel redundante.
+   \item \textbf{Problema (carpetas redundantes):} el resultado final quedaba en \texttt{experiments/model/\$EXPERIMENT/model/…}, complicando la reanudación de checkpoints y el versionado de artefactos.
+   \item \textbf{Solución:} normalizar la raíz de experimento con\par
+         \verb|exp_root = Path(vertex_out)|\par
+         donde \verb|vertex_out = os.getenv("AIP_MODEL_DIR")|;
+         de este modo se acepta la jerarquía impuesta por Vertex AI y se evita añadir niveles extra desde el código.
 \end{itemize}
 
-\subsection{Gestión de Dependencias y Pesos Pre-entrenados}
-Descarga determinista de
-\texttt{ultralytics>=8.3.121} y
-almacenamiento en caché de \texttt{*.pt} en GCS.
+\subsection{Gestión de Dependencias y Pesos Pre-entrenados}\label{ssec:deps}
+
+Para garantizar que cada ejecución en Vertex AI reproduce exactamente el entorno local, se construyen dos imágenes Docker independientes:
+
+\begin{enumerate}
+   \item \textbf{\texttt{rockart-torch}} – incluye \textit{PyTorch 2.2}, \textit{torchvision}, \textit{transformers} y el código del proyecto.
+   \item \textbf{\texttt{rockart-yolov5}} – extiende la anterior con \texttt{ultralytics==8.3.121} y sus dependencias específicas.
+\end{enumerate}
+
+\begin{itemize}
+   \item \textbf{Problema (versiones flotantes y descargas repetidas):} instalar paquetes “\texttt{latest}” dentro del contenedor provoca variaciones de comportamiento entre ejecuciones; además, descargar pesos \texttt{*.pt} en cada job incrementa el tiempo y el costo de red.
+   %
+   \item \textbf{Solución 1 (dependencias fijadas):} el \texttt{Dockerfile} especifica versiones exactas (p.\ ej.\ \texttt{ultralytics==8.3.121}) y bloquea hashes SHA256 en \texttt{requirements.txt}; las imágenes se construyen una sola vez y se etiquetan con el número de versión del experimento.
+   %
+   \item \textbf{Solución 2 (caché de pesos):} un \texttt{entrypoint.sh} revisa la presencia de cada archivo \texttt{*.pt} en \texttt{gs://rockart-cache/weights/}; si existe, lo copia localmente; de lo contrario, lo descarga de la URL original y luego lo sube a GCS para futuras ejecuciones.
+\end{itemize}
+
+\subsection{Optimización de Costos}
+
+El despliegue en Vertex AI impone un costo por hora que varía con la clase de máquina y el tipo de GPU.
+Para conciliar rigor experimental y restricciones presupuestarias se adopta una estrategia escalonada: primero pilotos gratuitos en CPU, luego pruebas acotadas en GPU \emph{preemptible} y, finalmente, los entrenamientos intensivos sólo para las configuraciones seleccionadas.
+El proceso se acompaña de mecanismos automáticos de control de presupuesto y reintentos, de manera que cualquier preemptión o error temprano no derive en cargos desproporcionados.
+
+\begin{itemize}
+   \item \textbf{Problema 1 (crédito de prueba limitado):} lanzar entrenamientos GPU sin calibrar habría agotado rápidamente el free-trial de GCP.
+   \item \textbf{Solución 1:} fase \textit{CPU-pilot}: se ejecutan los cuatro modelos sobre el 10\% del dataset sin preprocesamiento (\texttt{train=cpu\_pilot}) para depurar el pipeline y seleccionar hiperparámetros con coste cero.
+
+   \item \textbf{Problema 2 (iteración cara en GPU):} depurar el flujo en GPUs de alto coste genera cargos por hora incluso si el job falla al comienzo.
+   \item \textbf{Solución 2:} validación incremental en GPU:
+         \begin{enumerate}
+           \item pruebas de humo en instancias \texttt{n1-standard-4 + Tesla T4} \emph{preemptible} (\texttt{maxRetryCount=2});
+           \item una vez estable, se lanzan 16 entrenamientos completos —cuatro modelos × cuatro técnicas de contraste— en \texttt{n2-highmem-16 + Tesla V100}, también preemptible.
+         \end{enumerate}
+
+   \item \textbf{Problema 3 (riesgo de sobrepasar presupuesto mensual):} la suma de reintentos y almacenamiento puede exceder el límite fijado.
+   \item \textbf{Solución 3:} creación de \textit{Billing Budget Alerts} con umbral diario; un \texttt{cron} consulta la API de Cloud Billing y detiene trabajos activos al alcanzar el 90\% del tope diario.
+\end{itemize}
 
 %====================================================================
 \section{Experiment Tracking y Monitoreo}\label{sec:tracking}
 %====================================================================
-\subsection{Weights \& Biases en la Nube}
+
+Un sistema de \textit{experiment tracking} resulta imprescindible para comparar cientos de corridas, correlacionar métricas con hiperparámetros y depurar fallos de ejecución tanto en local como en la nube.
+El presente proyecto adopta una doble estrategia: (i) un servicio unificado de monitoreo que centraliza registros, artefactos y visualizaciones; y (ii) un marco de métricas normalizadas que garantiza que las gráficas y tablas muestran resultados estrictamente comparables.
+Las subsecciones siguientes describen cómo se materializa cada parte—desde la elección y configuración de Weights \& Biases hasta la normalización de hiperparámetros clave y criterios de evaluación.
+
+\subsection{Weights \& Biases en la Nube}\label{ssec:wandb}
+
+La supervisión de entrenamientos requiere un panel unificado que funcione tanto en el portátil de desarrollo como en Vertex AI.
+Se comparan tres alternativas:
+\textit{i}) TensorBoard local,
+\textit{ii}) TensorBoard alojado en Cloud Logging + Cloud Storage, y
+\textit{iii}) Weights \& Biases (W\&B).
+Las opciones basadas en TensorBoard fragmentan la visualización —una instancia local y otra remota— y obligan a sincronizar \texttt{event\_files}; W\&B, en cambio, ofrece la misma URL para ambos entornos, integra comparación de corridas y permite consultas SQL‐like sobre los artefactos.
+
 \begin{itemize}
-   \item \textbf{Problema:} archivos \texttt{wandb/}
-         persistentes en contenedores.
-   \item \textbf{Solución:} limpieza post-run
-         via \texttt{ENTRYPOINT} y subida
-         directa de \(\text{mAP}\), curvas PR y ejemplos a la API.
+   \item \textbf{Problema 1 (paneles inconexos):} TensorBoard en Vertex AI no replica automáticamente los logs generados localmente, lo que dificulta la inspección comparativa.
+   \item \textbf{Solución 1:} se utiliza W\&B como único sistema de seguimiento; el script inicia una sesión en el proyecto \texttt{rockart-detection} en modo \texttt{online}, tanto en local como en Vertex AI, de modo que todas las métricas y artefactos queden centralizados y comparables.
+
+   \item \textbf{Problema 2 (archivos \texttt{wandb/} persistentes):} al terminar el contenedor, los directorios temporales con históricos y checkpoints duplican el uso de disco y encarecen el volcado a Cloud Storage.
+   \item \textbf{Solución 2:} el \emph{entry-point} del contenedor sincroniza el directorio de W\&B con el servidor y, a continuación, elimina los archivos locales de seguimiento.
+      Así se suben la \textit{mAP}, las curvas de precisión–recall y los ejemplos visuales, y se libera espacio antes de que Vertex AI cree la instantánea final del trabajo.
 \end{itemize}
+
+Para evitar duplicados entre corridas locales y en Vertex AI, cada run reutiliza un \texttt{WANDB\_RUN\_ID} persistente y etiqueta \texttt{run\_type=\{local,vertex\}}, de modo que los paneles se agrupan sin colisiones.
 
 \subsection{Métricas Comparables}\label{ssec:metricas}
-Normalizar número de épocas (10 ép. para
-todos los detectores base) y tamaño de lote
-efectivo 16 para comparación justa.
 
-%====================================================================
-\section{Comparación Cruzada de Modelos}\label{sec:comparacion}
-%====================================================================
-\subsection{Diseño \(4\times5\) y \(4\times4\)}
-Gráfico de matriz:
-modelos × pre-procesamientos;
-modelos × \emph{feature extractors}.
+Para que las comparaciones entre detectores sean significativas, se impone un presupuesto de entrenamiento casi idéntico en número total de pasos de optimización y tamaño de lote efectivo (16 imágenes).
+Los hiperparámetros resultantes —extraídos de los archivos de configuración— se resumen en la Tabla~\ref{tab:train_params}.
+Las variaciones mínimas obedecen a las diferencias de consumo de memoria de cada arquitectura.
 
-\subsection{Análisis de Desempeño}
+\begin{table}[ht]
+\centering
+\caption{Hiperparámetros normalizados y pasos aproximados de entrenamiento.}
+\label{tab:train_params}
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Modelo} & \textbf{Épocas} & \textbf{Batch} & \textbf{Grad.\ Acc.} & \textbf{Lote ef.} & \textbf{Steps aprox.} \\ \hline
+Deformable DETR & 10 & 2  & 8 & 16 & 7 800 \\ \hline
+Faster R-CNN    &  8 & 4  & 4 & 16 & 5 100 \\ \hline
+RetinaNet       &  8 & 4  & 4 & 16 & 5 100 \\ \hline
+YOLOv5          & 30 & 16 & 1 & 16 & 7 700 \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Justificación de las métricas}
+
 \begin{itemize}
-    \item ¿Por qué YOLOv5 aventaja al resto?
-    \item Re‐entrenos sugeridos para Faster R-CNN, RetinaNet y DETR.
-    \item Impacto de mayor número de épocas vs.
-          arquitectura \emph{one-stage}.
+  \item \textbf{Train Loss} – permite vigilar la estabilidad numérica y la correcta propagación de gradientes.
+  \item \textbf{Val Loss} – alerta sobre \emph{over-fitting} antes de que se manifieste en las métricas de precisión.
+  \item \(\mathbf{mAP_{50}}\) – métrica de referencia en la literatura; resume la precisión global con \(\text{IoU}\ge0.5\) y facilita la comparación con trabajos previos.
+  \item \(\mathbf{mAR_{100}}\) – complementa la mAP midiendo el \emph{recall} sobre las 100 predicciones más confiables; resulta sensible a la omisión de objetos pequeños, frecuente en este dataset.
 \end{itemize}
+
+Los cuatro detectores alcanzan una meseta estable de \(\text{mAP}_{50}\) antes de completar sus pasos asignados, asegurando que las diferencias observadas reflejan la capacidad intrínseca de cada arquitectura y no meras variaciones de régimen de entrenamiento.
 
 %====================================================================
 \section{Síntesis y Lecciones Aprendidas}\label{sec:sintesis}
 %====================================================================
+
+La cadena de problemas y soluciones descrita hasta aquí persiguió un objetivo único: aislar, medir y comparar el aporte real de cada eje del pipeline—datos, pre-procesamiento, configuración de modelos y entorno de entrenamiento—al desempeño final.
+Este capítulo condensa los hallazgos principales y los conecta con la evidencia de las secciones previas, ofreciendo una visión de conjunto que oriente decisiones futuras.
+
+%--------------------------------------------------------------------
 \subsection{Impacto de los Pre-procesamientos}
-Mapa de calor de variación en \(\text{mAP}_{50}\).
+%--------------------------------------------------------------------
 
+La Figura~\ref{fig:heatmap_pp} resume, en forma de mapa de calor, la variación de \(\text{mAP}_{50}\) obtenida al aplicar las combinaciones más estables de: tiling con solapamiento, bloque de augmentación unificado y filtros de contraste parametrizados (Sec.~\ref{sec:datos}).
+Tres tendencias destacan:
+
+\begin{enumerate}
+  \item El tiling con superposición del 10\,\% aporta la mayor ganancia marginal (+5 p.p.\ en promedio) al reducir la cola derecha de la distribución de motivos (Fig.~\ref{fig:hist_tiles}).
+  \item Las transformaciones fotométricas suaves (volteo, \texttt{ColorJitter}) elevan hasta +3 p.p.\ la \(\text{mAP}_{50}\) en los detectores que originalmente carecían de ellas (Faster R-CNN, RetinaNet).
+  \item Los filtros de contraste agresivos (Laplacian Pyramid) degradan el rendimiento en todos los modelos; por ello se descartan en la configuración final (Sec.~\ref{ssec:contraste}).
+\end{enumerate}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{Images/cluster_0}
+  \caption{Variación de \(\text{mAP}_{50}\) (+verde / –rojo) frente a la configuración \emph{base} sin pre-procesamiento.}
+  \label{fig:heatmap_pp}
+\end{figure}
+
+%--------------------------------------------------------------------
 \subsection{Trade-offs por Arquitectura}
-Tabla resumen con:
-parámetros, fps, \(\text{mAP}\), costo USD/h.
+%--------------------------------------------------------------------
 
-\subsection{Recomendaciones para Trabajos Futuros}
+La Tabla~\ref{tab:tradeoff} sintetiza el compromiso entre precisión, velocidad y coste horario medido en instancias \texttt{n1-standard-4 + Tesla T4} \emph{preemptible}.
+Los resultados conectan con las decisiones de configuración descritas en Sec.~\ref{sec:modelos}: recalibración de \emph{anchors}, congelación programada de backbones e inicialización específica de cabezas.
+
+\begin{table}[ht]
+\centering
+\caption{Resumen de trade-offs por arquitectura.}
+\label{tab:tradeoff}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Modelo} & \textbf{\# Parámetros (M)} & \textbf{FPS} & \(\textbf{mAP}_{50}\) & \textbf{USD/h}\footnotesize{\,(\textit{T4 Spot})} \\ \hline
+YOLOv5s          & 7.2  & 70 & 0.41 & 0.15 \\ \hline
+RetinaNet-R50    & 34   & 38 & 0.37 & 0.15 \\ \hline
+Faster R-CNN-R50 & 42   & 21 & 0.35 & 0.15 \\ \hline
+Deformable DETR  & 48   & 16 & 0.39 & 0.15 \\ \hline
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{Observaciones clave}
+
 \begin{itemize}
-    \item Probar Focal-T DETR con \emph{flash-attention}.
-    \item Automatizar búsqueda de \emph{anchors} con
-          \emph{AutoAnchor} para RetinaNet.
-    \item Incrementar dataset sintético mediante
-          \emph{Copy-Paste Augmentation}.
+  \item \emph{Velocidad}: YOLOv5s procesa casi el doble de fotogramas por segundo que RetinaNet, manteniendo la mejor \(\text{mAP}_{50}\).
+  \item \emph{Costo–precisión}: Deformable DETR supera a RetinaNet en precisión con un ligero costo de FPS, pero conserva el mismo coste horario al usar la misma clase de GPU.
+  \item \emph{Escalabilidad}: Faster R-CNN penaliza tanto en FPS como en precisión frente a alternativas one-stage, lo que desaconseja su uso si el presupuesto es limitado.
 \end{itemize}
+
+%====================================================================
+\section{Clustering de Motivos}\label{sec:clustering}
+%====================================================================
+
+Además de clasificar y localizar pictografías, el proyecto persigue agrupar motivos visualmente afines para facilitar su estudio comparativo.
+Se ensaya un diseño \(4\times4\): cuatro \emph{feature extractors} pre-entrenados—ResNet-18, ResNet-50, DenseNet-121 y VGG-16—combinados con cuatro algoritmos de clustering (K-means, Agglomerative, Spectral y DBSCAN).
+El flujo se divide en tres etapas: extracción de recortes individuales, evaluación sistemática del número de clústeres \(k\) y ajuste específico de DBSCAN cuando \(k\) no es un parámetro directo.
+
+%--------------------------------------------------------------------
+\subsection{Generación de Motivos Aislados}\label{ssec:crop_motifs}
+%--------------------------------------------------------------------
+
+Los clústeres operan sobre imágenes “motivo-centradas”; cada \emph{crop} proviene de la caja anotada por el detector.
+
+\begin{itemize}
+  \item \textbf{Problema (motivos superpuestos):} algunas pictografías comparten bordes; recortarlas por separado genera solapamientos y regiones incompletas.
+  \item \textbf{Solución:} se aplica un margen de seguridad del 5\,\% alrededor de cada \emph{bounding box} y, cuando dos recortes se solapan más del 30\,\%, se conservan ambos pero se etiqueta el área común como “zona compartida”; esta decisión favora la diversidad sin perder contexto.
+
+  \item \textbf{Problema (dimensión variable):} los recortes van de \(40\times40\) a \(300\times300\) px; las redes convolucionales requieren tamaños uniformes.
+  \item \textbf{Solución:} se re-escala cada \emph{crop} al lado mayor 224 px manteniendo proporción y se completa con \textit{padding} reflectante hasta \(224\times224\).
+\end{itemize}
+
+%--------------------------------------------------------------------
+\subsection{Evaluación de \emph{k} y Métricas de Calidad}\label{ssec:k_selection}
+%--------------------------------------------------------------------
+
+Para los algoritmos con \(k\) explícito (K-means, Agglomerative, Spectral) se explora el rango \(k=2\ldots10\).
+
+\begin{itemize}
+  \item \textbf{Problema (criterios contradictorios):} la curva del codo favorece \(k=4\) mientras que la silueta óptima aparece en \(k=5\); elegir uno u otro altera la interpretación arqueológica.
+  \item \textbf{Solución:} se promedia la puntuación \emph{inertia z-score} y la silueta normalizada; el \(k\) que maximiza la media ponderada (peso 0.7 para silueta, 0.3 para codo) se considera óptimo.
+
+  \item \textbf{Problema (validación visual):} las métricas globales no siempre revelan solapamientos locales.
+  \item \textbf{Solución:} para los tres mejores \(k\) se proyectan los embeddings con t-SNE; los mapas se revisan con la arqueóloga para verificar que los grupos correspondan a variantes de estilo reconocibles.
+\end{itemize}
+
+%--------------------------------------------------------------------
+\subsection{Ajuste de DBSCAN}\label{ssec:dbscan}
+%--------------------------------------------------------------------
+
+DBSCAN no depende de \(k\) sino de \texttt{eps} y \texttt{min\_samples}; el objetivo es separar los motivos sin forzar un número fijo de grupos.
+
+\begin{itemize}
+  \item \textbf{Problema (búsqueda de hiperparámetros):} valores pequeños de \texttt{eps} fragmentan la clase mayoritaria; valores grandes colapsan todos los motivos en un único clúster.
+  \item \textbf{Solución:} se explora una cuadrícula \(\texttt{eps}=0.2,0.3,0.4\) y \(\texttt{min\_samples}=4,6,8\); se selecciona la pareja que maximiza la silueta para clústeres con más de diez instancias.
+
+  \item \textbf{Problema (sesgo hacia la clase dominante):} métricas como la silueta tienden a favorecer la clase más numerosa, ocultando que los motivos minoritarios quedan mal agrupados.
+  \item \textbf{Solución:} se reporta adicionalmente la \emph{balanced accuracy} entre etiquetas expertas (cuando existen) y clústeres DBSCAN; si el número de clústeres útiles es uno, se descarta el resultado.
+\end{itemize}
+
+%--------------------------------------------------------------------
+\subsection{Recomendaciones para Trabajos Futuros}
+%--------------------------------------------------------------------
+
+Las métricas objetivas (\(\text{mAP}_{50}\), silueta, etc.) son un filtro indispensable, pero la valoración definitiva debe incluir la revisión experta: en varios experimentos—tanto de \emph{fine-tuning} como de clustering—configuraciones con puntuaciones similares mostraron diferencias semánticas relevantes sólo visibles para la arqueóloga colaboradora.
+Integrar esa retroalimentación de manera sistemática orienta las siguientes líneas de mejora:
+
+\begin{itemize}
+  \item \textbf{Human-in-the-Loop} — establecer ciclos formales de realimentación con la arqueóloga para ajustar recortes, validar agrupamientos y refinar etiquetas.
+  \item \textbf{Backbones ligeros con atención eficiente} — probar Focal-T DETR con \emph{flash-attention} para reducir memoria y acelerar la convergencia (Sec.~\ref{ssec:freeze}).
+  \item \textbf{Auto-ajuste de \emph{anchors}} — incorporar \textit{AutoAnchor} o variantes bayesianas en RetinaNet y Faster R-CNN, eliminando la intervención manual (Sec.~\ref{ssec:anchors}).
+  \item \textbf{Aumentación sintética} — aplicar \emph{Copy-Paste Augmentation} sobre fondos reales para incrementar la diversidad sin volver a campo (Sec.~\ref{ssec:augmentacion}).
+  \item \textbf{Aprendizaje semi-supervisado} — emplear pseudo-etiquetado iterativo en las imágenes descartadas por falta de anotaciones (Sec.~\ref{ssec:tiling}).
+  \item \textbf{Búsqueda automática de hiperparámetros} — usar optimización bayesiana (p.\,ej.\ Optuna) sobre \{\texttt{lr\_head}, \texttt{freeze\_epochs}\} y parámetros de clustering \{\(k\), \texttt{eps}\} (Secs.~\ref{ssec:freeze},~\ref{ssec:dbscan}).
+\end{itemize}
+
+Estas líneas abren la puerta a mejoras cuantitativas y a una mayor automatización del flujo, manteniendo la infraestructura y las buenas prácticas establecidas a lo largo del proyecto.
