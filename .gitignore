@@ -138,4 +138,4 @@ job_templates
 wandb/
 outputs/
 outputs_clustering/
-
+results/
