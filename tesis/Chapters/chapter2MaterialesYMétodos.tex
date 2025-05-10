@@ -9,7 +9,7 @@ Finalmente, se detallan los métodos de agrupamiento aplicados para la organizac
 
 \noindent
 Todo el código empleado, pipelines de detección, algoritmos de agrupamiento no supervisado y utilidades de preprocesamiento, está disponible en el repositorio público
-\href{https://github.com/KevinHansen90/RockArtDetection}{\texttt{github.com/KevinHansen90/RockArtDetection}}, cuyo \texttt{README.md} resume los pasos descritos a lo largo de este capítulo y enlaza a los scripts correspondientes.
+\href{https://github.com/KevinHansen90/RockArtDetection}{\texttt{github.com/KevinHansen90/RockArtDetection}}, cuyo \texttt{README.md} resume los pasos descritos a lo largo de este capítulo y enlaza a los programas correspondientes.
 
 \section{Preparación del Conjunto de Datos}
 
@@ -21,7 +21,7 @@ Las siguientes subsecciones profundizan en cada fase y documentan las decisiones
 \subsection{Selección de Imágenes}
 Se seleccionan un total de 683 fotografías con una resolución de \(4.288 \times 2.848\ \text{px}\) píxeles, capturadas entre los años 2019 y 2023 en los aleros de Cueva de las Manos, ubicada en la zona de Río Pinturas, Santa Cruz, Argentina.
 Estas imágenes son tomadas por el equipo de arqueólogos que trabajan en el sitio y pertenecen al Instituto Nacional de Antropología y Pensamiento Latinoamericano (INAPL).
-Se trabaja en estrecha colaboración con Agustina Papú, una arqueóloga especializada en Arte Rupestre, quien asiste en la selección y etiquetado de las imágenes.
+Se trabaja en estrecha colaboración con la Lic. Agustina Papú, una arqueóloga especializada en Arte Rupestre, quien asiste en la selección y etiquetado de las imágenes.
 
 La metodología para la selección de las imágenes busca cubrir la totalidad de los paneles presentes en los aleros, asegurando la repetición de capturas en aquellas zonas donde se consiguen diferentes ángulos o condiciones lumínicas.
 Esta estrategia permite obtener una representación más completa de los elementos presentes en el sitio.
@@ -30,7 +30,7 @@ En la Figura~\ref{fig:imagen_ejemplo} se muestra un ejemplo de las imágenes sel
 La diferenciación de algunos de estos elementos respecto del fondo presenta dificultades, dadas las similitudes cromáticas y la erosión natural que ha sufrido la superficie rocosa a lo largo del tiempo.
 Estas condiciones complican el reconocimiento automatizado del arte rupestre.
 
-\begin{figure}[ht!]
+\begin{figure}[!h]
     \centering
     \includegraphics[width=\textwidth]{Images/imagen_ejemplo}
     \caption{Ejemplo de una imagen seleccionada para el estudio.}
@@ -45,34 +45,42 @@ Esta diversidad iconográfica refleja la riqueza del arte rupestre de la región
 Con el objetivo de llevar a cabo un análisis detallado y sistemático, se propone una clasificación inicial de las imágenes, que comprende un total de 19 clases distintas, basada en los conocimientos de la licenciada Agustina Papú.
 Las clases iniciales propuestas son las siguientes:
 
-\begin{itemize}
-    \item Zoomorfo (artiodactyla)
-    \item Zoomorfo (ave)
-    \item Zoomorfo (piche)
-    \item Zoomorfo (matuasto)
-    \item Antropomorfo
-    \item Positivo de mano
-    \item Negativo de mano
-    \item Negativo de pata de choique
-    \item Negativo de puño
-    \item Círculos
-    \item Círculos concéntricos
-    \item Líneas rectas
-    \item Líneas zigzag
-    \item Escala
-    \item Persona
-    \item Lazo bola
-    \item Conjuntos de puntos
-    \item Impactos
-    \item Tridígitos
-\end{itemize}
+\begin{table}[!h]
+    \centering
+    \begin{tabular}{r l}
+        \hline
+        \textbf{ID} & \textbf{Clase} \\
+        \hline
+        0  & Zoomorfo (artiodactyla) \\
+        1  & Zoomorfo (ave) \\
+        2  & Zoomorfo (piche) \\
+        3  & Zoomorfo (matuasto) \\
+        4  & Antropomorfo \\
+        5  & Positivo de mano \\
+        6  & Negativo de mano \\
+        7  & Negativo de pata de choique \\
+        8  & Negativo de puño \\
+        9  & Círculos \\
+        10 & Círculos concéntricos \\
+        11 & Líneas rectas \\
+        12 & Líneas zigzag \\
+        13 & Escala \\
+        14 & Persona \\
+        15 & Lazo bola \\
+        16 & Conjuntos de puntos \\
+        17 & Impactos \\
+        18 & Tridígitos \\
+    \end{tabular}
+    \caption{Clases de motivos pictográficos y su identificador numérico.}
+    \label{tab:clases-motivos}
+\end{table}
 
 La herramienta makesense.ai ~\cite{makesense} se utiliza para el etiquetado de las imágenes, elegida por su facilidad de uso y la capacidad de trabajar con lotes de tamaño personalizado.
 Esta flexibilidad permite adaptarse a la disponibilidad de la arqueóloga, optimizando así el proceso de etiquetado.
 A lo largo de un mes, se lleva a cabo el etiquetado de las imágenes utilizando la clasificación inicial mencionada, lo que facilita no sólo la organización de los datos, sino también un análisis más profundo de las representaciones iconográficas presentes en el sitio.
-Se presenta un resumen de las cantidades de elementos etiquetados por cada categoría
+Se presenta un resumen de las cantidades de elementos etiquetados por cada categoría en la tabla~\ref{tab:conteo_porcentajes}.
 
-\begin{table}[h]
+\begin{table}[!h]
     \centering
     \begin{tabular}{l r r}
         \hline
@@ -107,7 +115,7 @@ Se presenta un resumen de las cantidades de elementos etiquetados por cada categ
 En la Figura~\ref{fig:imagen_etiquetada} se presenta un ejemplo de una de las imágenes etiquetadas según esta clasificación inicial.
 Esta figura ilustra cómo las diferentes clases se aplican a los elementos identificados en la imagen, proporcionando una visualización clara del proceso de etiquetado.
 
-\begin{figure}[ht!]
+\begin{figure}[!h]
     \centering
     \includegraphics[width=\textwidth]{Images/imagen_etiquetada}
     \caption{Imagen etiquetada con la clasificación inicial propuesta.}
@@ -124,7 +132,7 @@ Los motivos geométricos, ``Círculos'', ``Círculos concéntricos'', ``Líneas 
 Por último, ``Escala'' y ``Persona'', identificadores 13 y 14, se integran en la categoría \textit{Other}.
 La Tabla~\ref{tab:grupos} resume la nueva distribución de frecuencias y porcentajes y evidencia la reducción del desbalance inicial.
 
-\begin{table}[h]
+\begin{table}[!h]
     \centering
     \begin{tabular}{l r r}
         \hline
@@ -155,7 +163,7 @@ La proporción entre clases se mantiene de forma aproximada, siendo las diferenc
 En la Figura~\ref{fig:imagen_dividida} se muestran cinco recortes de 512x512 píxeles obtenidos a partir de la imagen original.
 Cada clase identificada en los recortes está representada por un color específico, lo cual facilita la visualización de los distintos elementos en el arte rupestre.
 
-\begin{figure}[ht!]
+\begin{figure}[!h]
     \centering
     \begin{minipage}{0.19\textwidth}
         \includegraphics[width=\textwidth]{Images/recorte1}
@@ -195,9 +203,9 @@ La Figura~\ref{fig:crop_example} muestra tres ejemplos de recortes generados.
 Se observa que aunque el ruido del fondo se minimice, el de superposición sigue presente.
 
 Trabajar con imágenes aisladas de esta forma reduce el ruido de fondo, homogeneiza la escala y facilita la comparación de texturas, contornos y cromatismos.
-Además incrementa el tamaño efectivo del conjunto de datos, lo que mejora la densidad de muestras y, por extensión, la robustez de técnicas como \emph{k}-means o el agrupamiento jerárquico.
+Además incrementa el tamaño efectivo del conjunto de datos, lo que mejora la densidad de muestras y, por extensión, la robustez de técnicas como \emph{k}-means.
 
-\begin{figure}[ht!]
+\begin{figure}[!h]
     \centering
     \includegraphics[width=.3\textwidth]{Images/crop_example1}\hfill
     \includegraphics[width=.3\textwidth]{Images/crop_example2}\hfill
@@ -221,7 +229,7 @@ Las técnicas seleccionadas son:
 \begin{itemize}
     \item \textbf{Ecualización de Histograma (CLAHE):}
     La técnica de Ecualización de Histograma Adaptativa con Limitación de Contraste (CLAHE) fue introducida para mejorar el contraste local en las imágenes, siendo especialmente útil en áreas con iluminación desigual o bajo contraste, como el arte rupestre.
-    CLAHE limita la amplificación de contraste para evitar la sobreexposición en áreas claras o oscuras, manteniendo los detalles en las zonas intermedias~\cite{zuiderveld1994contrast}.
+    El método CLAHE, limita la amplificación de contraste para evitar la sobreexposición en áreas claras u oscuras, manteniendo los detalles en las zonas intermedias~\cite{zuiderveld1994contrast}.
     Este método ha demostrado ser particularmente efectivo para resaltar diferencias sutiles entre el fondo y los elementos pictográficos.
 
     \item \textbf{Filtro Bilateral:}
@@ -246,30 +254,88 @@ Se comparan las distintas técnicas empleadas contra un escenario base sin proce
 El rendimiento de cada modelo se valora mediante cuatro métricas complementarias que describen tanto el proceso de optimización como la calidad final de las predicciones.
 
 \begin{itemize}
-    \item \textbf{Pérdida de entrenamiento (\emph{train\_loss}):}
-    Promedio de la función de pérdida calculada sobre cada lote durante el aprendizaje.
-    Incluye los componentes de clasificación, regresión de cajas y, cuando procede, ajuste de \emph{IoU}.
-    Un descenso sostenido indica que el optimizador encuentra gradientes útiles y que los parámetros se ajustan al dominio~\cite{goodfellow2016deep}.
+    \item \textbf{Función de pérdida del conjunto de entrenamiento (\emph{train\_loss}):}\\[2pt]
+      Se define como el promedio, lote a lote, de la suma ponderada de sus tres componentes fundamentales:
+      \[
+      \mathcal{L}_{\text{train}}
+      =\frac{1}{B}\sum_{b=1}^{B}
+        \bigl(
+          \mathcal{L}_{\text{cls}}^{(b)}
+          +\mathcal{L}_{\text{reg}}^{(b)}
+          +\lambda\,\mathcal{L}_{\text{IoU}}^{(b)}
+        \bigr)
+      \]
+      donde
+      \begin{itemize}
+        \item $\mathcal{L}_{\text{cls}}$ \,(pérdida de \textit{clasificación}, \emph{classification loss}) cuantifica el error al asignar la clase correcta a cada instancia; suele implementarse como entropía cruzada o \emph{Focal Loss}.
+        \item $\mathcal{L}_{\text{reg}}$ \,(pérdida de \textit{regresión de cajas}, \emph{box regression loss}) mide la discrepancia entre las coordenadas predichas y las cajas de verdad‐terreno.
+        \item $\mathcal{L}_{\text{IoU}}$ \,(pérdida de \textit{superposición IoU}, \emph{IoU-based loss}) penaliza predicciones con baja intersección-sobre-unión; $\lambda$ es su peso relativo.
+      \end{itemize}
+      Un descenso sostenido de $\mathcal{L}_{\text{train}}$ indica que el optimizador encuentra gradientes informativos y ajusta los parámetros al dominio de la tarea~\cite{goodfellow2016deep}.
 
-    \item \textbf{Pérdida de validación (\emph{val\_loss}):}
-    Pérdida promedio obtenida al evaluar el modelo, sin actualización de pesos, sobre un subconjunto independiente de los datos.
-    Permite detectar sobreajuste: si la pérdida de validación deja de disminuir o aumenta mientras la de entrenamiento sigue bajando, el modelo comienza a memorizar en lugar de generalizar.
+    \item \textbf{Función de pérdida del conjunto de validación (\emph{val\_loss}):}\\[2pt]
+      Se calcula con la misma expresión que la anterior, pero sobre un subconjunto independiente y sin actualizar los pesos:
+      \[
+      \mathcal{L}_{\text{val}}
+      =\frac{1}{B_v}\sum_{b=1}^{B_v}
+        \bigl(
+          \mathcal{L}_{\text{cls}}^{(b)}
+          +\mathcal{L}_{\text{reg}}^{(b)}
+          +\lambda\,\mathcal{L}_{\text{IoU}}^{(b)}
+        \bigr)
+      \]
+      Al comparar su evolución con $\mathcal{L}_{\text{train}}$ se detecta sobreajuste: si $\mathcal{L}_{\text{val}}$ deja de disminuir o aumenta mientras $\mathcal{L}_{\text{train}}$ continúa bajando, el modelo pierde capacidad de \emph{generalizar} a ejemplos no vistos~\cite{goodfellow2016deep}.
+      Los términos $\mathcal{L}_{\text{cls}}$, $\mathcal{L}_{\text{reg}}$ y $\mathcal{L}_{\text{IoU}}$ mantienen el mismo significado descrito arriba, garantizando una comparación directa entre entrenamiento y validación.
 
-    \item \textbf{mAP\textsubscript{0.5} (media de precisión promedio con IoU 0.5):}
-    Resume la precisión en localización y clasificación promediando la precisión interpolada en todos los puntos de recuperación y en todas las clases, con un umbral \emph{IoU} de 0.5.
-    Valores altos indican que el modelo delimita correctamente los motivos y asigna la categoría apropiada~\cite{lin2014microsoft,everingham2010pascal}.
+    \item \textbf{mAP\textsubscript{0.5} (media de precisión promedio con $\text{IoU}=0.5$):}\\[2pt]
+      Se obtiene promediando la \emph{precisión promedio} (\textit{Average Precision}, $\mathrm{AP}$) de cada clase $c$ cuando el criterio de acierto exige una intersección-sobre-unión $\text{IoU}\ge 0.5$:
+      \[
+      \text{mAP}_{0.5}
+      \;=\;
+      \frac{1}{C}\sum_{c=1}^{C}
+      \underbrace{\int_{0}^{1} P_c(R)\,dR}_{\mathrm{AP}_c}
+      \]
+      donde
+      \begin{itemize}
+        \item $C$ es el número total de clases.
+        \item $P_c(R)$ es la \textit{precisión} ($P$) interpolada de la clase $c$ como función de la \textit{recuperación} ($R$).
+        \item El integral calcula el área bajo la curva $P$-vs-$R$, es decir, la $\mathrm{AP}_c$ (precisión promedio de la clase).
+        \item Sólo se consideran verdaderos positivos aquellas predicciones cuya $\text{IoU}$ con la caja de verdad-terreno supera $0.5$ (umbrales de \textit{superposición}, \emph{overlap threshold}).
+      \end{itemize}
+      Valores altos de $\text{mAP}_{0.5}$ indican que el modelo delimita correctamente los motivos y asigna la categoría adecuada~\cite{lin2014microsoft,everingham2010pascal}.
 
-    \item \textbf{mAR\textsubscript{100} (media de \emph{recall} promedio con 100 detecciones por imagen):}
-    Mide la fracción de objetos correctamente recuperados al permitir hasta 100 predicciones por imagen, mitigando el efecto de filtrados tempranos.
-    Es sensible a los falsos negativos y, por tanto, refleja la capacidad del modelo para no pasar por alto motivos poco contrastados o parcialmente ocluidos~\cite{cocoEval2015}.
+    \item \textbf{mAR\textsubscript{100} (media de \emph{recall} promedio con 100 detecciones por imagen):}\\[2pt]
+      Promedia, entre clases, la \emph{recuperación promedio} (\textit{Average Recall}, $\mathrm{AR}$) cuando se permite un máximo de $N=100$ predicciones por imagen:
+      \[
+      \text{mAR}_{100}
+      \;=\;
+      \frac{1}{C}\sum_{c=1}^{C}
+      \underbrace{\frac{1}{|G_c|}
+      \sum_{g\in G_c}\!
+      \mathbf{1}\bigl(
+          \exists\,p\le N:\,\text{IoU}(g,p)\ge 0.5
+      \bigr)}_{\mathrm{AR}_{100,c}}
+      \]
+      donde
+      \begin{itemize}
+        \item $G_c$ es el conjunto de objetos de verdad-terreno (ground-truth) de la clase $c$.
+        \item $\mathbf{1}(\cdot)$ es la función indicadora que vale $1$ si para el objeto $g$ existe alguna predicción $p$ (entre las $N$ más confiables) con $\text{IoU}\ge 0.5$, y $0$ en caso contrario.
+        \item $\mathrm{AR}_{100,c}$ (recuperación promedio por clase) mide qué fracción de objetos se recupera correctamente bajo el límite de 100 detecciones.
+      \end{itemize}
+      Al ser sensible a los falsos negativos, un alto $\text{mAR}_{100}$ refleja la capacidad del modelo para no pasar por alto motivos poco contrastados u ocluidos~\cite{cocoEval2015}.
 \end{itemize}
 
-Las pérdidas de entrenamiento y validación controlan la convergencia del optimizador y alertan sobre sobreajuste, mientras que mAP\textsubscript{0.5} y mAR\textsubscript{100} cuantifican la eficacia práctica de la detección.
-Combinadas, proporcionan una visión completa:
-(i)~las pérdidas evalúan si el modelo aprende representaciones estables,
-(ii)~mAP indica la exactitud de las cajas y etiquetas, y
-(iii)~mAR verifica que la mayoría de los motivos se recuperan.
-Así, se equilibran precisión y cobertura, criterios esenciales cuando se trabaja con arte rupestre donde abundan motivos pequeños, superpuestos y de bajo contraste.
+Las \textbf{funciones de pérdida} de entrenamiento y validación monitorizan la estabilidad del aprendizaje y alertan sobre posible sobreajuste, mientras que \textbf{mAP\textsubscript{0.5}} y \textbf{mAR\textsubscript{100}} valoran el rendimiento práctico del modelo en \emph{detección de motivos} (clasificación + localización).
+
+\begin{itemize}
+    \item \emph{Funciones de pérdida}: revelan si el optimizador ajusta los parámetros al dominio sin sacrificar la capacidad de generalizar, al comparar descensos paralelos entre entrenamiento y validación.
+    \item \textbf{mAP\textsubscript{0.5}}: combina precisión de clasificación y precisión de localización.
+    Exige que la caja predicha se solape con la caja verdadera con $\text{IoU}\ge 0.5$, midiendo así la \emph{exactitud de las cajas}.
+    \item \textbf{mAR\textsubscript{100}}: calcula la proporción de motivos correctamente \emph{recuperados} cuando se permiten hasta 100 predicciones por imagen, reflejando la cobertura del modelo y su sensibilidad a los falsos negativos.
+\end{itemize}
+
+Conjuntamente, estas métricas equilibran \emph{precisión} (mAP) y \emph{cobertura} (mAR), criterios esenciales en el análisis de arte rupestre, donde abundan figuras pequeñas, de bajo contraste y frecuentemente superpuestas.
+
 
 \subsection{Selección de Modelos Preentrenados}
 Se seleccionan modelos preentrenados de diversas estructuras, teniendo en cuenta su eficacia en la detección de objetos pequeños y de bajo contraste, como los presentes en el arte rupestre, así como su disponibilidad como open source, compatibilidad con los recursos computacionales disponibles, y la diversidad en la literatura revisada.
@@ -295,28 +361,37 @@ Los modelos seleccionados incluyen:
     Además, su arquitectura end-to-end simplifica el proceso de detección, eliminando la necesidad de etapas separadas de anclaje y refinamiento, lo cual es ventajoso cuando se trabaja con objetos abstractos y difusos.
 \end{itemize}
 
-Cada modelo potencialmente tiene beneficios para el problema en cuestión. A continuación, se describen en la tabla~\ref{tab:justificacion_modelos}:
+Cada modelo potencialmente tiene beneficios para el problema en cuestión.
+A continuación, se describen en la tabla~\ref{tab:justificacion_modelos}:
 
-\begin{table}[h]
+\begin{table}[!h]
     \centering
     \begin{tabular}{p{3.5cm} p{10.8cm}}
         \hline
         \textbf{Modelo} & \textbf{Justificación para arte rupestre} \\
         \hline
-        RetinaNet & Gestiona desequilibrio de clases mediante \emph{focal loss}, lo que refuerza la respuesta a figuras poco frecuentes y de tamaño reducido.
-        La pirámide de características capta variaciones de escala y mejora la detección en zonas de bajo contraste y contornos difusos. \\[0.4em]
-        YOLOv5 & Ofrece ciclos de prueba rápidos y eficientes, aspecto clave para ajustar hiperparámetros en conjuntos de datos con miles de recortes.
-        Aun cuando su precisión decrece en escenas muy superpuestas, la velocidad facilita exploraciones iterativas y comparaciones controladas. \\[0.4em]
-        Faster~R-CNN + FPN & La red de propuestas de regiones concentra la atención en áreas candidatas y refina bordes, ventaja crucial para objetos pequeños y parcialmente solapados.
-        La combinación con FPN incrementa la sensibilidad multiescala, permitiendo capturar tanto paneles completos como motivos de pocos píxeles. \\[0.4em]
-        Deformable DETR & El mecanismo de atención deformable dirige los pesos a fragmentos relevantes, resistiendo fondos texturizados y variaciones cromáticas leves.
-        Su arquitectura \emph{end-to-end} evita anclajes manuales y se adapta bien a formas abstractas y a la superposición habitual en las pinturas. \\
+        RetinaNet &
+        Gestiona el desequilibrio de clases mediante \emph{focal loss}, lo que refuerza la respuesta a figuras poco frecuentes y de tamaño reducido~\cite{lin2017focal,suhaimi2023}.
+        La pirámide de características multiescala capta variaciones de escala y mejora la detección en zonas de bajo contraste y contornos difusos~\cite{esri_retinanet,wunderlich2023}. \\[0.4em]
+
+        YOLOv5 &
+        Ofrece ciclos de prueba rápidos y eficientes, aspecto clave para ajustar hiperparámetros en conjuntos de datos con miles de recortes~\cite{yolov5,suhaimi2023}.
+        Aunque su precisión decrece en escenas muy superpuestas, la velocidad facilita exploraciones iterativas y comparaciones controladas~\cite{li2022}. \\[0.4em]
+
+        Faster~R-CNN + FPN &
+        La red de propuestas de regiones concentra la atención en áreas candidatas y refina bordes, ventaja crucial para objetos pequeños y parcialmente solapados~\cite{ren2015faster}.
+        La combinación con FPN incrementa la sensibilidad multiescala, permitiendo capturar tanto paneles completos como motivos de pocos píxeles~\cite{suhaimi2023}. \\[0.4em]
+
+        Deformable DETR &
+        El mecanismo de atención deformable dirige los pesos a fragmentos relevantes, resistiendo fondos texturizados y variaciones cromáticas leves~\cite{zhu2021,smallobjDETR}.
+        Su arquitectura \emph{end-to-end} evita el uso de anclajes manuales y se adapta bien a motivos abstractos y superpuestos, habituales en las pinturas rupestres~\cite{horn2022ai}. \\
     \end{tabular}
     \caption{Criterios de selección de los modelos preentrenados frente a los desafíos del arte rupestre: superposición, bajo contraste, abundancia de objetos y motivos abstractos.}
     \label{tab:justificacion_modelos}
 \end{table}
 
-\paragraph{Implementaciones empleadas.}
+
+\paragraph{Implementaciones empleadas}
 Todas las redes se instancian a partir de sus versiones oficiales de \textsc{PyTorch}/Ultralytics, asegurando reproducibilidad y compatibilidad con las \textit{weights} ImageNet por defecto:
 RetinaNet~\href{https://pytorch.org/vision/main/models/generated/torchvision.models.detection.retinanet_resnet50_fpn_v2.html}{\texttt{retinanet\_resnet50\_fpn\_v2}},
 Faster\,R--CNN~\href{https://pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn_v2.html}{\texttt{fasterrcnn\_resnet50\_fpn\_v2}},
@@ -345,22 +420,30 @@ AdamW separa explícitamente la regularización por decaimiento del peso de la a
 Este desacople mejora la generalización en arquitecturas con capas normalizadas, como Deformable DETR, al mantener la norma de los parámetros bajo control sin interferir con la estimación de momentos.
 En las pruebas preliminares se observa que AdamW acelera la estabilización de la pérdida cuando la \emph{backbone} permanece activa y el modelo debe adaptarse a motivos abstractos y superpuestos.
 
-\begin{table}[h]
+\begin{table}[!h]
     \centering
-    \begin{tabular}{l p{10.2cm}}
+    \begin{tabular}{p{3.2cm} p{10.5cm}}
         \hline
         \textbf{Optimizador} & \textbf{Justificación en contexto de arte rupestre} \\
         \hline
-        SGD + momento & Proporciona actualizaciones estables incluso con tasas fijas. Su bajo consumo de memoria resulta útil en experimentos extensos con miles de recortes.
-        Favorece la preservación de características genéricas de la \emph{backbone} y evita sobreajustes rápidos cuando los ejemplos positivos son escasos. \\[0.3em]
-        Adam & Adapta la tasa de cada peso y acelera la fase inicial de aprendizaje en las cabezas recién inicializadas.
-        Maneja bien gradientes ruidosos debidos a bordes difusos y contrastes bajos en las figuras. \\[0.3em]
-        AdamW & Mantiene la regularización independiente de los momentos, lo que reduce sobreajuste en modelos con capas normalizadas y atenciones deformables.
-        Resulta especialmente útil cuando el modelo aprende simultáneamente motivos grandes y patrones finos. \\
+        SGD con momento &
+        Proporciona actualizaciones estables incluso con tasas de aprendizaje fijas y bajo consumo de memoria~\cite{robbins1951stochastic,qian1999momentum}.
+        Ha demostrado escalar bien a lotes grandes sin degradar la precisión~\cite{goyal2017}, ventaja clave cuando se procesan miles de recortes.
+        Favorece la preservación de rasgos genéricos de la \emph{backbone} y ralentiza el sobreajuste cuando los ejemplos positivos son escasos, comportamiento observado en tareas de detección rupestre~\cite{suhaimi2023}. \\[0.3em]
+
+        Adam &
+        Ajusta de forma adaptativa la tasa de cada peso y acelera la fase inicial de aprendizaje en las capas recién inicializadas~\cite{kingma2015adam}.
+        Su manejo robusto de gradientes ruidosos resulta pertinente ante bordes difusos y bajo contraste en los motivos~\cite{horn2022ai,jalandoni2022}.
+        Además, converge más rápido que SGD cuando la anotación es limitada y heterogénea~\cite{goodfellow2016deep}. \\[0.3em]
+
+        AdamW &
+        Desacopla la descomposición de pesos de los momentos, ofreciendo una regularización más directa y reduciendo el sobreajuste en arquitecturas con capas normalizadas~\cite{loshchilov2019adamw}.
+        Se ha utilizado con éxito en transformadores deformables para objetos pequeños y superpuestos~\cite{zhu2021,smallobjDETR}, lo que lo vuelve idóneo cuando el mismo modelo debe aprender simultáneamente motivos grandes y trazos finos presentes en paneles rupestres. \\
     \end{tabular}
-    \caption{Criterios de selección de los optimizadores en función de la arquitectura y los desafíos del arte rupestre.}
+    \caption{Criterios de selección de los optimizadores según la arquitectura y los desafíos específicos del arte rupestre.}
     \label{tab:optimizadores}
 \end{table}
+
 
 \subsection{Planificadores de Tasa de Aprendizaje}
 
@@ -391,18 +474,29 @@ Introduce reinicios programados cada \(10\,\text{épocas}\). Cada ciclo reestabl
 Incrementa la tasa de forma rápida hasta un máximo y luego la reduce siguiendo una ley cóncava, estrategia que acelera la convergencia inicial y promueve la generalización (\emph{super-convergence})~\cite{smith2019}.
 Su dinamismo resulta ventajoso en entrenamientos cortos sobre miles de recortes.
 
-\begin{table}[h]
+\begin{table}[!h]
     \centering
     \begin{tabular}{p{3.8cm} p{10.4cm}}
         \hline
         \textbf{Planificador} & \textbf{Adecuación al arte rupestre} \\
         \hline
-        StepLR / MultiStepLR & Fases con tasa fija largas favorecen la estabilización de características globales. Los saltos discretos evitan sobreajuste en etapas tardías. \\[0.3em]
-        ReduceLRonPlateau & Ajuste reactivo a mesetas típicas cuando los ejemplos minoritarios comienzan a dominar la pérdida. \\[0.3em]
-        CosineAnnealing (con o sin reinicios) & Disminución suave preserva aprendizaje de detalles finos. Los reinicios añaden exploración para escapar de mínimos causados por fondos texturizados. \\[0.3em]
-        OneCycleLR & Fase inicial agresiva aprende rasgos prominentes en pocas épocas y fase descendente fina refina contornos difusos sin degradar la generalización. \\
+        StepLR / MultiStepLR &
+        Fases con tasa fija prolongadas estabilizan la extracción de rasgos globales y los saltos discretos reducen el sobreajuste en etapas tardías~\cite{goyal2017,goodfellow2016deep}.
+        Han sido empleados con éxito en detección de motivos rupestres donde los conjuntos presentan gran variación de escala y tamaño~\cite{suhaimi2023}. \\[0.3em]
+
+        ReduceLRonPlateau &
+        Ajusta la tasa de forma reactiva cuando la métrica se estanca, útil cuando las clases minoritarias empiezan a dominar la función de pérdida~\cite{goodfellow2016deep}.
+        Esta estrategia ha mostrado mejoras en proyectos de identificación automática de arte rupestre con distribuciones altamente desequilibradas~\cite{horn2022ai}. \\[0.3em]
+
+        CosineAnnealing (con o sin reinicios) &
+        La disminución suave preserva detalles finos sin cambios bruscos en la convergencia~\cite{loshchilov2017}.
+        Los reinicios periódicos facilitan escapar de mínimos locales causados por fondos muy texturizados, frecuentes en capturas de roca~\cite{sharp2024}. \\[0.3em]
+
+        OneCycleLR &
+        La fase inicial agresiva aprende rasgos prominentes en pocas épocas, seguida de un descenso gradual que refina bordes difusos manteniendo la generalización~\cite{smith2019}.
+        Ha demostrado converger rápido en experimentos de detección rupestre con tiempo de cómputo limitado~\cite{suhaimi2023}. \\
     \end{tabular}
-    \caption{Criterios de elección de los planificadores de tasa de aprendizaje según los desafíos de detección en arte rupestre.}
+    \caption{Criterios de elección de planificadores de tasa de aprendizaje frente a los desafíos de detección en arte rupestre.}
     \label{tab:lr_schedulers}
 \end{table}
 
@@ -416,7 +510,7 @@ Se entrena cada una de las cuatro arquitecturas \emph{preentrenadas} con un subc
 Los experimentos se ejecutan de forma mixta: local y en Vertex AI sobre \texttt{n2-highmem-16} (\emph{CPU}) para controlar costos y depurar el flujo de trabajo.
 La partición aleatoria queda:
 
-\begin{table}[h]
+\begin{table}[!h]
     \centering
     \begin{tabular}{l r r r}
         \hline
@@ -456,7 +550,7 @@ Dicho equilibrio evita que las diferencias de rendimiento se deban a desigualdad
 
 Para hacer totalmente reproducible el piloto y aislar el efecto de la arquitectura, se fijaron explícitamente los hiperparámetros de optimización que más influyen en la convergencia (optimizador, tasas de aprendizaje, regularización y planificador de LR).  A continuación se resumen.
 
-\begin{table}[h]
+\begin{table}[!h]
 \centering
 \caption{Hiperparámetros de entrenamiento utilizados en el piloto}
 \label{tab:pilot_hparams}
