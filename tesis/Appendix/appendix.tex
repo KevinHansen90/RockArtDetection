@@ -1,0 +1,10 @@
+\chapter{Apéndice}
+\label{ch:materiales-metodos}
+
+\paragraph{Implementaciones empleadas}
+Todas las redes se instancian a partir de sus versiones oficiales de \textsc{PyTorch}/Ultralytics, asegurando reproducibilidad y compatibilidad con las \textit{weights} ImageNet por defecto:
+RetinaNet \href{https://pytorch.org/vision/main/models/generated/torchvision.models.detection.retinanet_resnet50_fpn_v2.html}{\texttt{retinanet\_resnet50\_fpn\_v2}},
+Faster\,R--CNN \href{https://pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn_v2.html}{\texttt{fasterrcnn\_resnet50\_fpn\_v2}},
+Deformable\,DETR \href{https://huggingface.co/SenseTime/deformable-detr}{\texttt{SenseTime/deformable-detr}} (repositorio de \textit{Hugging Face})
+y YOLOv5 \href{https://github.com/ultralytics/yolov5}{\texttt{ultralytics/yolov5}}.
+Cada versión se clona o descarga en la \texttt{commit} indicada en el repositorio citado, de modo que el código y los pesos permanecen congelados a lo largo de todos los experimentos.

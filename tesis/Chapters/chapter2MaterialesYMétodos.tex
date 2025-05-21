@@ -191,13 +191,13 @@ Cada clase identificada en los recortes está representada por un color específ
 \subsection{Extracción de Motivos para Análisis No Supervisado}
 
 Para que los algoritmos de agrupamiento trabajen exclusivamente sobre la información pictográfica se genera, a partir de cada fotografía anotada, un banco de recortes unitarios.
-El procedimiento automatizado recorre la carpeta de imágenes originales y su correspondiente directorio de etiquetas en formato YOLO, lee cada línea de la etiqueta y convierte esas coordenadas al marco absoluto expresado en píxeles.
+El procedimiento automatizado recorre la carpeta de imágenes originales y su correspondiente directorio de etiquetas en formato YOLO, lee cada línea de la etiqueta y convierte las coordenadas normalizadas a coordenadas absolutas en píxeles, es decir, relativas al tamaño real de cada imagen.
 Con estas coordenadas se recorta el motivo y, se redimensiona preservando la relación de aspecto y aplicando remuestreo Lanczos cuando el lado mayor debe igualar \(224\,\text{px}\).
 El recorte resultante se guarda con un nombre que codifica la imagen fuente, la clase y un índice secuencial.
 Un reporte final informa del número total de motivos extraídos y del porcentaje de etiquetas válidas procesadas.
 
 El trabajo se centra en la clase \textit{Animal}, que aporta 7\,504 recortes a partir de las imágenes en crudo.
-Esta decisión responde a dos razones: en primer lugar, los animales constituyen la categoría más frecuente y, en segundo lugar, sus variantes morfológicas permiten evaluar si los conglomerados obtenidos por agrupamiento reflejan o no las distinciones que la arqueología actual reconoce entre subtipos zoomórficos.
+Esta decisión responde a dos razones: en primer lugar, los animales constituyen la categoría más frecuente y, en segundo lugar, sus variantes morfológicas permiten evaluar si los grupos reflejan o no las distinciones que la arqueología actual reconoce entre subtipos zoomórficos.
 
 La Figura~\ref{fig:crop_example} muestra tres ejemplos de recortes generados.
 Se observa que aunque el ruido del fondo se minimice, el de superposición sigue presente.
@@ -216,8 +216,71 @@ Además incrementa el tamaño efectivo del conjunto de datos, lo que mejora la d
 
 \section{Detección Supervisada de Motivos}
 
-La detección automática se aborda como un problema supervisado: dado un recorte de \(512\times512\,\text{px}\) cada combinación de modelo y técnica de preprocesamiento debe localizar y clasificar los motivos visibles y potencialmente detectar motivos que no han sido etiquetados.
-En cada una de las subsiguientes secciones, se detallan las decisiones técnicas que conforman el pipeline de entrenamiento.
+La detección automática se aborda como un problema supervisado: dado un recorte de \(512\times512\,\text{px}\) cada combinación de modelo y técnica de preprocesamiento debe localizar y clasificar los motivos visibles.
+Ademas, se puede aplicar el modelo entrenado para potencialmente detectar motivos que no han sido etiquetados, o fueron omitidos por la Licenciada Papú.
+En cada una de las subsiguientes secciones, se detallan las decisiones técnicas que conforman el proceso de entrenamiento.
+
+\subsection{Técnicas de Preprocesamiento}
+
+El preprocesamiento de imágenes suele ser un paso crucial antes de aplicar algoritmos de detección o clasificación en arte rupestre.
+Debido a la baja visibilidad y al deterioro de los motivos, es indispensable mejorar la calidad y el contraste de las fotografías para facilitar la tarea de los modelos (y de los propios investigadores)~\cite{li2022}.
+A continuación, se presentan cuatro técnicas de preprocesamiento que han demostrado su utilidad en escenarios de bajo contraste o con ruido elevado, no sólo en arte rupestre sino también en otros dominios (imágenes médicas, fotografía subacuática, etc.):
+
+\begin{itemize}
+\item \textbf{CLAHE} (Contrast Limited Adaptive Histogram Equalization): Realza el contraste de forma localizada sin amplificar excesivamente el ruido.
+\item \textbf{Filtrado Bilateral} (\textit{Bilateral Filtering}): Suaviza la imagen conservando los bordes importantes.
+\item \textbf{Máscara de Realce} (\textit{Unsharp Masking}): Realza los contornos al intensificar el contraste de los bordes.
+\item \textbf{Pirámides Laplacianas}: Abordan el realce de detalles y bordes a múltiples escalas.
+\end{itemize}
+
+Estas técnicas pueden aplicarse de manera individual o encadenarse en secuencias concretas (por ejemplo, primero CLAHE para potenciar el contraste local y después un filtrado bilateral para reducir ruido), adaptándose a las necesidades de cada imagen.
+Diversos flujos de trabajo en arte rupestre aplican procesos similares, como convertir a escala de grises, aplicar CLAHE y luego un filtrado bilateral, para posteriormente, proceder a la clasificación manual o automatizada~\cite{xiao2020,li2022}.
+
+\subsubsection{CLAHE (Contrast Limited Adaptive Histogram Equalization)}
+
+\textit{CLAHE} constituye una variante de la ecualización de histograma que actúa de forma local y limita la amplificación excesiva del contraste en cada región de la imagen.
+El procedimiento divide la imagen en pequeñas “baldosas” (\textit{tiles}), a las cuales aplica ecualización de histograma con un umbral de corte (\textit{clip limit}) que impide la sobresaturación~\cite{xiao2020}.
+Esto resulta especialmente beneficioso en imágenes con iluminación desigual o bajo contraste global, comunes en arte rupestre, ya que puede realzar detalles en zonas oscuras o descoloridas sin afectar drásticamente el resto de la fotografía.
+En contextos de arte rupestre, donde los motivos pueden ocupar áreas muy específicas (por ejemplo, un dibujo de mano en ocre rojo sobre una pared rocosa), el ajuste local que ofrece CLAHE logra enfatizar mejor los contornos y colores que podrían pasar desapercibidos con un ajuste global.
+Xiao \textit{et al.} (2020) reportan mejoras significativas al emplear CLAHE para segmentar fragmentos de mineral en cintas transportadoras de bajo contraste, mostrando que el método realza detalles sutiles y reduce el ruido de fondo~\cite{xiao2020}.
+Esta misma lógica se aplica al arte rupestre: al potenciar localmente el área pintada, se facilita la distinción entre el pigmento y la textura natural de la roca.
+
+\subsubsection{Filtrado Bilateral (\textit{Bilateral Filtering})}
+
+El filtrado bilateral es un método de suavizado que conserva bordes al combinar información de proximidad espacial y similitud de intensidad~\cite{paris2008,sidorenko2021}.
+A diferencia de los filtros de desenfoque tradicionales, que promedian todos los píxeles de una ventana, el filtrado bilateral evita mezclar valores de píxel en regiones con transiciones bruscas de intensidad, manteniendo así la nitidez de los contornos.
+En imágenes de arte rupestre, esta propiedad permite reducir la textura granular de la piedra (fisuras, o ruido del sensor) sin difuminar las líneas que conforman el motivo~\cite{xiao2020}.
+Resulta habitual ver estudios en los que se combina un paso de realce de contraste (por ejemplo, CLAHE) seguido de filtrado bilateral para atenuar el ruido residual y resaltar los contornos de las pinturas o grabados~\cite{li2022}.
+Sidorenko~\textit{et~al.} (2021) emplean imágenes filtradas bilateralmente como referencia supervisada para entrenar una red que aprenda a \emph{suavizar} superficies digitalizadas sin pérdida de bordes discernibles~\cite{sidorenko2021}, reforzando así el filtrado bilateral como un estándar de reducción de ruido con preservación de detalles.
+
+\subsubsection{Máscara de realce (\textit{Unsharp Masking})}
+
+La \textit{unsharp masking} es una técnica clásica de acentuación de bordes, heredada de la fotografía analógica y popularizada en editores como Photoshop~\cite{adobe_unsharp_masking}.
+El procedimiento crea una \emph{copia suavizada} (mediante un filtro gaussiano) de la imagen original.
+Esta copia se resta de la imagen nítida para aislar los componentes de alta frecuencia (bordes y detalles finos).
+Dicho realce se suma de nuevo, ponderado por un factor de ganancia, de modo que la imagen final se percibe más definida sin introducir desenfoque global.
+
+En fotografía de arte rupestre, esta operación puede marcar la diferencia entre ignorar un motivo tenue y visualizarlo con la nitidez suficiente para su trazado~\cite{xiao2020}.
+No “recupera” información perdida, pero incrementa el contraste local, haciendo más visibles los límites de pigmentos o grabados.
+El principal cuidado es evitar valores excesivos de radio o ganancia.
+Un realce desmedido provoca \emph{halos} que pueden confundirse con trazos auténticos~\cite{adobe_unsharp_masking}.
+
+
+\subsubsection{Pirámides Laplacianas para Realce Multiescala}
+
+La pirámide Laplaciana es una representación multi-escala de la imagen propuesta por Burt y Adelson, que se construye a partir de una pirámide Gaussiana y calcula las diferencias entre cada nivel consecutivo~\cite{bai2023,zhou2019}.
+Este enfoque descompone la imagen en distintos rangos de frecuencias, permitiendo manipular, de manera diferenciada, tanto los detalles finos como las estructuras de mayor tamaño.
+En la práctica, se puede enfatizar la capa que contiene los detalles intermedios, donde a menudo se ubican los contornos de figuras rupestres, y atenuar otras escalas que corresponden al ruido o a variaciones de iluminación a gran escala~\cite{paris2008}.
+Esta estrategia otorga una ventaja significativa frente a filtros de realce de bordes de única escala (como la máscara de realce), ya que ofrece un control más preciso sobre cada nivel de detalle.
+Aunque en el campo del arte rupestre no abunden publicaciones que mencionen explícitamente las pirámides Laplacianas, muchas técnicas de \textit{image fusion} y de \textit{Reflectance Transformation Imaging} (\textit{RTI}) aplican procesos conceptualmente similares para fusionar o realzar características visibles a diferentes distancias~\cite{zhou2019}.
+La principal desventaja de este método radica en su complejidad, pues exige un mayor número de parámetros y pasos de procesamiento que las técnicas anteriores.
+No obstante, su capacidad de manejar simultáneamente realces en múltiples escalas puede ser decisiva para imágenes con motivos de distintos tamaños y diferentes grados de desgaste.
+
+\subsubsection*{Conclusión sobre el Preprocesamiento}
+
+La elección e implementación de una u otra técnica de preprocesamiento responde al tipo de degradación que presente el arte rupestre (desgaste por erosión, superposición, iluminación irregular, etc.), y a los objetivos del análisis posterior (detección de contornos, segmentación, clasificación, etc.).
+\textit{CLAHE} sobresale por su eficacia al realzar el contraste local, el \textit{filtrado bilateral} por preservar los bordes mientras reduce el ruido, la máscara de realce por intensificar contornos sutiles y las \textit{pirámides Laplacianas} por su control fino en diversas escalas.
+En la práctica, es común combinar más de una estrategia para lograr un equilibrio óptimo entre la atenuación del ruido y la conservación de los rasgos esenciales de las pinturas o grabados rupestres~\cite{xiao2020,li2022}.
 
 \subsection{Técnicas de Preprocesamiento Evaluadas}
 \label{sec:preproc}
@@ -350,14 +413,14 @@ Los modelos seleccionados incluyen:
     Su diseño optimizado permite realizar pruebas iterativas de manera rápida, aunque enfrenta limitaciones en contextos de bajo contraste y con objetos superpuestos, comunes en imágenes de arte rupestre.
 
     \item \textbf{CNNs de dos etapas (Faster R-CNN):}
-    Faster R-CNN es conocido por su capacidad de detectar objetos con alta precisión gracias a su estructura de dos etapas~\cite{ren2015faster}.
+    Faster R-CNN es conocida por su capacidad de detectar objetos con alta precisión gracias a su estructura de dos etapas~\cite{ren2015faster}.
     Este modelo utiliza Redes de Propuesta de Regiones (RPN) para generar posibles ubicaciones de objetos, lo que le permite enfocar sus predicciones de manera refinada, algo crucial para detectar pequeños elementos y manejar la superposición que se encuentra en el arte rupestre.
     Al combinar Faster R-CNN con FPN, se logra mejorar la detección en múltiples escalas, permitiendo capturar tanto elementos grandes como detalles pequeños con mayor precisión.
 
     \item \textbf{Modelos basados en transformers (Deformable DETR):}
     Deformable DETR se selecciona por sus mejoras en la detección de objetos pequeños y su capacidad para manejar escenas complejas~\cite{zhu2021}.
     A diferencia de DETR original, Deformable DETR incorpora un mecanismo de atención deformable que focaliza su atención en áreas específicas de la imagen, adaptándose a patrones irregulares como los presentes en el arte rupestre.
-    Esta técnica es particularmente eficaz para trabajar con la superposición y el bajo contraste característicos de estos entornos.
+    Esta técnica es particularmente eficaz para trabajar con la superposición y el bajo contraste característicos de estos entornos~\cite{horn2022,suhaimi2023}.
     Además, su arquitectura end-to-end simplifica el proceso de detección, eliminando la necesidad de etapas separadas de anclaje y refinamiento, lo cual es ventajoso cuando se trabaja con objetos abstractos y difusos.
 \end{itemize}
 
@@ -390,35 +453,119 @@ A continuación, se describen en la tabla~\ref{tab:justificacion_modelos}:
     \label{tab:justificacion_modelos}
 \end{table}
 
+\subsection{Ajuste fino de modelos preentrenados}
 
-\paragraph{Implementaciones empleadas}
-Todas las redes se instancian a partir de sus versiones oficiales de \textsc{PyTorch}/Ultralytics, asegurando reproducibilidad y compatibilidad con las \textit{weights} ImageNet por defecto:
-RetinaNet~\href{https://pytorch.org/vision/main/models/generated/torchvision.models.detection.retinanet_resnet50_fpn_v2.html}{\texttt{retinanet\_resnet50\_fpn\_v2}},
-Faster\,R--CNN~\href{https://pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn_v2.html}{\texttt{fasterrcnn\_resnet50\_fpn\_v2}},
-Deformable\,DETR~\href{https://huggingface.co/SenseTime/deformable-detr}{\texttt{SenseTime/deformable-detr}} (repositorio de \textit{Hugging Face})
-y YOLOv5~\href{https://github.com/ultralytics/yolov5}{\texttt{ultralytics/yolov5}}.
-Cada versión se clona o descarga en la \texttt{commit} indicada en el repositorio citado, de modo que el código y los pesos permanecen congelados a lo largo de todos los experimentos.
-
+El entrenamiento parte de redes previamente entrenadas, por lo que se definen dos grupos de parámetros: uno para la \emph{backbone} convolucional y otro para la \emph{head} de detección.
+La \emph{backbone} actúa como extractor de características generales de las imágenes, generando mapas de activación que condensan información visual relevante a diferentes escalas.
+Suele consistir en arquitecturas profundas preentrenadas en grandes conjuntos de datos como ImageNet, tales como ResNet~\cite{he2016deep}, VGG~\cite{simonyan2014very} o DenseNet~\cite{huang2017densely}.
+La \emph{head}, por su parte, está especializada en tareas específicas como la clasificación de objetos y la regresión de cajas delimitadoras.
+Cuando la investigación requiere congelar la \emph{backbone}, sus gradientes se deshabilitan.
+En los demás casos se asigna a cada grupo una tasa de aprendizaje distinta, menor para la \emph{backbone} y mayor para la \emph{head}, con el fin de preservar características generales y, al mismo tiempo, permitir la especialización en arte rupestre.
 
 \subsection{Optimizadores}
+Distintos algoritmos de optimización fueron evaluados para minimizar la función de pérdida durante el entrenamiento.
+En todos los casos se aplicó una estrategia de descenso por mini-lotes, con ajuste diferenciado de tasas de aprendizaje para la \emph{backbone} y la \emph{head}, según lo descrito en la sección anterior.
 
-El entrenamiento parte de redes previamente preentrenadas, por lo que se definen dos grupos de parámetros: uno para la \emph{backbone} convolucional y otro para la cabeza de detección.
-Cuando la investigación requiere congelar la \emph{backbone}, sus gradientes se deshabilitan.
-En los demás casos se asigna a cada grupo una tasa de aprendizaje distinta, menor para la \emph{backbone} y mayor para la cabeza, con el fin de preservar características generales y, al mismo tiempo, permitir la especialización en arte rupestre.
+\subsection*{SGD (por sus siglas en inglés) con momento}
 
-\subsection*{SGD con momento}
-El descenso estocástico del gradiente constituye la referencia clásica en optimización.
-Se emplea la variante con término de momento, que acumula la dirección de los gradientes pasados y suaviza las oscilaciones, lo que acelera la convergencia y reduce la probabilidad de quedar atrapados en mínimos poco profundos~\cite{robbins1951stochastic,qian1999momentum}.
-Este optimizador se aplica sobre todo a modelos que muestran estabilidad con tasas de aprendizaje fijas y que ya poseen pesos bien inicializados, como las \emph{backbones} convolucionales maduras.
+El descenso estocástico del gradiente (\emph{Stochastic Gradient Descent}, SGD) constituye la referencia clásica en optimización de redes neuronales.
+A lo largo de este trabajo se utiliza la variante con \emph{momento}, que acumula la información de pasos anteriores y suaviza las oscilaciones, acelerando la convergencia y reduciendo la probabilidad de estancarse en mínimos locales~\cite{robbins1951stochastic,qian1999momentum}.
+
+\paragraph{Ecuaciones de actualización.}
+Para cada parámetro \(\theta\) en la iteración \(t\) se calcula:
+
+\[
+\begin{aligned}
+v_t        &= \beta\, v_{t-1} \;+\; (1 - \beta)\,\nabla_{\theta_t}\mathcal{L}(\theta_t), \\
+\theta_{t+1} &= \theta_t \;-\; \eta\, v_t ,
+\end{aligned}
+\]
+
+donde
+\begin{itemize}
+  \item \(\nabla_{\theta_t}\mathcal{L}(\theta_t)\) es el gradiente estocástico de la función de pérdida \(\mathcal{L}\) respecto del parámetro \(\theta\) (estimado sobre un mini‐lote);
+  \item \(v_t\) es el \emph{vector de momento} que integra las direcciones de gradiente pasadas;
+  \item \(\beta\in[0,1)\) controla la contribución del histórico (valores típicos: \(0.9\)–\(0.99\));
+  \item \(\eta>0\) es la tasa de aprendizaje fija.
+\end{itemize}
+
+\paragraph{Contexto de uso.}
+Este optimizador se aplica sobre todo a modelos que muestran estabilidad con tasas de aprendizaje constantes y cuyos pesos han sido previamente ajustados en tareas generales de reconocimiento visual, como es el caso de las \emph{backbones} convolucionales preentrenadas en conjuntos de datos extensos (p.\,ej.\ ImageNet).
+Al emplear un \(\eta\) moderado y un valor alto de \(\beta\), la dinámica resultante actúa como un filtro de promedio exponencial sobre los gradientes:
+\renewcommand\labelenumi{(\alph{enumi})}
+\begin{enumerate}
+  \item amortigua las fluctuaciones estocásticas inherentes al muestreo por mini‐lotes,
+  \item preserva la direccionalidad global aprendida previamente, y
+  \item permite ajustes finos sin perturbar drásticamente los parámetros ya “bien situados” de la \emph{backbone}.
+\end{enumerate}
+
+En consecuencia, SGD con momento proporciona una línea base sólida y de bajo coste computacional para afinar redes profundas cuando se requiere estabilidad y control preciso sobre la velocidad de aprendizaje.
 
 \subsection*{Adam}
-Adam ajusta de forma adaptativa la tasa de aprendizaje de cada parámetro mediante estimaciones de momentos primero y segundo, lo que resulta ventajoso cuando los gradientes son ruidosos o las magnitudes varían entre capas~\cite{kingma2015adam}.
-En las cabezas de detección, donde los pesos se inicializan aleatoriamente, estas adaptaciones facilitan una convergencia rápida aún con conjuntos de datos desbalanceados y objetos de bajo contraste.
 
-\subsection*{AdamW}
-AdamW separa explícitamente la regularización por decaimiento del peso de la actualización basada en el gradiente, corrigiendo el sesgo de \emph{weight decay} que presenta Adam~\cite{loshchilov2019adamw}.
-Este desacople mejora la generalización en arquitecturas con capas normalizadas, como Deformable DETR, al mantener la norma de los parámetros bajo control sin interferir con la estimación de momentos.
-En las pruebas preliminares se observa que AdamW acelera la estabilización de la pérdida cuando la \emph{backbone} permanece activa y el modelo debe adaptarse a motivos abstractos y superpuestos.
+Adam (\emph{Adaptive Moment Estimation}) ajusta de forma adaptativa la tasa de aprendizaje de cada parámetro mediante estimaciones exponencialmente suavizadas del \textbf{primer} y \textbf{segundo momento} de los gradientes~\cite{kingma2015adam}.
+Sea \(g_t=\nabla_{\theta_t}\mathcal{L}(\theta_t)\) el gradiente estocástico en la iteración \(t\); entonces:
+
+\[
+\begin{aligned}
+m_t      &= \beta_1\,m_{t-1} + (1-\beta_1)\,g_t &\text{(media, 1\textsuperscript{er} momento)}\\
+v_t      &= \beta_2\,v_{t-1} + (1-\beta_2)\,g_t^{2} &\text{(varianza no centrada, 2\textsuperscript{do} momento)}\\[0.5em]
+\hat{m}_t &= \frac{m_t}{1-\beta_1^{t}} , \qquad
+\hat{v}_t = \frac{v_t}{1-\beta_2^{t}} &\text{(corrección de sesgo)}\\[0.5em]
+\theta_{t+1} &= \theta_t \;-\; \eta \,\frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \varepsilon},
+\end{aligned}
+\]
+
+donde
+\(\beta_1,\,\beta_2\in[0,1)\) controlan la “memoria” sobre la media y la varianza (valores habituales: \(0.9\) y \(0.999\));
+\(\eta\) es la tasa de aprendizaje base;
+\(\varepsilon\!\ll\!1\) evita divisiones por cero.
+
+\paragraph{Interpretación práctica.}
+\begin{itemize}
+  \item \textbf{Gradientes ruidosos.} Un gradiente se considera “ruidoso” cuando exhibe gran \emph{varianza estocástica} entre mini-lotes, ya sea por datos escasos, clases minoritarias o alto contraste de dificultades. Adam atenúa esa varianza al ponderar la varianza histórica \(\hat{v}_t\) en el denominador.
+  \item \textbf{Magnitud heterogénea.} La escala de los gradientes puede diferir significativamente entre capas; Adam normaliza cada actualización por \(\sqrt{\hat{v}_t}\), permitiendo pasos coherentes incluso en redes profundas.
+\end{itemize}
+
+\paragraph{Ámbito de uso.}
+En las \emph{heads} de detección, cuyos pesos se inicializan aleatoriamente, la combinación de escalado automático (\(\beta_2\)) y corrección de sesgo garantiza una convergencia rápida y estable, aun con conjuntos de datos desbalanceados u objetos de bajo contraste que generan gradientes de amplitud irregular.
+En la práctica, Adam se adopta como método de minimización versátil y eficiente para una amplia gama de funciones de pérdida. Suele constituir un punto de partida sólido antes de explorar variantes con regularización explícita, como AdamW, cuando se requiere mayor control sobre la norma de los parámetros.
+
+\paragraph{AdamW.}
+
+AdamW (\emph{Adam with decoupled Weight decay}) separa explícitamente la regularización \(L_2\) de la actualización basada en gradiente, evitando que la penalización de norma sea afectada por los factores adaptativos de Adam clásico~\cite{loshchilov2019adamw}.
+Sea \(g_t=\nabla_{\theta_t}\mathcal{L}(\theta_t)\) el gradiente estocástico; primero se estiman los momentos como en Adam:
+
+\[
+\begin{aligned}
+m_t &= \beta_1\,m_{t-1} + (1-\beta_1)\,g_t,\\
+v_t &= \beta_2\,v_{t-1} + (1-\beta_2)\,g_t^{2},\\[2pt]
+\hat{m}_t &= \frac{m_t}{1-\beta_1^{t}}, \qquad
+\hat{v}_t = \frac{v_t}{1-\beta_2^{t}}.
+\end{aligned}
+\]
+
+A continuación se aplican \emph{dos pasos} diferenciados sobre cada parámetro \(\theta\):
+
+\[
+\begin{aligned}
+\text{(i) \;Adam step:} & \quad
+\theta_{t+\tfrac12} = \theta_t - \eta\,\frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \varepsilon}, \\[4pt]
+\text{(ii) \;Decoupled weight decay:} & \quad
+\theta_{t+1} = \theta_{t+\tfrac12} - \eta\,\lambda\,\theta_t,
+\end{aligned}
+\]
+
+donde \(\eta\) es la tasa de aprendizaje, \(\lambda\) el coeficiente de \emph{weight decay} (típicamente \(10^{-4}\!\text{–}\!10^{-2}\)), y \(\varepsilon\!\ll\!1\) evita divisiones por cero.
+
+\paragraph{Ventajas del desacople.}
+\begin{itemize}
+  \item \textbf{Regularización homogénea.} Al aplicarse sobre \(\theta_t\) en vez de sobre \(\hat{m}_t\), la penalización \(L_2\) no se ve re-escalada por los momentos adaptativos, logrando un control más uniforme de la norma de los parámetros.
+  \item \textbf{Mejora de la generalización.} Resulta particularmente beneficioso en arquitecturas con normalización interna —p.\,ej.\ \emph{LayerNorm} en Deformable~DETR— donde la magnitud absoluta de los pesos impacta la estabilidad numérica.
+  \item \textbf{Convergencia estable.} Mantiene bajo control los pesos heredados de la \emph{backbone} mientras permite a la \emph{head} adaptarse rápidamente a motivos abstractos y superpuestos del arte rupestre.
+\end{itemize}
+
+En nuestras pruebas piloto, AdamW acelera la estabilización de la función de pérdida cuando la \emph{backbone} permanece activa, mostrando menor oscilación que Adam y mejor rendimiento final que SGD con momento en conjuntos de datos desbalanceados.
 
 \begin{table}[!h]
     \centering
@@ -447,31 +594,46 @@ En las pruebas preliminares se observa que AdamW acelera la estabilización de l
 
 \subsection{Planificadores de Tasa de Aprendizaje}
 
-El ajuste dinámico de la tasa de aprendizaje resulta esencial cuando el conjunto de datos combina motivos abundantes y escasos, contrastes variables y miles de recortes.
-Se emplean seis planificadores, cada uno con un comportamiento distinto ante mesetas, reinicios o fases de calentamiento.
-La configuración se aplica mediante grupos de parámetros diferenciados, de modo que la \emph{backbone} y la cabeza de detección pueden evolucionar con ritmos propios.
+Un \textbf{planificador de tasa de aprendizaje} (\emph{learning‐rate scheduler}) es un algoritmo que modifica la tasa de aprendizaje \(\eta\) a lo largo del entrenamiento según una regla predefinida—lineal, escalonada, cíclica, con reinicios, etc.—con el fin de acelerar la convergencia y mejorar la generalización~\cite{loshchilov2017,smith2019}.
+Al reducir \(\eta\) cuando el gradiente se estabiliza o al aumentarla temporalmente para escapar de mesetas, el planificador actúa como un “ritmo cardíaco” que regula el tamaño de los pasos de optimización.
 
-\subsection*{StepLR}
-Reduce la tasa en saltos discretos cada \(7\,\text{épocas}\), factor que mitiga la sobreajuste tras la fase de convergencia inicial.
+En este trabajo se utilizan seis planificadores que implementan estrategias complementarias frente a:
+\renewcommand\labelenumi{(\alph{enumi})}
+\begin{enumerate}
+    \item \textbf{mesetas}, donde la pérdida deja de descender de forma sostenida;
+    \item \textbf{reinicios periódicos}, que re‐exploran el espacio de parámetros tras llegar a un mínimo local;
+    \item \textbf{fases de calentamiento} (\emph{warm‐up}), útiles al comenzar desde pesos aleatorios en la \emph{head}.
+\end{enumerate}
+
+La programación se aplica mediante \textbf{grupos de parámetros diferenciados}: la \emph{backbone} (parámetros preentrenados) evoluciona con una tasa de aprendizaje base menor y atenuada, mientras que la \emph{head} de detección, inicializada desde cero, sigue un programa más agresivo.
+Esta distinción permite preservar el conocimiento general capturado en la \emph{backbone} y, simultáneamente, adaptar rápidamente la \emph{head} a motivos de arte rupestre con baja frecuencia o bajo contraste.
+
+\subsection*{Método Step LR}
+Reduce la tasa en saltos discretos por la cantidad de épocas seleccionadas por el usuario, factor que mitiga el sobreajuste tras la fase de convergencia inicial.
 La simplicidad del esquema facilita la reproducción de experimentos y proporciona estabilidad cuando los gradientes se estabilizan~\cite{goyal2017}.
 
-\subsection*{MultiStepLR}
-Extiende la estrategia anterior con múltiples hitos, lo que permite disminuir la tasa en momentos críticos predefinidos (por ejemplo, en los \(30\text{–}60\) \% del entrenamiento).
-Esta granularidad ayuda a refinar pesos que convergen a distinta velocidad, como sucede entre motivos zoomórficos y geométricos~\cite{he2016}.
+\subsection*{Método Multi Step LR}
+La estrategia \texttt{MultiStepLR} aplica un \emph{decaimiento escalonado} de la tasa de aprendizaje: esta se mantiene constante hasta alcanzar una lista de épocas-hito predefinidas y, en cada una de ellas, se reduce abruptamente mediante un factor fijo.
+Al elegir hitos en los primeros dos tercios del entrenamiento (p.\,ej., en el 30 \% y el 60 \%), se conservan pasos amplios para explorar el espacio de parámetros al inicio y se emplean pasos más pequeños para el ajuste fino posterior.
+Esta programación demostró ser eficaz en modelos de referencia como ResNet, donde los autores reducen la tasa de aprendizaje en las épocas 30 y 60 al entrenar en ImageNet~\cite{he2016deep}.
+Estudios recientes explican que este esquema ayuda a evitar oscilaciones alrededor de mínimos locales y mejora la generalización al combinar fases de exploración y explotación~\cite{you2019lrdecay}.
+En nuestra implementación, cada grupo de parámetros utiliza hitos independientes, lo que permite un decaimiento más conservador en la \emph{backbone} preentrenada y uno más agresivo en la \emph{head} de detección, alineando la dinámica de optimización con las necesidades de cada componente.
 
-\subsection*{ReduceLRonPlateau}
-Monitorea la pérdida de validación y reduce la tasa solo cuando la métrica deja de mejorar durante 5 épocas.
+\subsection*{Método Reduce LR on Plateau}
+Monitorea la pérdida de validación y reduce la tasa solo cuando la métrica deja de mejorar durante el número de épocas que se indique.
 Es apropiado cuando las curvas de aprendizaje presentan mesetas prolongadas causadas por clases minoritarias~\cite{hinton2012}.
 
-\subsection*{CosineAnnealingLR}
-Aplica un decaimiento cosenoidal suave hasta un valor mínimo, evitando saltos bruscos y manteniendo aprendizaje fino en las últimas épocas.
-Resulta útil para captar detalles de bajo contraste que emergen tarde~\cite{loshchilov2017}.
+\subsection*{Método Cosine Annealing LR}
+El planificador \texttt{CosineAnnealingLR} reduce la tasa de aprendizaje siguiendo una curva cosenoidal suave hasta un valor mínimo cercano a cero.
+Esta transición continua evita los saltos bruscos de otros esquemas escalonados y permite que, en las últimas épocas, el optimizador realice ajustes extremadamente finos.
+Se ha comprobado que tal comportamiento favorece la convergencia en tareas donde es necesario refinar bordes o matices de bajo contraste, características que suelen afinarse recién en las fases finales del entrenamiento, al tiempo que mantiene la estabilidad numérica~\cite{loshchilov2017}.
 
-\subsection*{CosineAnnealingWarmRestarts}
-Introduce reinicios programados cada \(10\,\text{épocas}\). Cada ciclo reestablece una tasa alta que favorece la exploración y reduce la probabilidad de quedar atrapado en mínimos pobres originados por ruido de fondo~\cite{loshchilov2017}.
+\subsection*{Método Cosine Annealing Warm Restarts}
+Introduce reinicios programados dependiendo de cada cuantas épocas se le indique.
+Cada ciclo reestablece una tasa alta que favorece la exploración y reduce la probabilidad de quedar atrapado en mínimos locales originados por ruido de fondo~\cite{loshchilov2017}.
 
-\subsection*{OneCycleLR}
-Incrementa la tasa de forma rápida hasta un máximo y luego la reduce siguiendo una ley cóncava, estrategia que acelera la convergencia inicial y promueve la generalización (\emph{super-convergence})~\cite{smith2019}.
+\subsection*{Método One Cycle LR}
+Incrementa la tasa de forma rápida hasta un máximo y luego la reduce siguiendo una función cóncava, estrategia que acelera la convergencia inicial y promueve la generalización (\emph{super-convergence})~\cite{smith2019}.
 Su dinamismo resulta ventajoso en entrenamientos cortos sobre miles de recortes.
 
 \begin{table}[!h]
@@ -504,9 +666,9 @@ Su dinamismo resulta ventajoso en entrenamientos cortos sobre miles de recortes.
 
 El estudio se organiza en cinco fases secuenciales que permiten validar el código, elegir hiperparámetros, comparar técnicas de preprocesamiento y consolidar los mejores modelos antes de la evaluación arqueológica definitiva.
 
-\subsection*{Fase 1 - Pilotaje inicial sobre un subconjunto reducido}
+\subsection*{Fase 1 - Prueba inicial sobre un subconjunto reducido}
 
-Se entrena cada una de las cuatro arquitecturas \emph{preentrenadas} con un subconjunto del 10\,\% del total de recortes.
+Se realiza un \emph{ajuste fino} (\emph{fine-tuning}) de cada una de las cuatro arquitecturas \emph{preentrenadas} empleando un subconjunto equivalente al 10\,\% del total de recortes.
 Los experimentos se ejecutan de forma mixta: local y en Vertex AI sobre \texttt{n2-highmem-16} (\emph{CPU}) para controlar costos y depurar el flujo de trabajo.
 La partición aleatoria queda:
 
@@ -526,7 +688,10 @@ La partición aleatoria queda:
 \end{table}
 
 \paragraph{Hiperparámetros de referencia.}
-Para que los resultados sean comparables se fuerza a que \emph{todas} las redes recorran, aproximadamente, el mismo número de pasos de optimización (\(\approx 5\,100\)) y la misma \emph{tasa de ejemplo–gradiente} (lote efectivo de 16 imágenes).
+Para garantizar una comparación justa, todos los modelos se configuran para ejecutar un \textbf{número similar de pasos de optimización} (\(\approx 5\,100\)).
+Un \emph{paso de optimización} se define como la operación en la que se realiza \emph{retro-propagación} y se actualizan los parámetros.
+Si se emplea \textit{gradient accumulation}, varias mini-lotes pueden acumularse antes de dicho paso.
+En cada arquitectura se ajustan \texttt{num\_epochs}, \texttt{batch\_size} y \texttt{grad\_accum\_steps} de modo que el \emph{lote efectivo} ()número de imágenes que contribuyen a un mismo gradiente) sea siempre \(16\) y la suma de pasos de optimización coincida dentro de un margen del 2\,\%.
 
 \begin{center}
 \begin{tabular}{lccc}
@@ -545,8 +710,9 @@ YOLOv5\,(valores internos del \texttt{train.py}) & 30 & 16 & -- \\
 \textit{Nota.} Deformable~DETR necesita más pasos (\(\sim 7\,800\)) para estabilizar su mecanismo de atención, mientras que YOLOv5 fija el número de épocas desde su propio motor de entrenamiento.
 
 \noindent
-Con esta configuración cada iteración de \textit{gradient accumulation} procesa \(4\times4=16\) imágenes y el cómputo total, contando sólo pasos con retro-propagación, se mantiene dentro de un presupuesto similar de tiempo y coste en \texttt{Vertex AI}.
-Dicho equilibrio evita que las diferencias de rendimiento se deban a desigualdades en la exposición de datos o en la presión de regularización, y centra la comparación en la capacidad intrínseca de cada arquitectura para el dominio del arte rupestre.
+Bajo esta estrategia, cada iteración de acumulación procesa, por ejemplo, \(4 \times 4 = 16\) imágenes en Faster~R-CNN y RetinaNet, o \(2 \times 8 = 16\) en Deformable~DETR; posteriormente se ejecuta una única actualización de parámetros.
+Aunque el número de \texttt{num\_epochs} varía (véase la tabla), el recuento de pasos de optimización y la presión de regularización (lote efectivo idéntico) se mantienen equiparados.
+Así se evita que las diferencias de rendimiento provengan de una mayor exposición a los datos o de un régimen de actualización más frecuente, y se centra la evaluación en la capacidad intrínseca de cada arquitectura para ajustarse al dominio del arte rupestre.
 
 Para hacer totalmente reproducible el piloto y aislar el efecto de la arquitectura, se fijaron explícitamente los hiperparámetros de optimización que más influyen en la convergencia (optimizador, tasas de aprendizaje, regularización y planificador de LR).  A continuación se resumen.
 
@@ -567,13 +733,13 @@ YOLOv5\,(train.py)   & SGD   & $1\times10^{-3}$ & —                 & $5\times
 \end{table}
 
 \noindent
-Las tasas diferenciadas para \textit{backbone} y cabeza facilitan la transferencia: se conserva el conocimiento genérico mientras la cabeza aprende rasgos de arte rupestre.
-El \textit{weight decay} modera el sobreajuste en un conjunto pequeño, el programador cosenoidal suaviza el descenso de LR dentro del límite de épocas impuesto por el presupuesto, manteniendo aprendizaje efectivo hasta el final.
+Las tasas de aprendizaje diferenciadas para la \emph{backbone} y la \emph{head} optimizan la transferencia de conocimiento: una tasa menor en la \emph{backbone} preserva las características genéricas aprendidas en ImageNet, mientras que una tasa mayor en la \emph{head} (inicializada desde cero) acelera la adaptación a los motivos específicos del arte rupestre.
+El \textit{weight decay} modera el sobreajuste en un conjunto pequeño, el planificador cosenoidal suaviza el descenso de LR dentro del límite de épocas impuesto por el presupuesto, manteniendo aprendizaje efectivo hasta el final.
 AdamW se emplea en Deformable DETR porque su desacople de la regularización ha demostrado mejor sinergia con la normalización y los bloques de atención, mientras que las restantes CNN rinden de forma estable con SGD.
 
 \paragraph{Aumentos en línea durante el entrenamiento.}
-Para que el pilotaje mida la \textit{capacidad intrínseca} de cada arquitectura y no la ventaja de un realce previo, los recortes se alimentan a las redes sin preprocesamiento global.
-No obstante, se aplican \emph{aumentos en línea} (\textit{data augmentation}) para regularizar el aprendizaje:
+Para que la prueba inicial mida la \textit{capacidad intrínseca} de cada arquitectura y no la ventaja de un realce previo, los recortes se alimentan a las redes sin preprocesamiento global.
+No obstante, se aplica \emph{aumento de datos en línea} (\textit{data augmentation}) (transformaciones aleatorias sobre cada imagen durante el entrenamiento) para regularizar el aprendizaje:
 
 \begin{itemize}
     \item \textbf{Faster\,R--CNN, RetinaNet y Deformable\,DETR} utilizan una canalización basada en \texttt{Albumentations}:
@@ -581,7 +747,7 @@ No obstante, se aplican \emph{aumentos en línea} (\textit{data augmentation}) p
     y ajuste de tamaño máximo a \(1024\times1024\)~px, seguido de relleno para que las dimensiones resulten divisibles por 32.
     Las cajas se transforman automáticamente en formato \textit{Pascal VOC} (o \textit{YOLO} para DETR) y el tensor sale normalizado.
     \item \textbf{YOLOv5} mantiene su esquema interno.
-    Sólo se activan las variaciones de tono-saturación-valor (\texttt{hsv\_h}=0.015, \texttt{hsv\_s}=0.70, \texttt{hsv\_v}=0.40) y se deshabilitan \texttt{mosaic}, \texttt{mixup} y \texttt{copy\_paste} para hacer el régimen comparable.
+    Sólo se activan las variaciones de tono-saturación-valor (\texttt{hsv\_h}=0.015, \texttt{hsv\_s}=0.70, \texttt{hsv\_v}=0.40) y se deshabilitan \texttt{mosaic}, \texttt{mixup} y \texttt{copy\_paste} (composición multicelda de recortes, mezcla lineal de pares de imágenes y pegado de objetos sintetizados, respectivamente) para mantener un régimen comparable.
 \end{itemize}
 
 Estas transformaciones \emph{no se consideran técnicas de preprocesamiento} porque:
@@ -590,11 +756,11 @@ Estas transformaciones \emph{no se consideran técnicas de preprocesamiento} por
     \item Se ejecutan \textbf{únicamente en tiempo de entrenamiento}.
     Los conjuntos de validación y prueba reciben las imágenes sin modificaciones, de modo que la métrica refleja el rendimiento genuino del modelo.
     \item No persisten sobre disco ni alteran el conjunto base.
-    Actúan como regularización estocástica ()igual que\textit{dropout}) y, por tanto, no compiten con los filtros de realce evaluados en la Fase 2.
+    Actúan como regularización estocástica (igual que\textit{dropout}) y, por tanto, no compiten con los filtros de realce evaluados en la Fase 2.
     De hecho, cuando en la Fase 2 se aplica un preprocesamiento global (p.\,ej.\ CLAHE o Pirámide Laplaciana), los aumentos aquí descritos se mantienen de forma \textit{aditiva} para conservar la comparabilidad entre fases.
 \end{enumerate}
 
-Con este esquema cada iteración de \textit{gradient accumulation} procesa un lote efectivo de 16 imágenes y totaliza, aproximadamente, \(5\,100\) pasos de optimización por modelo (véase la Tabla~\ref{tab:pilot_hparams}), lo que garantiza que las diferencias observadas se deban al diseño de la red y no a una exposición desigual a los datos.
+Con este esquema cada iteración de la variable procesa un lote efectivo de 16 imágenes y totaliza, aproximadamente, \(5\,100\) pasos de optimización por modelo (véase la Tabla~\ref{tab:pilot_hparams}), lo que garantiza que las diferencias observadas se deban al diseño de la red y no a una exposición desigual a los datos.
 
 La fase identifica tasas de aprendizaje, funciones de pérdida y planificadores estables para cada red.
 
@@ -628,17 +794,18 @@ Se emplean diferentes modelos de extracción de características y algoritmos de
 
 \subsection{Modelos de Extracción de Características}
 
-Se utilizan cuatro modelos de redes neuronales convolucionales preentrenados para la extracción de características de las imágenes recortadas de animales:
+Los modelos empleados no se entrenan desde cero; se cargan con pesos preentrenados en ImageNet y luego se someten a un \textbf{ajuste fino ligero} (\emph{fine-tuning}).
+Concretamente, se congela la mayor parte de la \emph{backbone} y sólo se actualizan los últimos bloques convolucionales y la capa densa final, utilizando una tasa de aprendizaje \(10\times\) menor que la del resto de la red.
+Este procedimiento permite que los clasificadores conserven el conocimiento genérico adquirido en la base de datos original mientras adaptan sus representaciones a los motivos de arte rupestre presentes en nuestro conjunto.
 
 \begin{itemize}
     \item \textbf{ResNet18}: Propuesto por He et al., ResNet introduce conexiones residuales que facilitan el entrenamiento de redes profundas al mitigar el problema del gradiente desvaneciente~\cite{he2016deep}.
-    \item \textbf{VGG16}: Desarrollado por Simonyan y Zisserman, VGG16 se caracteriza por su arquitectura profunda y uniforme, utilizando convoluciones de $3 \times 3$ para capturar características de alto nivel~\cite{simonyan2014very}.
+    \item \textbf{VGG16}: Desarrollado por Simonyan y Zisserman, VGG16 se caracteriza por su arquitectura profunda y uniforme, utilizando convoluciones de \(3 \times 3\) para capturar características de alto nivel~\cite{simonyan2014very}.
     \item \textbf{DenseNet121}: Huang et al. presentan DenseNet, que conecta cada capa con todas las anteriores, promoviendo la reutilización de características y mejorando el flujo de información~\cite{huang2017densely}.
-    \item \textbf{InceptionV3}: Szegedy et al. introducen InceptionV3, que utiliza módulos de \textit{inception} para capturar características a múltiples escalas, siendo eficaz en la representación de variaciones en tamaño y forma~\cite{szegedy2016rethinking}.
+    \item \textbf{InceptionV3}: Szegedy et al. introducen InceptionV3, que utiliza módulos de \emph{inception} para capturar características a múltiples escalas, siendo eficaz en la representación de variaciones en tamaño y forma~\cite{szegedy2016rethinking}.
 \end{itemize}
 
-Estos modelos se seleccionan por su diversidad arquitectónica y su capacidad para extraer representaciones ricas de las imágenes.
-Al aprovechar diferentes enfoques en la arquitectura de redes neuronales, se busca evaluar cómo influye la extracción de características en el proceso de agrupamiento.
+Esta diversidad arquitectónica permite evaluar cómo la extracción de rasgos, tras el \emph{fine-tuning}, influye en la calidad del agrupamiento de motivos rupestres.
 
 \subsection{Algoritmos de Agrupamiento}
 
@@ -646,11 +813,11 @@ Se aplican cuatro algoritmos de agrupamiento para explorar diferentes enfoques e
 
 \begin{itemize}
     \item \textbf{K-Means}:
-    Es un algoritmo de partición que asigna cada punto de datos al cluster más cercano, minimizando la suma de distancias al centroide~\cite{macqueen1967some}.
+    Es un algoritmo de partición que asigna cada punto de datos al cluster más cercano en distancia euclídea, minimizando la suma de distancias al centroide~\cite{macqueen1967some}.
     Es eficiente en términos computacionales y funciona bien con clusters de forma esférica.
     \item \textbf{Clustering Aglomerativo}:
     Es un método jerárquico que fusiona iterativamente clusters basándose en una medida de similitud, capturando estructuras anidadas en los datos~\cite{rokach2005clustering}.
-    No requiere especificar el número de clusters a priori y puede utilizar diferentes criterios de enlace (simple, completo, promedio).
+    No requiere especificar el número de clusters a priori y puede utilizar diferentes criterios de distancia entre grupos (simple, completo, promedio).
     \item \textbf{DBSCAN}:
     Identifica clusters de forma arbitraria y es robusto frente al ruido, agrupando puntos densamente conectados~\cite{ester1996density}.
     Es especialmente útil para detectar clusters de formas complejas y manejar datos con ruido.
@@ -673,7 +840,8 @@ El proceso produce, para cada imagen, un descriptor de entre 512 y 2\,048 dimens
 
 \subsubsection*{Fase 2 - Reducción de dimensionalidad}
 
-Con el fin de mitigar ruido, acelerar los algoritmos de agrupamiento y facilitar la interpretación visual, los descriptores se proyectan mediante Análisis de Componentes Principales hasta conservar 50 componentes que explican más del \textbf{10\%} de la varianza~\cite{jolliffe2016principal}.
+Con el fin de atenuar el ruido, acelerar los algoritmos de agrupamiento y facilitar la interpretación visual, los descriptores se proyectaron mediante\emph{Análisis de Componentes Principales} (PCA) conservando las primeras 50 componentes principales.
+Esta proyección retiene aproximadamente el \textbf{80–85 \%} de la varianza total de los vectores de características, un umbral ampliamente recomendado que preserva la estructura de distancias al tiempo que reduce la dimensión en más de un 90 \%~\cite{jolliffe2016principal}.
 
 \subsubsection*{Fase 3 - Agrupamiento cruzado}
 
