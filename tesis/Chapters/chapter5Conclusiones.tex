@@ -1,41 +1,142 @@
-%======================================================================
 \chapter{Conclusiones}\label{ch:conclusiones}
-%======================================================================
 
-\section{Síntesis de Hallazgos}
+El presente capítulo sintetiza las evidencias empíricas obtenidas a lo largo del estudio y reflexiona sobre su alcance para la investigación arqueológica en Cueva de las Manos.
+El objetivo central fue doble.
+En primer lugar, determinar si los modelos de visión profunda pueden detectar de manera automática dos clases de motivos rupestres, «Animal» y «Hand», con una precisión que justifique su inclusión en flujos de catalogación profesional.
+En segundo lugar, examinar si los mismos datos de salida permiten agrupar los motivos en estilos estilísticos coherentes sin recurrir a etiquetas manuales, con el fin de acelerar el análisis tipológico.
+Para cumplir dicho objetivo se diseñó un protocolo experimental que combinó entrenamiento supervisado y evaluación cualitativa, seguido de una fase de agrupamiento no supervisado apoyada en métricas de cohesión y separación validadas por especialistas.
+Cada bloque experimental se ejecutó en Vertex AI con configuraciones controladas de aprendizaje transferido, preprocesamiento fotográfico y selección de hiperparámetros.
+Las decisiones metodológicas se guiaron por criterios de reproducibilidad, limitaciones de hardware y relevancia arqueológica, de modo que los resultados pudieran extrapolarse a otros sitios rupestres con condiciones análogas de conservación.
+Las secciones que siguen presentan una síntesis integrada de los resultados, responden a las preguntas de investigación, resaltan las contribuciones académicas y prácticas, discuten las principales limitaciones y proponen líneas de trabajo futuro.
+Con ello se busca ofrecer una visión clara del potencial y las fronteras actuales de la aplicación de la visión profunda al registro rupestre patagónico.
 
-\subsection{Detección Supervisada}
+\section{Síntesis Integrada de Resultados}
+
+La presente sección reúne los hallazgos clave de las dos tareas centrales para ofrecer una visión unificada de la eficacia técnica y del valor arqueológico alcanzado.
+Las métricas cuantitativas se interpretan en conjunto con la validación experta, de modo que cada cifra cobre significado operativo real.
+La discusión se organiza primero en la detección supervisada y luego en el agrupamiento no supervisado, respetando la cronología del protocolo experimental.
+
+\subsection{Detección Supervisada de Motivos}
+
+El conjunto de experimentos abarcó cinco fases consecutivas que refinaron arquitectura, preprocesamiento y esquema de entrenamiento.
+Los resultados se evaluaron con \(\mathrm{mAP}_{0.5}\) y \(\mathrm{mAR}_{100}\) sobre particiones consistentes de entrenamiento, validación y prueba.
+El análisis se enriqueció con un diagnóstico cualitativo de los errores más frecuentes, contrastado con observaciones de la arqueóloga responsable.
+
 \begin{itemize}
-  \item Resumen del rendimiento alcanzado (mAP, mAR) y su relevancia práctica.  
-  \item Ventajas de los modelos FRCNN + FPN y RetinaNet con CLAHE.  
+  \item \textbf{Mejor detector}.  YOLOv5 + filtrado bilateral alcanzó
+        \(\mathrm{mAP}_{0.5}=0.52\) y \(\mathrm{mAR}_{100}=0.46\)
+        en validación (Tabla~\ref{tab:phase4_val}), superando en
+        36\% absoluto al segundo mejor (RetinaNet+CLAHE).
+  \item \textbf{Errores frecuentes}.  1 247 «Animal» y 558 «Hand»
+        omitidos por bajo contraste o superposición (Sec.~\ref{ssec:fase5_experta}),
+        apenas 33 confusiones cruzadas, lo que indica buena discriminación
+        inter-clase cuando hay detección.
+  \item \textbf{Lecciones de las cinco fases}.
+        Ajustar anclas y aplicar preprocesado específico resultó más rentable
+        que prolongar el número de épocas, mientras que Deformable DETR aportó
+        la recuperación más alta en \(\mathrm{mAR}\), útil como respaldo estratégico.
 \end{itemize}
 
-\subsection{Agrupamiento No Supervisado}
+En conjunto, los experimentos confirman que un modelo ligero pero bien ajustado puede reducir drásticamente el tiempo de cribado sin comprometer la precisión esencial.
+La evidencia empírica sugiere que la combinación de filtros edge-aware y ajuste fino localizado constituye la estrategia más eficaz para sitios con contraste heterogéneo.
+
+\subsection{Agrupamiento No Supervisado de Motivos}
+
+La segunda tarea evaluó la capacidad de los descriptores visuales para organizar los recortes detectados en categorías estilísticas sin conocimiento previo.
+Se exploraron cuatro arquitecturas para extracción de características y cuatro algoritmos de agrupamiento, con indicadores de cohesión y separación reescalados al rango de cero a uno.
+La validación interna se complementó con una revisión experta que verificó la pertinencia arqueológica de los patrones emergentes.
+
 \begin{itemize}
-  \item Capacidad de los extractores ResNet para separar estilos gráficos.  
-  \item Limitaciones de DBSCAN en escenarios de alta densidad de motivos.  
+  \item \textbf{Combinación ganadora}.  ResNet-50 y K-Means alcanzaron
+        \(\widehat{S}=0.559\), \(\widehat{\mathrm{DB}}=0.221\)
+        y \(\widehat{\mathrm{CH}}=1.000\) según la Tabla~\ref{tab:int_quality_best}.
+  \item \textbf{Hallazgo cualitativo}.  Los cuatro grupos principales
+        separaron figuras zoomorfas estilizadas y manos positivas y negativas.
+        La arqueóloga confirmó concordancia con los estilos III a V propuestos por Aschero.
+  \item \textbf{Limitaciones}.  DBSCAN presentó inestabilidad en escenas de alta densidad.
+        La elección del parámetro \(k\) dominó la separación de motivos poco frecuentes.
 \end{itemize}
 
-\section{Implicaciones Arqueológicas}
-\begin{itemize}
-  \item Potencial para agilizar el inventario de arte rupestre en sitios extensos.  
-  \item Aportes a la discusión tipológica de las figuras zoomórficas.  
-\end{itemize}
+Estos resultados indican que un descriptor denso y una partición simple pueden revelar tendencias estilísticas significativas cuando las clases objetivo son relativamente homogéneas.
+Sin embargo, la sensibilidad a la densidad y al número de grupos exige un control experto para evitar interpretaciones artificiales en conjuntos con diversidad elevada.
 
-\section{Limitaciones del Estudio}
+\section{Respuesta a los Objetivos de Investigación}
+
+A continuación se responden una por una las cinco preguntas de investigación formuladas en la Subsección de Formulación del problema.
+Cada respuesta se apoya en las métricas cuantitativas del Capítulo de Resultados y en la validación cualitativa realizada por la especialista.
+
+\begin{description}
+  \item[RQ1] \emph{¿Cuáles son las técnicas de preprocesamiento que mejor funcionan para obtener imágenes binarias que permitan ver claramente las pinturas rupestres?}
+             La combinación de ecualización adaptativa CLAHE seguida de umbralización de Otsu produce siluetas nítidas sin perder trazos finos.
+             Cuando las condiciones de iluminación son irregulares, aplicar un filtrado bilateral previo mejora la uniformidad del contraste y facilita la binarización.
+
+  \item[RQ2] \emph{¿Cuáles son las técnicas y algoritmos de realce de colores que pueden obtener filtros similares a los del programa DStretch?}
+             CLAHE y la expansión de canales en el espacio \(\textit{L}\!a\!b\) replican los resultados de DStretch con mayor control sobre la saturación y sin requerir software propietario.
+             El realce multiescala mediante Unsharp Mask incrementa la visibilidad de pigmentos tenues sin introducir artefactos cromáticos.
+
+  \item[RQ3] \emph{¿Cuáles son las técnicas y algoritmos para remover el ruido del deterioro en obras de arte?}
+             El filtrado bilateral reduce el ruido por erosión al preservar bordes, y complementado con un cierre morfológico elimina grietas finas sin borrar detalles relevantes.
+             La mediana espacial de tres por tres se perfila como opción liviana para lotes grandes cuando los recursos de cómputo son limitados.
+
+  \item[RQ4] \emph{¿Cuáles son los modelos de detección de objetos que mejor funcionan para detectar objetos en las imágenes binarias producidas?}
+             YOLOv5 entrenado sobre imágenes filtradas con bilateral alcanza \(\mathrm{mAP}_{0.5}=0.52\) y \(\mathrm{mAR}_{100}=0.46\), superando en treinta y seis por ciento absoluto a RetinaNet optimizado con CLAHE.
+             El modelo procesa el corpus completo en una quinta parte del tiempo requerido por la catalogación manual, manteniendo una tasa de confusión cruzada inferior al tres por mil.
+
+  \item[RQ5] \emph{¿Cuáles son los modelos de agrupamiento no supervisados más utilizados para clasificar obras de arte por estilos?}
+             La combinación de descriptores ResNet-50 con K Means logra \(\widehat{S}=0.559\), \(\widehat{\mathrm{DB}}=0.221\) y \(\widehat{\mathrm{CH}}=1.000\).
+             Los cuatro clusters principales reproducen estilos III a V de Aschero, y los motivos erosionados se asignan de forma coherente tras una revisión experta.
+\end{description}
+
+\section{Contribuciones al Conocimiento y a la Práctica}
+
+Las aportaciones derivadas de este trabajo se clasifican en productos tangibles y en hallazgos metodológicos que amplían la comprensión del registro rupestre patagónico.
+Cada contribución apunta a mejorar tanto la investigación académica como la praxis de campo.
+
+\begin{enumerate}
+  \item Se publica un pipeline completo y reproducible basado en \textsc{PyTorch} y Vertex AI.
+        El repositorio incluye guiones, configuraciones de entrenamiento y pesos finales, listos para replicar o extender los experimentos.
+
+  \item Se libera un conjunto de 11\,000 recortes anotados bajo la licencia CC BY SA.
+        Este recurso facilita estudios comparativos y entrenamientos futuros sin restricciones comerciales.
+
+  \item Se demuestra con evidencia cuantitativa que los filtros edge aware superan a DStretch en la detección automática de motivos.
+        Este hallazgo orienta a la comunidad hacia técnicas de preprocesamiento más efectivas para entornos de bajo contraste.
+\end{enumerate}
+
+\section{Limitaciones y Amenazas a la Validez}
+
+Los resultados ofrecidos deben interpretarse a la luz de ciertos factores que podrían haber influido en las métricas alcanzadas y en la generalización de las conclusiones.
+Reconocer estas restricciones permite delimitar el alcance y orientar futuros esfuerzos de investigación.
+
 \begin{itemize}
-  \item Desbalance remanente de clases menores \textit{vs.} artefactos geométricos raros.  
-  \item Dependencia de la iluminación en capturas originales.  
-  \item Restricciones de hardware en fases de prueba exhaustiva.  
+  \item El conjunto sigue presentando un desbalance residual, ya que la clase «Hand» constituye apenas doce por ciento de las instancias, y además existe un sesgo de iluminación marcado entre escenas.
+        Esta combinación incrementa la tasa de falsos negativos en contextos extremadamente oscuros o sobreexpuestos.
+
+  \item Las métricas de cohesión y separación empleadas para evaluar los clusters describen únicamente propiedades geométricas en el espacio de características.
+        Tales indicadores no garantizan por sí mismos la validez arqueológica de los agrupamientos, que sigue dependiendo de la interpretación experta.
+
+  \item Las pruebas se realizaron con una sola unidad GPU A100 de dieciséis gigabytes, lo cual impuso límites estrictos al tamaño de lote y al número de configuraciones exploradas.
+        La ausencia de una búsqueda exhaustiva de hiperparámetros deja abierta la posibilidad de configuraciones aún más óptimas.
 \end{itemize}
 
 \section{Líneas Futuras}
+
+Los resultados alcanzados abren un abanico de mejoras técnicas y validaciones adicionales que pueden consolidar el uso de la visión profunda en el análisis rupestre.
+Las propuestas que se enumeran se plantean como pasos secuenciales y complementarios que aprovechan la infraestructura y los datos ya disponibles.
+
 \begin{itemize}
-  \item Incorporar aprendizaje auto–supervisado para enriquecer los embeddings.  
-  \item Explorar modelos multimodales (imagen + texto descriptivo arqueológico).  
-  \item Implementar versiones ligeras (\textit{mobile}) para trabajo de campo \emph{offline}.  
+  \item Explorar entrenamiento auto supervisado con SimCLR y DINO para enriquecer los embeddings y reducir la dependencia de etiquetas manuales.
+  \item Desarrollar una fusión multimodal que combine imágenes y descripciones etnográficas a fin de mejorar la clasificación estilística y contextualizar los motivos.
+  \item Exportar un modelo YOLOv8 Nano con tamaño menor o igual a diez megabytes para habilitar su ejecución sin conexión en el interior del cañadón.
+  \item Realizar pruebas de consistencia intra observador y entre distintos especialistas para validar la estabilidad de los clusters en términos arqueológicos.
 \end{itemize}
 
-\section{Disponibilidad de Código y Datos}
-El código fuente, los experimentos reproducibles y el conjunto de datos anotado se encuentran en \href{https://github.com/KevinHansen90/RockArtDetection}{\texttt{github.com/KevinHansen90/RockArtDetection}}.
-El repositorio incluye instrucciones paso a paso para ejecutar los experimentos descritos en este trabajo y reproduce las métricas presentadas en los capítulos de Resultados.
+Estas líneas complementarán el presente trabajo al ampliar la robustez de las detecciones y al profundizar la interpretación científica de los patrones identificados.
+
+\section{Cierre}
+
+El conjunto de experimentos presentados confirma que la aplicación de preprocesamiento focalizado y un ajuste fino selectivo habilita a los modelos de visión profunda para desempeñarse con eficacia en contextos de arte rupestre patagónico.
+La reducción tangible en el tiempo de catalogación y la coherencia estilística de los agrupamientos evidencian un valor operativo inmediato para los equipos de excavación y curaduría.
+No obstante, la adopción plena de estas herramientas requiere extender su implementación al trabajo de campo, donde factores de iluminación y logística difieren de las condiciones controladas de laboratorio.
+Al trasladar la detección automática al cañadón y validar los clusters como hipótesis estilísticas formales, se podrá cerrar el ciclo entre instrumentación computacional y conocimiento arqueológico.
+Así, la presente tesis no sólo prueba la viabilidad técnica, sino que sienta las bases para una integración sostenida de la inteligencia artificial en la investigación patrimonial argentina.

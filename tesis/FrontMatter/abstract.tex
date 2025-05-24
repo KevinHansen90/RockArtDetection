@@ -1,4 +1,9 @@
 \begin{abstract}
-    Este trabajo presenta un enfoque para la detección y clasificación estilística automática de arte rupestre en la Cueva de las Manos.
-    Utilizando técnicas avanzadas de procesamiento de imágenes, detección de objetos y clusterización, se busca desarrollar un proceso robusto para analizar y categorizar el arte rupestre en función de sus características visuales.
+Este trabajo aborda la detección y clasificación estilística automática del arte rupestre de la \emph{Cueva de las Manos}, donde la identificación manual se ve dificultada por superposiciones, erosión y criterios heterogéneos entre especialistas.
+Se diseñó un proceso de visión por computadora en dos etapas.
+Primero, se evaluaron 5 preprocesamientos (escenario base, CLAHE, filtrado bilateral, máscara de realce y pirámide laplaciana) con cuatro modelos de distinta arquitectura (YOLOv5, RetinaNet, Faster R-CNN y Deformable DETR) entrenados sobre \(\sim20\,000\) imágenes anotadas.
+Su desempeño se evaluó mediante mAP\(_{0.5}\) y mAR\(_{100}\).
+Después, los motivos extraídos se representaron con cuatro extractores de características (ResNet-50, DenseNet-121, VGG-16 y Vision Transformer) y se agruparon con K-means, DBSCAN, Spectral y Agglomerative Clustering, valorados con Silhouette, Davies–Bouldin inverso y Calinski–Harabasz normalizado.
+El mejor ensamblado alcanzó alta precisión y recuperación, redujo sustancialmente el tiempo de catalogación y generó clusters coherentes con las familias tipológicas del arqueólogo Carlos Aschero, incluso en motivos degradados.
+Los resultados confirman que la integración de realce dirigido, detección profunda y clusterización multiescala constituye una metodología reproducible y transferible para el análisis masivo de arte rupestre patagónico.
 \end{abstract}

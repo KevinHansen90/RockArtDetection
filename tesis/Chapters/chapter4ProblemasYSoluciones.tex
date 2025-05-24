@@ -529,7 +529,7 @@ La Figura~\ref{fig:heatmap_pp} resume, en forma de mapa de calor, la variación 
 Tres tendencias destacan:
 
 \begin{enumerate}
-  \item El tiling con superposición del 10\,\% aporta la mayor ganancia marginal (+5 p.p.\ en promedio) al reducir la cola derecha de la distribución de motivos (Fig.~\ref{fig:hist_tiles}).
+  \item El tiling con superposición del 10\% aporta la mayor ganancia marginal (+5 p.p.\ en promedio) al reducir la cola derecha de la distribución de motivos (Fig.~\ref{fig:hist_tiles}).
   \item Las transformaciones fotométricas suaves (volteo, \texttt{ColorJitter}) elevan hasta +3 p.p.\ la \(\text{mAP}_{50}\) en los detectores que originalmente carecían de ellas (Faster R-CNN, RetinaNet).
   \item Los filtros de contraste agresivos (Laplacian Pyramid) degradan el rendimiento en todos los modelos.
   Por ello se descartan en la configuración final (Sec.~\ref{ssec:contraste}).
@@ -537,7 +537,7 @@ Tres tendencias destacan:
 
 \begin{figure}[!h]
   \centering
-  \includegraphics[width=\textwidth]{Images/cluster_0}
+  \includegraphics[width=\textwidth]{Images/heatmap_pp}
   \caption{Variación de \(\text{mAP}_{50}\) (+verde / –rojo) frente a la configuración \emph{base} sin pre-procesamiento.}
   \label{fig:heatmap_pp}
 \end{figure}
