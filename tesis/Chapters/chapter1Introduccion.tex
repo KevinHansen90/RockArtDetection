@@ -415,28 +415,57 @@ Para medir la calidad de los agrupamientos obtenidos a partir de las caracterís
     \(H(\mathcal{C}) = -\sum_k p_k \log p_k\), \(H(\mathcal{Y}) = -\sum_\ell q_\ell \log q_\ell\) son las entropías; \(p_k\) y \(q_\ell\) son proporciones de muestras en \(C_k\) y \(Y_\ell\). El resultado está acotado en \([0,1]\); 1 indica coincidencia perfecta.
 
     \item \textbf{Silhouette}.
-    Para cada punto \(i\) se calcula
-    \(a_i = \text{promedio de distancias dentro de su \emph{cluster}}\) y
-    \(b_i = \text{mínimo promedio de distancias a los demás \emph{clusters}}\).
-    La silueta individual es
+    Sea \(i\) el \emph{motivo rupestre} individual, descrito por su vector de características en el espacio de representación.
+    Para cada motivo \(i\) se calcula
+    \(a_i = \text{promedio de distancias entre \(i\) y los demás motivos de su mismo \emph{cluster}}\) y
+    \(b_i = \text{mínimo promedio de distancias entre \(i\) y los motivos de los demás \emph{clusters}}\).
+    La silueta individual resulta
     \[
         s_i \;=\; \frac{b_i - a_i}{\max(a_i,\,b_i)} \in [-1,1],
     \]
-    y la \emph{Silhouette Score} global es el promedio de \(s_i\). Valores cercanos a 1 indican \emph{clusters} compactos y bien separados; valores negativos sugieren asignaciones incorrectas.
+    y el \emph{Silhouette Score} global es el promedio de todos los \(s_i\).
+    Valores cercanos a 1 indican grupos compactos y bien separados, mientras que valores negativos sugieren asignaciones incorrectas.
 
-    \item \textbf{Purity}.
-    Sea \(N\) el número total de muestras.
+    \item \textbf{Pureza (Purity).}
+    Sea \(N\) el número total de motivos rupestres analizados (una imagen por motivo).
+    Denotemos:
+    \begin{itemize}[nosep,leftmargin=1.5em]
+    \item \(C_k\) — conjunto de motivos que el algoritmo asigna al \(k\)-ésimo \emph{cluster}, con \(k = 1,\dots,K\);
+    \item \(Y_\ell\) — conjunto de motivos que comparten la etiqueta arqueológica \(\ell\) (clase de referencia definida por la especialista), con \(\ell = 1,\dots,L\).
+    \end{itemize}
+    Entonces,
     \[
-        \operatorname{Purity} \;=\; \frac{1}{N}\sum_{k=1}^{K} \max_{\ell}\,|C_k \cap Y_\ell|.
+      \operatorname{Purity} \;=\;
+      \frac{1}{N}\,\sum_{k=1}^{K} \max_{\ell}\,|C_k \cap Y_\ell|.
     \]
-    Mide la fracción de muestras correctamente agrupadas según su clase dominante dentro de cada \emph{cluster}; oscila entre 0 y 1.
+    La métrica mide la fracción de motivos correctamente agrupados según la clase dominante dentro de cada \emph{cluster}.
+    Su rango va de \(0\) (agrupamiento aleatorio) a \(1\) (correspondencia perfecta con las clases arqueológicas).
 
-    \item \textbf{Rand Index}.
-    Para todos los pares de muestras se cuentan coincidencias (\textsc{tp} y \textsc{tn}) y discrepancias (\textsc{fp}, \textsc{fn}) entre las particiones \(\mathcal{C}\) y \(\mathcal{Y}\).
+    \item \textbf{Rand Index (RI).}
+    Sea \(\mathcal{C}=\{C_1,\dots,C_K\}\) la partición obtenida por el algoritmo
+    y \(\mathcal{Y}=\{Y_1,\dots,Y_L\}\) la partición de referencia definida por la especialista.
+    Para cada par no ordenado de motivos rupestres \((i,j)\) se evalúa:
+
+    \begin{center}
+    \begin{tabular}{@{}ll@{}}
+    \textsc{tp}: & \(i\) y \(j\) están en el mismo \(C_k\) \emph{y} en la misma \(Y_\ell\) \\[2pt]
+    \textsc{tn}: & \(i\) y \(j\) están en distintos \(C_k\) \emph{y} en distintos \(Y_\ell\) \\[2pt]
+    \textsc{fp}: & \(i\) y \(j\) están en el mismo \(C_k\) pero en distintos \(Y_\ell\) \\[2pt]
+    \textsc{fn}: & \(i\) y \(j\) están en distintos \(C_k\) pero en el mismo \(Y_\ell\)
+    \end{tabular}
+    \end{center}
+    
+    Con estos conteos se define
     \[
-        \operatorname{RI} \;=\; \frac{\textsc{tp}+\textsc{tn}}{\textsc{tp}+\textsc{fp}+\textsc{fn}+\textsc{tn}} \in [0,1].
+      \operatorname{RI} \;=\;
+      \frac{\textsc{tp} + \textsc{tn}}
+           {\textsc{tp} + \textsc{fp} + \textsc{fn} + \textsc{tn}}
+      \in [0,1].
     \]
-    Un valor alto indica fuerte acuerdo entre los \emph{clusters} obtenidos y la referencia externa.
+
+    Un valor próximo a \(1\) indica fuerte acuerdo entre la agrupación estimada y la clasificación arqueológica.
+    Aunque la fórmula es formalmente análoga a la \emph{accuracy}, la comparación se realiza sobre \emph{todos los pares} de motivos.
+    Por lo tanto, el RI evalúa la coherencia relacional dentro y entre los grupos, no la exactitud etiqueta a etiqueta.
 \end{itemize}
 
 En el caso del arte rupestre, la ausencia de una taxonomía universal y la posibilidad de descubrir nuevos estilos hacen especialmente valiosas estas métricas.
