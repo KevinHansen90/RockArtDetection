@@ -128,10 +128,10 @@ Los valores se muestran con tres decimales; un incremento de \(+0.011\) equivale
 
 \begin{itemize}
   \item \textbf{Mejoras notables.}
-        El filtro \emph{Bilateral} aporta la mayor ganancia absoluta a Faster R–CNN (+0.011 ≈ +1.1 pp en mAP\(_{0.5}\)) y a YOLOv5 (+0.011 pp).
+        El filtro \emph{Bilateral} aporta la mayor ganancia absoluta a Faster R–CNN (+0.011 en mAP\(_{0.5}\)) y a YOLOv5 (+0.011).
         En términos de mAR\(_{100}\), la ventaja se amplía hasta +0.024 pp para YOLOv5.
   \item \textbf{Efecto neutro a leve.}
-        \emph{CLAHE}, \emph{Laplacian Pyramid} y \emph{Unsharp Masking} producen mejoras menores (≤ +0.015 pp) o prácticamente nulas en Faster R–CNN.
+        \emph{CLAHE}, \emph{Laplacian Pyramid} y \emph{Unsharp Masking} producen mejoras menores (+0.015 pp) o prácticamente nulas en Faster R–CNN.
   \item \textbf{Degradación en Deformable DETR.}
         Para este detector, el preprocesamiento resulta contraproducente: el filtro \emph{Bilateral} reduce la mAP\(_{0.5}\) en –0.033 pp y la mAR\(_{100}\) en –0.029 pp; incluso el mejor caso (\emph{CLAHE}) apenas compensa esta caída.
 \end{itemize}
@@ -229,21 +229,16 @@ La Tabla~\ref{tab:phase4_val} aporta la referencia numérica exacta:
 \begin{figure}[!ht]
   \centering
   \includegraphics[height=0.8\textheight,keepaspectratio]{Images/phase4_curves}
-  \caption{Evolución de las métricas durante la Fase 4.
-           \textbf{YOLOv5} eleva mAP\(_{0.5}\) de 0.15 a 0.45 en las primeras
-           $\sim$15 épocas y luego se estabiliza, lo que refleja una
-           convergencia rápida y sostenida.
-           \textbf{Deformable DETR} muestra oscilaciones pronunciadas en las
-           pérdidas debido al \emph{warm-up} lineal del \emph{learning rate}\footnotemark,
-           aunque la tendencia media de mAR\(_{100}\) es ascendente.
-           \textbf{Faster R–CNN} necesita unas 20 épocas para acercarse a su
-           máximo, de modo que su convergencia es más lenta en términos de
-           épocas efectivas.}
+  \caption[Evolución de las métricas durante la Fase 4 (resumen)]%
+          {Evolución de las métricas durante la Fase 4.%
+          \textbf{YOLOv5} eleva mAP\(_{0.5}\) de 0.15 a 0.45 en las primeras \(\sim\)15 épocas y luego se estabiliza, reflejando una convergencia rápida.%
+          \textbf{Deformable DETR} presenta oscilaciones pronunciadas en las pérdidas debidas al incremento lineal inicial de la tasa de aprendizaje (\emph{warm-up})\footnotemark, aunque la tendencia media de mAR\(_{100}\) es ascendente.%
+          \textbf{Faster R--CNN} requiere unas 20 épocas para aproximarse a su máximo, por lo que converge más lentamente en términos de épocas efectivas.}%
   \label{fig:phase4_curves}
 \end{figure}
-\footnotetext{Durante las primeras iteraciones se incrementa gradualmente la
-tasa de aprendizaje para evitar inestabilidades numéricas.
-Este \emph{warm-up} provoca picos en la \texttt{loss} antes de asentarse.}
+
+\footnotetext{Durante las tres primeras épocas se aplica un \emph{warm-up} lineal del \emph{learning rate}.}
+
 
 \begin{figure}[!ht]
   \centering

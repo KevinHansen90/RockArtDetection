@@ -428,30 +428,30 @@ Para medir la calidad de los agrupamientos obtenidos a partir de las caracterís
 
     \item \textbf{Pureza (Purity).}
     Sea \(N\) el número total de motivos rupestres analizados (una imagen por motivo).
-    Denotemos:
-    \begin{itemize}[nosep,leftmargin=1.5em]
-    \item \(C_k\) — conjunto de motivos que el algoritmo asigna al \(k\)-ésimo \emph{cluster}, con \(k = 1,\dots,K\);
-    \item \(Y_\ell\) — conjunto de motivos que comparten la etiqueta arqueológica \(\ell\) (clase de referencia definida por la especialista), con \(\ell = 1,\dots,L\).
-    \end{itemize}
-    Entonces,
+    Denotemos
+    \[
+      C_k = \{\text{motivos asignados al $k$-ésimo \emph{cluster}}\},\qquad
+      Y_\ell = \{\text{motivos con etiqueta arqueológica }\ell\}.
+    \]
+    Entonces
     \[
       \operatorname{Purity} \;=\;
-      \frac{1}{N}\,\sum_{k=1}^{K} \max_{\ell}\,|C_k \cap Y_\ell|.
+      \frac{1}{N}\sum_{k=1}^{K} \max_{\ell}\,|C_k \cap Y_\ell|.
     \]
-    La métrica mide la fracción de motivos correctamente agrupados según la clase dominante dentro de cada \emph{cluster}.
-    Su rango va de \(0\) (agrupamiento aleatorio) a \(1\) (correspondencia perfecta con las clases arqueológicas).
+    La métrica mide la fracción de motivos correctamente agrupados según la clase dominante en cada \emph{cluster},
+    con valores entre \(0\) (agrupamiento aleatorio) y \(1\) (correspondencia perfecta con las clases arqueológicas).
 
     \item \textbf{Rand Index (RI).}
-    Sea \(\mathcal{C}=\{C_1,\dots,C_K\}\) la partición obtenida por el algoritmo
-    y \(\mathcal{Y}=\{Y_1,\dots,Y_L\}\) la partición de referencia definida por la especialista.
-    Para cada par no ordenado de motivos rupestres \((i,j)\) se evalúa:
+    Sean \(\mathcal{C}=\{C_1,\dots,C_K\}\) la partición obtenida por el algoritmo y
+    \(\mathcal{Y}=\{Y_1,\dots,Y_L\}\) la partición de referencia definida por la especialista.
+    Para cada par de motivos \((i,j)\) se contabiliza:
 
     \begin{center}
-    \begin{tabular}{@{}ll@{}}
-    \textsc{tp}: & \(i\) y \(j\) están en el mismo \(C_k\) \emph{y} en la misma \(Y_\ell\) \\[2pt]
-    \textsc{tn}: & \(i\) y \(j\) están en distintos \(C_k\) \emph{y} en distintos \(Y_\ell\) \\[2pt]
-    \textsc{fp}: & \(i\) y \(j\) están en el mismo \(C_k\) pero en distintos \(Y_\ell\) \\[2pt]
-    \textsc{fn}: & \(i\) y \(j\) están en distintos \(C_k\) pero en el mismo \(Y_\ell\)
+    \begin{tabular}{ll}
+    \textsc{tp}: & mismo \(C_k\) \emph{y} mismo \(Y_\ell\) \\[2pt]
+    \textsc{tn}: & distinto \(C_k\) \emph{y} distinto \(Y_\ell\) \\[2pt]
+    \textsc{fp}: & mismo \(C_k\) pero distinto \(Y_\ell\) \\[2pt]
+    \textsc{fn}: & distinto \(C_k\) pero mismo \(Y_\ell\)
     \end{tabular}
     \end{center}
 
@@ -460,12 +460,10 @@ Para medir la calidad de los agrupamientos obtenidos a partir de las caracterís
       \operatorname{RI} \;=\;
       \frac{\textsc{tp} + \textsc{tn}}
            {\textsc{tp} + \textsc{fp} + \textsc{fn} + \textsc{tn}}
-      \in [0,1].
+      \;\in\; [0,1].
     \]
-
-    Un valor próximo a \(1\) indica fuerte acuerdo entre la agrupación estimada y la clasificación arqueológica.
-    Aunque la fórmula es formalmente análoga a la \emph{accuracy}, la comparación se realiza sobre \emph{todos los pares} de motivos.
-    Por lo tanto, el RI evalúa la coherencia relacional dentro y entre los grupos, no la exactitud etiqueta a etiqueta.
+    Valores cercanos a \(1\) indican fuerte acuerdo entre la agrupación estimada y la clasificación arqueológica.
+    Aunque su forma recuerda a la \emph{accuracy}, el RI evalúa la coherencia de \emph{todos} los pares de motivos, no las etiquetas uno a uno.
 \end{itemize}
 
 En el caso del arte rupestre, la ausencia de una taxonomía universal y la posibilidad de descubrir nuevos estilos hacen especialmente valiosas estas métricas.
