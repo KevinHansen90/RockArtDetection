@@ -19,14 +19,14 @@ El desempeño se resume mediante mAP$_{0.5}$ y mAR$_{100}$, acompañado de ejemp
 \subsection{Fase 1 — Prueba inicial}
 \label{ssec:fase1}
 
-\paragraph{Curvas de entrenamiento y validación.}
-La Figura~\ref{fig:phase1_small_multiples} sintetiza, en un \emph{small-multiples}, la evolución de \texttt{train\_loss} y \texttt{val\_loss} (filas superiores) junto con los indicadores de desempeño mAP$_{0.5}$ y mAR$_{100}$ (filas inferiores) para las cuatro arquitecturas que se evalúan.
+\paragraph{Curvas de Función de Pérdida para Conjuntos de Entrenamiento y Validación.}
+La Figura~\ref{fig:phase1_small_multiples} sintetiza, en un \emph{small-multiples} \footnote{El término, popularizado por Edward Tufte, designa una cuadrícula de gráficos de igual formato y escala que permite comparar visualmente varias series de datos de un vistazo.}, la evolución de funciones de pérdida para los conjuntos de entrenamiento y validación, respectivamente (filas superiores), junto con los indicadores de desempeño mAP$_{0.5}$ y mAR$_{100}$ (filas inferiores) para las cuatro arquitecturas que se evalúan.
 Cada columna corresponde a un modelo y cada punto representa una época.
 
 \begin{figure}[!ht]
   \centering
   \includegraphics[width=\textwidth]{Images/phase1_small_multiples}
-  \caption[Curvas de pérdida y métricas de la Fase 1]{Evolución de las pérdidas y métricas durante la prueba inicial. Las líneas sólidas muestran los valores por época y las áreas sombreadas indican el rango inter-cuartílico (25–75\,\%).}
+  \caption[Curvas de pérdida y métricas de la Fase 1]{Evolución de las pérdidas y métricas durante la prueba inicial. Las líneas sólidas muestran los valores por época.}
   \label{fig:phase1_small_multiples}
 \end{figure}
 
@@ -54,14 +54,16 @@ Faster R–CNN alcanza 5 \% y RetinaNet se mantiene por debajo del 1 \%.
 \paragraph{Breve discusión técnica.}
 \begin{itemize}
   \item \textbf{Estabilidad de la convergencia.}
-        YOLOv5 muestra una disminución monótona de \texttt{val\_loss} y una mejora sostenida de mAP/mAR; la brecha entre pérdida de entrenamiento y validación permanece acotada a lo largo de las 30 épocas.
-        Deformable DETR presenta oscilaciones de pérdida —propias de su escala de optimización—, pero las métricas de precisión exhiben una tendencia ascendente.
-  \item \textbf{Indicios de sobre-ajuste.}
-        En RetinaNet la \texttt{val\_loss} deja de descender a partir de la época 6 mientras la pérdida de entrenamiento continúa bajando, sin una mejora concomitante en mAP; este comportamiento indica sobre-ajuste temprano.
-        Un patrón similar, aunque menos pronunciado, se observa en Faster R–CNN tras la época 6.
+        YOLOv5 muestra una disminución casi monótona de \texttt{val\_loss} y un incremento sostenido de mAP y mAR a lo largo de las 30 épocas, con una brecha mínima respecto a la \texttt{train\_loss}.
+        En Deformable DETR las pérdidas oscilan de forma marcada (esperable en esta arquitectura si se observan pocas épocas), pero las métricas de precisión exhiben una tendencia netamente ascendente.
+
+  \item \textbf{Ausencia de sobre-ajuste visible.}
+        En los cuatro modelos la \texttt{val\_loss} desciende en paralelo (o solo ligeramente por encima) de la \texttt{train\_loss}.
+        Ninguna curva revierte su tendencia dentro del rango observado, por lo que no se aprecian indicios claros de sobre-ajuste durante las primeras 8–10 épocas (30 en el caso de YOLOv5).
+
   \item \textbf{Sensibilidad a la tasa de aprendizaje.}
-        La ganancia marginal de RetinaNet sugiere que la LR inicial —común a todas las pruebas— resulta sub-óptima para esta arquitectura.
-        Por el contrario, YOLOv5 se muestra robusto frente a dicho valor, lo que se refleja en una convergencia más rápida y estable.
+        RetinaNet muestra mejoras modestas: la pendiente de mAP/mAR se atenúa a partir de la época 6, lo que sugiere que la LR inicial, compartida por todas las pruebas, podría ser sub-óptima para esta arquitectura.
+        Por el contrario, YOLOv5 mantiene una convergencia rápida y estable con la misma configuración, indicando mayor robustez frente a la elección del hiperparámetro.
 \end{itemize}
 
 \paragraph{Criterio de avance.}
@@ -76,7 +78,7 @@ Los resultados de esta fase constituyen la línea base sobre la cual se desarrol
 
 \paragraph{Diseño experimental.}
 Se evalúan cinco técnicas de preprocesamiento —\textit{Base} (sin filtros), \textit{Bilateral Filter}, \textit{CLAHE}, \textit{Unsharp Masking} y \textit{Laplacian Pyramid}— aplicadas a las cuatro arquitecturas de la Fase 1.
-Para cada combinación se registra el mayor mAP\(_{0.5}\) dentro de la ventana de entrenamiento.
+Para cada combinación se registra el mayor mAP\(_{0.5}\) dentro de la ventana de entrenamiento, y se refleja en la tabla~\ref{tab:fase2_map}.
 
 \begin{table}[!ht]
   \centering
@@ -98,29 +100,55 @@ Para cada combinación se registra el mayor mAP\(_{0.5}\) dentro de la ventana d
 
 
 \paragraph{Variabilidad de los resultados.}
-La Figura~\ref{fig:fase2_ridges} presenta ridgelines con la distribución de mAP\(_{0.5}\) para cada filtro; {\small Bilateral} y {\small CLAHE} concentran la densidad en valores más altos, en tanto que Deformable DETR exhibe mayor dispersión.
+La Figura~\ref{fig:fase2_ridges} muestra un gráfico tipo \emph{ridgeline}\footnote{También denominado \emph{joyplot} o gráfico de crestas, útil para comparar distribuciones de densidad en paralelo.} con la distribución de mAP\(_{0.5}\) obtenida para cada técnica de preprocesamiento durante la Fase 2.
+Se representan en total \(n=240\) mediciones (5 filtros \(\times\) 4 detectores \(\times\) épocas), lo que permite captar tanto la variación intra-modelo como la evolución temporal.
+
+\begin{itemize}
+  \item Los filtros \textit{Bilateral} y \textit{CLAHE} concentran la mayor parte de su densidad entre \(0.20\) y \(0.25\), indicando un rendimiento sistemáticamente superior al caso \textit{Base} (sin filtrado), cuya cresta se desplaza hacia la izquierda.
+  \item \textit{Unsharp Masking} y la \textit{Pyrámide Laplaciana} muestran colas más extensas: alcanzan valores altos de mAP\(_{0.5}\) en algunos experimentos, pero con mayor dispersión, lo que sugiere sensibilidad al modelo o a la época de entrenamiento.
+  \item En ausencia de sobre-representación de un detector concreto, las diferencias observadas pueden atribuirse principalmente al preprocesamiento aplicado.
+\end{itemize}
 
 \begin{figure}[!ht]
   \centering
   \includegraphics[width=\textwidth]{Images/phase2_ridgelines}
-  \caption[Distribución de mAP\(_{0.5}\) por filtro]{Ridgelines de mAP\(_{0.5}\) (todas las épocas). Filtros con mediana más alta se ubican a la derecha.}
+  \caption[Distribución de mAP\(_{0.5}\) por técnica]{Comparación de las distribuciones de mAP\(_{0.5}\) (160 mediciones en total).
+           Cada cresta resume la densidad de una técnica de preprocesamiento: un desplazamiento hacia la derecha implica valores más altos de precisión.}
   \label{fig:fase2_ridges}
 \end{figure}
 
 \paragraph{Impacto relativo.}
-Los mapas de calor de la Figura~\ref{fig:fase2_deltas} muestran la ganancia relativa (\(\Delta\)) en mAP\(_{0.5}\) y mAR\(_{100}\) respecto de la condición \textit{Base}.
-El filtro bilateral ofrece la mayor mejora absoluta para Faster R–CNN (+1.1 pp) y YOLOv5 (+1.2 pp), mientras que Deformable DETR rinde mejor sin preprocesamiento (hasta –3 pp).
+La Figura~\ref{fig:fase2_deltas} compara cada combinación \(\langle\text{detector},\ \text{filtro}\rangle\) con su respectiva línea \textit{Base} (sin preprocesamiento).
+La “ganancia relativa” se define como
+\[
+  \Delta = \bar{m}_{\text{filtro}} - \bar{m}_{\text{Base}},
+\]
+donde \(\bar{m}\) es la media de la métrica (mAP\(_{0.5}\) a la izquierda, mAR\(_{100}\) a la derecha) sobre las ocho épocas analizadas.
+Los valores se muestran con tres decimales; un incremento de \(+0.011\) equivale a \(+1.1\) puntos porcentuales (pp) porque ambas métricas están acotadas en \([0,1]\).
+
+\begin{itemize}
+  \item \textbf{Mejoras notables.}
+        El filtro \emph{Bilateral} aporta la mayor ganancia absoluta a Faster R–CNN (+0.011 ≈ +1.1 pp en mAP\(_{0.5}\)) y a YOLOv5 (+0.011 pp).
+        En términos de mAR\(_{100}\), la ventaja se amplía hasta +0.024 pp para YOLOv5.
+  \item \textbf{Efecto neutro a leve.}
+        \emph{CLAHE}, \emph{Laplacian Pyramid} y \emph{Unsharp Masking} producen mejoras menores (≤ +0.015 pp) o prácticamente nulas en Faster R–CNN.
+  \item \textbf{Degradación en Deformable DETR.}
+        Para este detector, el preprocesamiento resulta contraproducente: el filtro \emph{Bilateral} reduce la mAP\(_{0.5}\) en –0.033 pp y la mAR\(_{100}\) en –0.029 pp; incluso el mejor caso (\emph{CLAHE}) apenas compensa esta caída.
+\end{itemize}
 
 \begin{figure*}[!ht]
   \centering
   \includegraphics[width=.48\textwidth]{Images/phase2_delta_map_heat}\hfill
   \includegraphics[width=.48\textwidth]{Images/phase2_delta_mar_heat}
-  \caption[Ganancia relativa (\(\Delta\)) en mAP y mAR]{Diferencia porcentual entre cada preprocesamiento y la línea \textit{Base}. Izquierda: mAP\(_{0.5}\); derecha: mAR\(_{100}\).}
+  \caption[Diferencia relativa en mAP y mAR]{Matrices de \(\Delta\) respecto a la condición \textit{Base}.
+           Izquierda: mAP\(_{0.5}\);\; derecha: mAR\(_{100}\).
+           Un valor positivo (verde) indica mejora; negativo (rojo), degradación.}
   \label{fig:fase2_deltas}
 \end{figure*}
 
+
 \paragraph{Mejores ejecuciones.}
-La Figura~\ref{fig:fase2_bestruns} ilustra las curvas de pérdida y métricas de las tres combinaciones con mayor potencial: Faster R–CNN + Bilateral, YOLOv5 + Bilateral y Deformable DETR + Base.
+La Figura~\ref{fig:fase2_bestruns} ilustra las curvas de funciones de pérdida y métricas de las tres combinaciones con mayor potencial: Faster R–CNN + Bilateral, YOLOv5 + Bilateral y Deformable DETR + Base.
 
 \begin{figure}[!ht]
   \centering
@@ -166,9 +194,21 @@ Por tanto, \textbf{YOLOv5 con filtrado bilateral} se adopta como configuración 
 \subsection{Fase 4 — Entrenamiento Integral}
 \label{ssec:fase4_integral}
 
-En la Fase 4 se entrenan tres arquitecturas hasta completar el número de épocas planificado (YOLOv5: 60, Deformable DETR: 25, Faster R-CNN: 30).
-La Fig.~\ref{fig:phase4_curves} muestra la evolución de las métricas.
-La Fig.~\ref{fig:phase4_bars} resume los mejores valores de mAP\(_{0.5}\) y mAR\(_{100}\) alcanzados en validación.
+En esta fase se completó el entrenamiento exhaustivo de las tres arquitecturas seleccionadas
+(YOLOv5, Deformable DETR y Faster~R–CNN), cada una con la cantidad de épocas definida en el plan experimental
+(YOLOv5: 60, Deformable~DETR: 25, Faster~R–CNN: 30).
+
+La Figura~\ref{fig:phase4_curves} ilustra la evolución temporal de las pérdidas y las métricas en los conjuntos de \textit{train} y \textit{val}.
+Se observan tres comportamientos bien diferenciados:
+
+\begin{itemize}
+  \item \textbf{YOLOv5} presenta una caída estable de \texttt{train\_loss} y \texttt{val\_loss}, acompañada de mejoras sostenidas en mAP\(_{0.5}\) y mAR\(_{100}\).
+  \item \textbf{Deformable DETR} exhibe oscilaciones pronunciadas propias de su esquema de \emph{warm-up} y del balance entre la \emph{Hungarian matching loss} y la regresión de cajas; aun así, la tendencia global de mAR\(_{100}\) es ascendente.
+  \item \textbf{Faster R–CNN} converge de forma más gradual; sus curvas muestran un descenso consistente, pero con menor pendiente que YOLOv5.
+\end{itemize}
+
+Para una comparación sintética, la Figura~\ref{fig:phase4_bars} agrupa los mejores valores de mAP\(_{0.5}\) y mAR\(_{100}\) alcanzados en validación.
+La Tabla~\ref{tab:phase4_val} aporta la referencia numérica exacta:
 
 \begin{table}[!ht]
   \centering
@@ -179,8 +219,8 @@ La Fig.~\ref{fig:phase4_bars} resume los mejores valores de mAP\(_{0.5}\) y mAR\
     \hline
     Modelo & mAP\(_{0.5}\)\,↑ & mAR\(_{100}\)\,↑\\
     \hline
-    YOLOv5 (\textit{Bilateral})       & 0.52 & 0.46\\
-    Deformable DETR (Base)            & 0.16 & 0.36\\
+    YOLOv5 (\textit{Bilateral})        & 0.52 & 0.46\\
+    Deformable DETR (\textit{Base})    & 0.16 & 0.36\\
     Faster R--CNN (\textit{Bilateral}) & 0.11 & 0.21\\
     \hline
   \end{tabular}
@@ -189,12 +229,21 @@ La Fig.~\ref{fig:phase4_bars} resume los mejores valores de mAP\(_{0.5}\) y mAR\
 \begin{figure}[!ht]
   \centering
   \includegraphics[height=0.8\textheight,keepaspectratio]{Images/phase4_curves}
-  \caption{Curvas de entrenamiento y validación durante la Fase 4.
-           YOLOv5 desciende de forma estable; Deformable DETR oscila
-           por el \emph{warm-up} del optimizador; Faster R-CNN converge
-           más lentamente.}
+  \caption{Evolución de las métricas durante la Fase 4.
+           \textbf{YOLOv5} eleva mAP\(_{0.5}\) de 0.15 a 0.45 en las primeras
+           $\sim$15 épocas y luego se estabiliza, lo que refleja una
+           convergencia rápida y sostenida.
+           \textbf{Deformable DETR} muestra oscilaciones pronunciadas en las
+           pérdidas debido al \emph{warm-up} lineal del \emph{learning rate}\footnotemark,
+           aunque la tendencia media de mAR\(_{100}\) es ascendente.
+           \textbf{Faster R–CNN} necesita unas 20 épocas para acercarse a su
+           máximo, de modo que su convergencia es más lenta en términos de
+           épocas efectivas.}
   \label{fig:phase4_curves}
 \end{figure}
+\footnotetext{Durante las primeras iteraciones se incrementa gradualmente la
+tasa de aprendizaje para evitar inestabilidades numéricas.
+Este \emph{warm-up} provoca picos en la \texttt{loss} antes de asentarse.}
 
 \begin{figure}[!ht]
   \centering
@@ -204,6 +253,11 @@ La Fig.~\ref{fig:phase4_bars} resume los mejores valores de mAP\(_{0.5}\) y mAR\
            considerable.}
   \label{fig:phase4_bars}
 \end{figure}
+
+En términos de precisión (mAP\(_{0.5}\)), YOLOv5 aventaja al segundo mejor modelo en \(\sim\)36~pp y,
+en capacidad de recuperación (mAR\(_{100}\)), la brecha es de 10~pp respecto a Deformable DETR.
+Estas diferencias motivan la selección preliminar de YOLOv5 como candidato principal para la fase de validación experta
+(Sección~\ref{ssec:fase5_experta}), sin descartar aportar observaciones cualitativas derivadas del modelo Deformable DETR.
 
 \paragraph{Inspección cualitativa.}
 La Fig.~\ref{fig:yolov5_val} ilustra detecciones de YOLOv5 sobre el conjunto de validación.
@@ -599,12 +653,3 @@ La fuerte coherencia tonal salta a la vista, al tiempo que la diversidad morfol�
 \end{figure}
 
 En síntesis, las métricas numéricas coinciden con la valoración experta al señalar que las configuraciones basadas en \texttt{densenet121} producen los conglomerados más “coherentes” en términos de color, aunque esa coherencia no siempre se traduce en agrupaciones semánticamente significativas para la tipología arqueológica.
-
-%----------------------------------------------------------------------
-\section{Comparación Cruzada y Costes Computacionales}
-
-\begin{itemize}
-  \item Tabla de tiempo de entrenamiento/inferencia y uso de VRAM por modelo.
-  \item Discusión sobre la relación coste–beneficio entre arquitecturas y técnicas de preprocesamiento.
-  \item Implicaciones para la adopción práctica en proyectos arqueológicos.
-\end{itemize}
