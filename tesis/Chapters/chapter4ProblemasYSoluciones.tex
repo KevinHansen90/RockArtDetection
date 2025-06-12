@@ -3,24 +3,26 @@
 %--------------------------------------------------------------------
 \noindent
 Este capítulo recoge, de forma sistemática, los inconvenientes hallados en dos frentes complementarios:
-\emph{(i)} el \emph{fine-tuning} de cuatro detectores de objetos (\textbf{Faster R-CNN}, \textbf{RetinaNet}, \textbf{YOLOv5} y \textbf{Deformable DETR}) entrenados sobre cinco variantes de pre-procesamiento (imagen base + 4 técnicas), y
-\emph{(ii)} el análisis comparativo que cruza cuatro extractores de características con cuatro algoritmos de agrupamiento.
-Cada apartado describe el \emph{problema} detectado, la \emph{solución} aplicada y la \emph{evidencia} que respalda tal decisión.
+\emph{(i)} el \emph{fine-tuning} de cuatro detectores de objetos (\textbf{Faster R-CNN}, \textbf{RetinaNet}, \textbf{YOLOv5} y \textbf{Deformable DETR}) entrenados sobre cinco variantes de pre-procesamiento, y
+\emph{(ii)} el análisis comparativo que combina cuatro extractores de características con cuatro algoritmos de agrupamiento.
+Cada apartado describe el problema detectado, la solución aplicada y la evidencia que respalda tal decisión.
 
 El recorrido avanza del dato crudo a la interpretación final.
-Primero se tratan los \textbf{datos y el pre-procesamiento}: tiling, augmentación, normalización de etiquetas y contraste.
+Primero se tratan los \textbf{datos y el pre-procesamiento}: \emph{tiling}, augmentación, normalización de etiquetas y contraste.
 Luego se examinan los desafíos inherentes a la \textbf{configuración de los modelos}.
-Entre ellos se cuentan la unificación de las implementaciones, la congelación progresiva de la red troncal (\emph{backbone}), la inicialización de los módulos de predicción y la recalibración de los anclajes de referencia.
-La congelación progresiva consiste en bloquear de forma escalonada los parámetros de las capas iniciales durante el entrenamiento, con el fin de preservar las representaciones generales ya aprendidas y centrar la optimización en las capas superiores especializadas.
+Entre ellos se cuentan la unificación de las implementaciones, la congelación progresiva de la red troncal \emph{backbone}, la inicialización de los módulos de predicción y la recalibración de los anclajes de referencia.
+
+VER SI SE PONE EN SU SECCION CORRESPONDIENTE: La congelación progresiva consiste en bloquear de forma escalonada los parámetros de las capas iniciales durante el entrenamiento, con el fin de preservar las representaciones generales ya aprendidas y centrar la optimización en las capas superiores especializadas.
+
 A continuación se revisan las \textbf{limitaciones del entrenamiento local} y la migración a la nube mediante la plataforma \textbf{Vertex AI}, con énfasis en plantillas de ejecución, organización de artefactos y control de costes.
 Seguidamente, la sección de \textbf{seguimiento de experimentos} explica cómo se unifican las métricas entre entornos y se fijan criterios de comparación equitativos.
 
-En la sección de \textbf{clustering de motivos} detalla:
-(a) el recorte automático de cada pictografía a partir de las cajas detectadas (aceptando cierta superposición inevitable),
+En la sección de \textbf{agrupamiento de motivos} se detalla:
+(a) el recorte automático de cada pictografía a partir de las cajas detectadas aceptando cierta superposición inevitable,
 (b) la selección del número óptimo de grupos mediante el gráfico del codo, la métrica de silueta y proyecciones t-SNE,
-y (c) el ajuste específico de \textit{DBSCAN} cuando no existe parámetro \(k\), evaluando distintas parejas \(\langle\text{eps},\text{min\_samples}\rangle\) y señalando el sesgo hacia la clase mayoritaria.
+y (c) el ajuste específico del método \textit{DBSCAN} evaluando distintos parámetros.
 
-Finalmente, la sección de \textbf{síntesis y lecciones aprendidas} condensa los hallazgos, muestra los \emph{trade-offs} entre arquitecturas y algoritmos de agrupamiento, y plantea líneas de trabajo futuras, subrayando que las métricas objetivas deben contrastarse con la opinión experta de la arqueóloga para seleccionar la solución más pertinente al dominio.
+Finalmente, la sección de \textbf{síntesis y lecciones aprendidas} condensa los hallazgos, muestra las ventajas y desventajas entre arquitecturas y algoritmos de agrupamiento, y plantea líneas de trabajo futuras, subrayando que las métricas objetivas deben contrastarse con la opinión experta de la arqueóloga para seleccionar la solución más pertinente al dominio.
 %====================================================================
 \section{Datos y Pre-procesamiento}\label{sec:datos}
 %====================================================================
@@ -35,7 +37,7 @@ y (v) la aplicación de filtros de contraste cuyos parámetros se gestionan con 
 Cada subsección detalla el problema identificado, la solución implementada y la evidencia, propia o de la literatura, que respalda su adopción.
 
 
-\subsection{Tiling y Solapamiento de Imágenes}\label{ssec:tiling}
+\subsection{emph{Tiling} y Solapamiento de Imágenes}\label{ssec:tiling}
 
 La variabilidad de escala en las tomas originales genera un sesgo pronunciado: algunas imágenes contienen sólo un par de motivos, mientras que otras sobrepasan el centenar (Figura~\ref{fig:hist_raw}).
 Ello repercute en la dificultad de detección (los objetos pequeños se diluyen tras el reescalado global) y en la carga de memoria al procesar fotos de \(4288\times2848\)\,px.
@@ -586,7 +588,7 @@ Los resultados se obtuvieron tras aplicar las optimizaciones descritas en la Sec
         Faster\,R-CNN presenta una penalización simultánea en velocidad y precisión respecto de los detectores de una sola etapa, lo que desaconseja su elección cuando el presupuesto computacional es restrictivo.
 \end{itemize}
 
-\section{Clustering de Motivos}\label{sec:clustering}
+\section{Agrupamiento de Motivos}\label{sec:agrupamiento}
 
 Además de detectar y clasificar pictografías, el proyecto busca agrupar motivos con similitud visual para facilitar su análisis comparativo.
 Se adopta un diseño factorial \(4\times4\) que combina cuatro extractores de características preentrenados—ResNet-18, ResNet-50, DenseNet-121 y VGG-16—con cuatro algoritmos de agrupamiento (K-means, aglomerativo jerárquico, espectral y DBSCAN).

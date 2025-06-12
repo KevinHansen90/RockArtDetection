@@ -813,20 +813,97 @@ Se aplican cuatro algoritmos de agrupamiento para explorar diferentes enfoques e
 
 \begin{itemize}
     \item \textbf{K-Means}:
-    Es un algoritmo de partición que asigna cada punto de datos al cluster más cercano en distancia euclídea, minimizando la suma de distancias al centroide~\cite{macqueen1967some}.
+    Es un algoritmo de partición que asigna cada punto de datos al grupo más cercano en distancia euclídea, minimizando la suma de distancias al centroide~\cite{macqueen1967some}.
     Es eficiente en términos computacionales y funciona bien con clusters de forma esférica.
-    \item \textbf{Clustering Aglomerativo}:
+    \item \textbf{Agrupamiento Aglomerativo}:
     Es un método jerárquico que fusiona iterativamente clusters basándose en una medida de similitud, capturando estructuras anidadas en los datos~\cite{rokach2005clustering}.
     No requiere especificar el número de clusters a priori y puede utilizar diferentes criterios de distancia entre grupos (simple, completo, promedio).
     \item \textbf{DBSCAN}:
     Identifica clusters de forma arbitraria y es robusto frente al ruido, agrupando puntos densamente conectados~\cite{ester1996density}.
     Es especialmente útil para detectar clusters de formas complejas y manejar datos con ruido.
-    \item \textbf{Clustering Espectral}:
+    \item \textbf{Agrupamiento Espectral}:
     Utiliza técnicas de álgebra lineal y teoría de grafos para identificar clusters en datos con estructuras complejas~\cite{ng2002spectral}.
     Es efectivo para detectar clusters que no son necesariamente convexos o separables linealmente.
 \end{itemize}
 
 La selección de estos algoritmos permite explorar diferentes metodologías de agrupamiento y evaluar cuál se adapta mejor a las características de los datos.
+
+\subsubsection*{Evaluación de la Calidad del Agrupamiento}
+Para medir la calidad de los agrupamientos obtenidos a partir de las características CNN, se utilizan métricas como:
+\begin{itemize}
+    \item \textbf{NMI} (\emph{Normalized Mutual Information}).
+    Dados los \emph{grupos} \( \mathcal{C}=\{C_1,\dots,C_K\} \) y las clases reales \( \mathcal{Y}=\{Y_1,\dots,Y_L\} \), se define
+    \[
+        \operatorname{NMI} \;=\;
+        \frac{ I(\mathcal{C};\mathcal{Y}) }{\sqrt{ H(\mathcal{C})\,H(\mathcal{Y}) }},
+    \]
+    donde \(I(\mathcal{C};\mathcal{Y}) = \sum_{k,\ell} p_{k\ell}\,\log\!\bigl(p_{k\ell}/(p_k\,q_\ell)\bigr)\) es la información mutua y
+    \(H(\mathcal{C}) = -\sum_k p_k \log p_k\), \(H(\mathcal{Y}) = -\sum_\ell q_\ell \log q_\ell\) son las entropías; \(p_k\) y \(q_\ell\) son proporciones de muestras en \(C_k\) e \(Y_\ell\). El resultado está acotado en \([0,1]\); 1 indica coincidencia perfecta.
+
+    \item \textbf{Silhouette}.
+    Sea \(i\) el \emph{motivo rupestre} individual, descrito por su vector de características en el espacio de representación.
+    Para cada motivo \(i\) se calcula
+    \(a_i = \text{promedio de distancias entre \(i\) y los demás motivos de su mismo \emph{grupo}}\) y
+    \(b_i = \text{mínimo promedio de distancias entre \(i\) y los motivos de los demás \emph{grupos}}\).
+    La silueta individual resulta
+    \[
+        s_i \;=\; \frac{b_i - a_i}{\max(a_i,\,b_i)} \in [-1,1],
+    \]
+    y el \emph{Silhouette Score} global es el promedio de todos los \(s_i\).
+    Valores cercanos a 1 indican grupos compactos y bien separados, mientras que valores negativos sugieren asignaciones incorrectas.
+
+    \item \textbf{Pureza (\emph{Purity}).}
+    Sea \(N\) el número total de motivos rupestres analizados (una imagen por motivo).
+    Denotemos
+    \[
+      C_k = \{\text{motivos asignados al $k$-ésimo \emph{grupo}}\},\qquad
+      Y_\ell = \{\text{motivos con etiqueta arqueológica }\ell\}.
+    \]
+    Entonces
+    \[
+      \operatorname{Purity} \;=\;
+      \frac{1}{N}\sum_{k=1}^{K} \max_{\ell}\,|C_k \cap Y_\ell|.
+    \]
+    La métrica mide la fracción de motivos correctamente agrupados según la clase dominante en cada \emph{grupo},
+    con valores entre \(0\) (agrupamiento aleatorio) y \(1\) (correspondencia perfecta con las clases arqueológicas).
+
+    \item \textbf{Rand Index (RI).}
+    Sean \(\mathcal{C}=\{C_1,\dots,C_K\}\) la partición obtenida por el algoritmo e
+    \(\mathcal{Y}=\{Y_1,\dots,Y_L\}\) la partición de referencia definida por la especialista.
+    Para cada par de motivos \((i,j)\) se contabiliza:
+
+    \begin{center}
+    \begin{tabular}{ll}
+    \textsc{tp}: & mismo \(C_k\) \emph{y} mismo \(Y_\ell\) \\[2pt]
+    \textsc{tn}: & distinto \(C_k\) \emph{y} distinto \(Y_\ell\) \\[2pt]
+    \textsc{fp}: & mismo \(C_k\) pero distinto \(Y_\ell\) \\[2pt]
+    \textsc{fn}: & distinto \(C_k\) pero mismo \(Y_\ell\)
+    \end{tabular}
+    \end{center}
+
+    Con estos conteos se define
+    \[
+      \operatorname{RI} \;=\;
+      \frac{\textsc{tp} + \textsc{tn}}
+           {\textsc{tp} + \textsc{fp} + \textsc{fn} + \textsc{tn}}
+      \;\in\; [0,1].
+    \]
+    Valores cercanos a \(1\) indican fuerte acuerdo entre la agrupación estimada y la clasificación arqueológica.
+    Aunque su forma recuerda a la \emph{accuracy}, el RI evalúa la coherencia de \emph{todos} los pares de motivos, no las etiquetas uno a uno.
+\end{itemize}
+
+En el caso del arte rupestre, la ausencia de una taxonomía universal y la posibilidad de descubrir nuevos estilos hacen especialmente valiosas estas métricas.
+Además, se acostumbra realizar validaciones cualitativas (p.ej., revisar si los motivos de un mismo \textit{grupo} comparten rasgos visuales coherentes), aspecto fundamental cuando los criterios de estilo resultan subjetivos o ambiguos.
+De esta forma, la combinación de CNNs para la extracción de características con métodos no supervisados de \textit{agrupamiento} se perfila como una estrategia eficaz para revelar patrones estilísticos complejos en conjuntos de imágenes de arte rupestre, sin restringir el análisis a categorías fijas o definidas \textit{a priori}.
+
+\paragraph{Convención de métricas.}
+Para todas las configuraciones se reportan tres índices de cohesión–separación
+re-escalados al rango \([0,1]\) y con dirección “mayor–mejor”:
+\(\widehat S=(S+1)/2\) para Silhouette,
+\(\widehat{DB}=1-\frac{DB-\min(DB)}{\max(DB)-\min(DB)}\) para Davies–Bouldin
+(invirtiendo su sentido original) y
+\(\widehat{CH}=\frac{CH-\min(CH)}{\max(CH)-\min(CH)}\) para Calinski–Harabasz.
+Con esta normalización los tres índices son directamente comparables.
 
 \subsection{Diseño del Proceso Experimental}\label{sec:unsup_design}
 
@@ -845,7 +922,7 @@ Esta proyección retiene aproximadamente el \textbf{80–85 \%} de la varianza t
 
 \subsubsection*{Fase 3 - Agrupamiento cruzado}
 
-Sobre la representación reducida se aplican cuatro estrategias: \emph{k}-means, agrupamiento jerárquico aglomerativo (\emph{ward}), clustering espectral y DBSCAN.
+Sobre la representación reducida se aplican cuatro estrategias: \emph{k}-means, agrupamiento jerárquico aglomerativo (\emph{ward}), agrupamiento espectral y DBSCAN.
 La combinación de las cuatro redes con los cuatro algoritmos origina 16 configuraciones.
 Para los métodos que exigen \(k\) se exploran valores de \(2\) a \(10\). En DBSCAN se ajustan \(\varepsilon\) entre \(0.4\) y \(0.7\), con \textit{min samples} tomando un valor de 5.
 Estos rangos cubren desde agrupamientos muy gruesos hasta un nivel de detalle ligeramente superior a las 6 categorías principales que usan los arqueólogos para clasificar manualmente los guanacos, de modo que podemos detectar si los motivos se descomponen en subgrupos significativos sin caer en el sobre-fraccionamiento o la mezcla excesiva de clases.

@@ -22,13 +22,13 @@ A continuación se resume la función de cada capítulo:
 
 \paragraph{Capítulo 1 — Introducción.}
 Plantea el problema de investigación en torno a la clasificación automática del arte rupestre de Cueva de las Manos.
-Explica el contexto teórico mediante un Estado de la Cuestión que revisa el modelo actual de clasificación, los avances de \textit{machine learning} en arqueología, los detectores de objetos y los métodos de clusterización.
+Explica el contexto teórico mediante un Estado de la Cuestión que revisa el modelo actual de clasificación, los avances de \textit{machine learning} en arqueología, los detectores de objetos y los métodos de agrupamiento.
 Delimita las limitaciones del conjunto de datos y las restricciones técnicas (modelos disponibles, recursos computacionales y ventana temporal del proyecto), destacando sus implicaciones para trabajos futuros.
 
 \paragraph{Capítulo 2 — Materiales y Métodos.}
-Describe la recolección y la división de imágenes en mosaicos, las cinco variantes de pre-procesamiento aplicadas y la definición de los conjuntos \textit{train/val/test}.
+Describe la recolección y la división de imágenes en mosaicos, las cinco variantes de pre-procesamiento aplicadas y la definición de los conjuntos de entrenamiento, testeo y validación.
 Detalla la configuración de los cuatro detectores (Faster R-CNN, RetinaNet, YOLOv5 y Deformable DETR), incluidos los perfiles de entrenamiento local y en Vertex AI.
-Explica el diseño factorial de los experimentos de agrupamiento basados en cuatro extractores de características, así como el flujo de trabajo reproducible mediante Hydra.
+Explica el diseño de los experimentos de agrupamiento basados en cuatro extractores de características, así como el flujo de trabajo reproducible mediante Hydra (marco de gestion de configuraciones para proyectos en Python).
 
 \paragraph{Capítulo 3 — Resultados.}
 Presenta las métricas obtenidas, con especial énfasis en \(\mathrm{mAP}_{50}\) y \(\mathrm{mAR}\), para cada combinación de modelo y pre-procesamiento.
@@ -57,7 +57,7 @@ La \textbf{detección y clasificación del arte rupestre} carece de un protocolo
 Ello introduce \emph{sesgos de subjetividad}, puesto que los analistas deben decidir manualmente qué contornos corresponden a motivos originales, cuáles son sobrepintados y dónde trazar los límites de una escena~\cite{aschero2012}.
 
 A esta variabilidad metodológica se suman las dificultades inherentes al registro: muchas pictografías se encuentran \emph{superpuestas}, han sufrido grados variables de meteorización y se documentan bajo condiciones lumínicas dispares.
-Herramientas de realce como \textsc{DStretch}~\cite{dstretch} (basadas en el estiramiento de decorrelación) han facilitado la visibilización de pigmentos, pero el software ha quedado desactualizado y no cubre todas las necesidades analíticas planteadas por la comunidad arqueológica (falta de soporte para grandes lotes de imágenes, escasas opciones de posprocesamiento).
+Herramientas de realce como el programa \textsc{DStretch}~\cite{dstretch} (basadas en el estiramiento de decorrelación) han facilitado la visibilización de pigmentos, pero el software ha quedado desactualizado y no cubre todas las necesidades analíticas planteadas por la comunidad arqueológica (falta de soporte para grandes lotes de imágenes, escasas opciones de posprocesamiento).
 
 En Argentina, el \emph{modelo estilístico} del arqueólogo Carlos Aschero clasifica los motivos mediante reglas descriptivas (forma, proporciones, color, posición en el panel)~\cite{aschero2000,aschero2012}.
 Aunque ampliamente adoptado, su carácter taxativo conlleva dos problemas:
@@ -69,9 +69,10 @@ Debido a que los estudios arqueológicos se organizan en \emph{campañas de mues
 Una secuencia de pasos basados en visión por computadora permitiría detectar, segmentar y etiquetar motivos a gran escala, minimizando la varianza inter‐observador y unificando los datos para comparaciones temporales y espaciales.
 
 \paragraph{Caso de estudio: Cueva de las Manos (ARPI).}
-La localidad arqueológica Alto Río Pinturas 1, conocida mundialmente como \textbf{Cueva de las Manos}, reúne una de las mayores concentraciones de arte rupestre de Sudamérica, con ocupaciones recurrentes desde \(\sim10\,500\) cal AP hasta \(\sim1\,500\) cal AP~\cite{gradin1976}.
-Consta de un \emph{Complejo de Sitios con Arte Rupestre} (CSAR) sensu \citet{aschero1996}, es decir, un conjunto de reparos rocosos próximos que comparten repertorio iconográfico pero difieren en espacio habitacional.
-La densidad de estratos pictóricos y la larga secuencia de superposiciones convierten a ARPI en un \emph{nodo de convergencia poblacional} con fuerte rol socio–simbólico, especialmente durante la época del Holoceno temprano~\cite{gradin1987,aschero2021,aschero2023}.
+La localidad arqueológica Alto Río Pinturas 1, conocida mundialmente como \textbf{Cueva de las Manos}, se ubica en la provincia de Santa Cruz, Argentina.
+Reúne una de las mayores concentraciones de arte rupestre de Sudamérica, con ocupaciones humanas recurrentes que abarcan aproximadamente desde \(10\,500\) hasta \(1\,500\) años calibrados antes del presente (cal AP)~\cite{gradin1976}.
+Consta de un \emph{Complejo de Sitios con Arte Rupestre} (CSAR), según la definición de \citet{aschero1996}, es decir, un conjunto de reparos rocosos próximos que comparten repertorio iconográfico pero difieren en espacio habitacional.
+La densidad de estratos pictóricos y la larga secuencia de superposiciones convierten a ARPI en un \emph{nodo de convergencia poblacional} con fuerte rol socio–simbólico, especialmente durante el Holoceno temprano~\cite{gradin1987,aschero2021,aschero2023}.
 
 Además, gran parte de los motivos identificados en ARPI reaparecen—en menor densidad—en otros sitios de la cuenca del río Pinturas y mesetas aledañas, lo que subraya su relevancia macro–regional~\cite{dincauze1987,dincauze2000}.
 Mejorar la clasificación automática en este CSAR, por tanto, no solo optimizará el procesamiento local, sino que generará una \emph{metodología transferible} a estudios comparativos en todo el noroeste y centro‐oeste de Santa Cruz.
@@ -103,11 +104,11 @@ Se aplica para el caso de Cueva de las Manos.
 
 Se propone realizar las siguientes actividades:
 \begin{enumerate}
-    \item Construir el set de datos de manera adecuada para el problema a resolver, y validarlo con un experto.
+    \item Construir el conjunto de datos de manera adecuada para el problema a resolver, y validarlo con un experto.
     \item Investigar las técnicas de realce de colores más utilizadas y compararlas para las fotografías seleccionadas.
     \item Investigar los algoritmos de detección de objetos más utilizados y compararlos para las fotografías seleccionadas.
     \item Investigar los algoritmos de clasificación más utilizados, así como los modelos de redes neuronales preentrenados, y compararlos para las fotografías seleccionadas.
-    \item Integrar todos los procesamientos en un proceso único.
+    \item Integrar todos los algoritmos en un proceso único.
 \end{enumerate}
 
 \subsection{Justificación del estudio}
@@ -143,7 +144,7 @@ En primer lugar se describe el modelo de clasificación actualmente empleado por
 A continuación se examinan las principales técnicas de preprocesamiento de imágenes que la literatura propone para realzar pigmentos y bordes, paso previo a cualquier análisis automatizado.
 Seguidamente se introduce la adopción de \emph{machine learning} en estudios de arte rupestre, destacando cómo ha evolucionado desde enfoques exploratorios hasta sistemas integrados de detección y análisis.
 El capítulo continúa con un repaso crítico de los detectores de objetos más influyentes, atendiendo a su idoneidad para identificar trazos pictográficos degradados y superpuestos.
-Finalmente se revisan los modelos de clusterización que facilitan la agrupación estilística o cronológica de motivos, completando así la base conceptual y metodológica sobre la que se apoya el resto del trabajo.
+Finalmente se revisan los modelos de agrupamiento que facilitan la agrupación estilística o cronológica de motivos, completando así la base conceptual y metodológica sobre la que se apoya el resto del trabajo.
 
 \subsection{Modelo Actual de Clasificación}
 
@@ -152,14 +153,14 @@ En la versión refinada, el \textbf{Grupo A} se desglosa en cinco estilos (A1–
 A continuación se sintetizan los rasgos diagnósticos de cada categoría.
 
 \begin{description}
-  \item[A1]  Motivos emplazados fuera del alcance directo (\(>\!2.5\) m), sin aprovechar la microtopografía del soporte.
-  Escenas jerárquicas donde los cazadores—de mayor tamaño—persiguen grandes tropillas de guanacos.
-  Trazos homogéneos que sugieren la utilización de hisopos~\cite{aschero2012}.
+  \item[A1] Motivos ubicados a más de \(2.5\)\,m sobre el nivel del suelo, es decir, fuera del alcance directo del ejecutante, y sin aprovechar la microtopografía del soporte.
+  Escenas jerárquicas en las que los cazadores —representados con mayor tamaño— persiguen extensas tropillas de guanacos.
+  Los trazos son homogéneos, lo que sugiere la aplicación del pigmento mediante hisopos~\cite{aschero2012}.
 
-  \item[A2]  Uso intencional de irregularidades de la roca para delimitar el diseño.
-  Camelidos sobredimensionados respecto de los humanos.
-  Detalles finos (\(<\!5\) mm) y actitudes dinámicas.
-  Se representan tanto tropillas aisladas como prácticas de caza colectiva.
+  \item[A2] Empleo intencional de las irregularidades de la roca para delimitar el diseño.
+  Camélidos sobredimensionados en relación con las figuras humanas.
+  Trazos de alta precisión, con un ancho inferior a \(5\,\text{mm}\), y posturas dinámicas.
+  Se representan tanto tropillas aisladas como escenas de caza colectiva.
 
   \item[A3]  Situados también fuera de alcance, aunque con escasa interacción con el soporte.
   Camelidos mayores que los antropomorfos, pero trazados con pinceladas gruesas y esquema más tosco.
@@ -358,16 +359,16 @@ Los modelos de una sola etapa (YOLOv5, \textit{RetinaNet}) ofrecen una solución
 En cualquier caso, la intervención experta sigue siendo fundamental para filtrar falsos positivos, producidos por ejemplo, por manchas naturales o grietas en la roca, y validar la interpretación final de los resultados.
 Asimismo, la aplicación de técnicas de preprocesamiento que realcen el contraste o de postprocesamiento (por ejemplo, supresión de detecciones redundantes o agrupamiento semántico) contribuye a mejorar la confiabilidad de las detecciones en el campo de la arqueología y del arte rupestre.
 
-\subsection{Modelos de Clusterización}
+\subsection{Modelos de Agrupamiento}
 
 Tras la detección de los elementos, el agrupamiento (o clasificación no supervisada) se contempla para analizar patrones estilísticos o morfológicos.
-Algoritmos como \textit{K-Means}, \textit{Agglomerative Clustering} o \textit{DBSCAN} pueden funcionar bien si los descriptores visuales se han depurado apropiadamente mediante preprocesamiento y redes neuronales.
-En casos más complejos, \textit{Deep Embedded Clustering} integra la extracción de características y la formación de \textit{clusters} en un mismo esquema, ofreciendo mayor adaptabilidad cuando las clases de motivos no están predefinidas.
+Algoritmos como \textit{K-Means}, \textit{Agglomerative Agrupamiento} o \textit{DBSCAN} pueden funcionar bien si los descriptores visuales se han depurado apropiadamente mediante preprocesamiento y redes neuronales.
+En casos más complejos, \textit{Deep Embedded Agrupamiento} integra la extracción de características y la formación de \textit{grupos} en un mismo esquema, ofreciendo mayor adaptabilidad cuando las clases de motivos no están predefinidas.
 Este enfoque podría ayudar a detectar grupos que no han sido contemplados en clasificaciones tradicionales y dar luz a nuevos estilos o variaciones subyacentes en las pinturas.
 
 \subsubsection{Arquitecturas CNN para la Extracción de Características de Estilo }
 La clasificación de motivos rupestres a menudo depende de taxonomías rígidas definidas por expertos, lo que puede subestimar la complejidad y diversidad estilística de los diseños.
-Investigaciones recientes en visión por computadora proponen combinar \textit{deep Convolutional Neural Networks} (CNN) para la extracción de características con algoritmos no supervisados de \textit{clustering}, a fin de agrupar los motivos según su estilo visual sin basarse estrictamente en etiquetas predefinidas~\cite{gairola2020}.
+Investigaciones recientes en visión por computadora proponen combinar \textit{deep Convolutional Neural Networks} (CNN) para la extracción de características con algoritmos no supervisados de \textit{agrupamiento}, a fin de agrupar los motivos según su estilo visual sin basarse estrictamente en etiquetas predefinidas~\cite{gairola2020}.
 Este enfoque resulta prometedor para capturar diferencias sutiles en la calidad de las líneas, la textura o las formas (aspectos críticos para el análisis estilístico en arqueología) y, a la vez, reduce la dependencia de taxonomías humanas potencialmente subjetivas o limitadas.
 Distintos modelos de CNN preentrenados en grandes conjuntos de datos (por ejemplo, \textit{ImageNet}) ofrecen una sólida base para la extracción de rasgos relevantes en imágenes degradadas o de bajo contraste, escenario común en el arte rupestre~\cite{guerin2018}.
 A continuación, se describen algunas arquitecturas populares que han sido exploradas en el periodo 2018–2024 para la clasificación no supervisada de imágenes artísticas y arqueológicas:
@@ -397,185 +398,118 @@ Sin embargo, utilizar capas iniciales o intermedias produce resultados peores (N
 Este hallazgo refuerza la idea de que el análisis de estilo en arte rupestre requiere identificar patrones globales en la composición, además de detalles locales.
 
 \paragraph{Resumen de las Arquitecturas CNN.}
-Diversos estudios coinciden en que las CNN preentrenadas ofrecen \textit{representaciones} útiles para el clustering en dominios con datos limitados o sin etiquetas~\cite{guerin2018,gairola2020}.
+Diversos estudios coinciden en que las CNN preentrenadas ofrecen \textit{representaciones} útiles para el agrupamiento en dominios con datos limitados o sin etiquetas~\cite{guerin2018,gairola2020}.
 Cada arquitectura presenta ventajas: VGG enfatiza la textura, ResNet y DenseNet combinan forma y detalle, mientras que Inception maneja patrones multi-escala.
 En arte rupestre, donde las imágenes pueden lucir tenues o erosionadas, una estrategia combinada, por ejemplo, concatenar características de distintas capas o emplear \textit{Gram matrices}, puede capturar tanto la geometría global como la variabilidad de pigmentación.
 El \textit{fine-tuning} sobre imágenes arqueológicas suele incrementar la sensibilidad de la red a los rasgos estilísticos específicos, resultando especialmente provechoso si se dispone de un número moderado de ejemplos etiquetados.
 
-\subsubsection*{Evaluación de la Calidad del Clustering}
-Para medir la calidad de los agrupamientos obtenidos a partir de las características CNN, se utilizan métricas como:
-\begin{itemize}
-    \item \textbf{NMI} (\emph{Normalized Mutual Information}).
-    Dados los \emph{clusters} \( \mathcal{C}=\{C_1,\dots,C_K\} \) y las clases reales \( \mathcal{Y}=\{Y_1,\dots,Y_L\} \), se define
-    \[
-        \operatorname{NMI} \;=\;
-        \frac{ I(\mathcal{C};\mathcal{Y}) }{\sqrt{ H(\mathcal{C})\,H(\mathcal{Y}) }},
-    \]
-    donde \(I(\mathcal{C};\mathcal{Y}) = \sum_{k,\ell} p_{k\ell}\,\log\!\bigl(p_{k\ell}/(p_k\,q_\ell)\bigr)\) es la información mutua y
-    \(H(\mathcal{C}) = -\sum_k p_k \log p_k\), \(H(\mathcal{Y}) = -\sum_\ell q_\ell \log q_\ell\) son las entropías; \(p_k\) y \(q_\ell\) son proporciones de muestras en \(C_k\) y \(Y_\ell\). El resultado está acotado en \([0,1]\); 1 indica coincidencia perfecta.
-
-    \item \textbf{Silhouette}.
-    Sea \(i\) el \emph{motivo rupestre} individual, descrito por su vector de características en el espacio de representación.
-    Para cada motivo \(i\) se calcula
-    \(a_i = \text{promedio de distancias entre \(i\) y los demás motivos de su mismo \emph{cluster}}\) y
-    \(b_i = \text{mínimo promedio de distancias entre \(i\) y los motivos de los demás \emph{clusters}}\).
-    La silueta individual resulta
-    \[
-        s_i \;=\; \frac{b_i - a_i}{\max(a_i,\,b_i)} \in [-1,1],
-    \]
-    y el \emph{Silhouette Score} global es el promedio de todos los \(s_i\).
-    Valores cercanos a 1 indican grupos compactos y bien separados, mientras que valores negativos sugieren asignaciones incorrectas.
-
-    \item \textbf{Pureza (Purity).}
-    Sea \(N\) el número total de motivos rupestres analizados (una imagen por motivo).
-    Denotemos
-    \[
-      C_k = \{\text{motivos asignados al $k$-ésimo \emph{cluster}}\},\qquad
-      Y_\ell = \{\text{motivos con etiqueta arqueológica }\ell\}.
-    \]
-    Entonces
-    \[
-      \operatorname{Purity} \;=\;
-      \frac{1}{N}\sum_{k=1}^{K} \max_{\ell}\,|C_k \cap Y_\ell|.
-    \]
-    La métrica mide la fracción de motivos correctamente agrupados según la clase dominante en cada \emph{cluster},
-    con valores entre \(0\) (agrupamiento aleatorio) y \(1\) (correspondencia perfecta con las clases arqueológicas).
-
-    \item \textbf{Rand Index (RI).}
-    Sean \(\mathcal{C}=\{C_1,\dots,C_K\}\) la partición obtenida por el algoritmo y
-    \(\mathcal{Y}=\{Y_1,\dots,Y_L\}\) la partición de referencia definida por la especialista.
-    Para cada par de motivos \((i,j)\) se contabiliza:
-
-    \begin{center}
-    \begin{tabular}{ll}
-    \textsc{tp}: & mismo \(C_k\) \emph{y} mismo \(Y_\ell\) \\[2pt]
-    \textsc{tn}: & distinto \(C_k\) \emph{y} distinto \(Y_\ell\) \\[2pt]
-    \textsc{fp}: & mismo \(C_k\) pero distinto \(Y_\ell\) \\[2pt]
-    \textsc{fn}: & distinto \(C_k\) pero mismo \(Y_\ell\)
-    \end{tabular}
-    \end{center}
-
-    Con estos conteos se define
-    \[
-      \operatorname{RI} \;=\;
-      \frac{\textsc{tp} + \textsc{tn}}
-           {\textsc{tp} + \textsc{fp} + \textsc{fn} + \textsc{tn}}
-      \;\in\; [0,1].
-    \]
-    Valores cercanos a \(1\) indican fuerte acuerdo entre la agrupación estimada y la clasificación arqueológica.
-    Aunque su forma recuerda a la \emph{accuracy}, el RI evalúa la coherencia de \emph{todos} los pares de motivos, no las etiquetas uno a uno.
-\end{itemize}
-
-En el caso del arte rupestre, la ausencia de una taxonomía universal y la posibilidad de descubrir nuevos estilos hacen especialmente valiosas estas métricas.
-Además, se acostumbra realizar validaciones cualitativas (p.ej., revisar si los motivos de un mismo \textit{cluster} comparten rasgos visuales coherentes), aspecto fundamental cuando los criterios de estilo resultan subjetivos o ambiguos.
-De esta forma, la combinación de CNNs para la extracción de características con métodos no supervisados de \textit{clustering} se perfila como una estrategia eficaz para revelar patrones estilísticos complejos en conjuntos de imágenes de arte rupestre, sin restringir el análisis a categorías fijas o definidas \textit{a priori}.
-
 \subsubsection{Métodos de Agrupamiento No Supervisado para la Clasificación Estilística }
 
-Una vez extraídos los vectores de características mediante redes convolucionales (CNN), es posible aplicar algoritmos de \textit{clustering} no supervisado para agrupar los motivos en función de su similitud visual.
+Una vez extraídos los vectores de características mediante redes convolucionales (CNN), es posible aplicar algoritmos de \textit{agrupamiento} no supervisado para agrupar los motivos en función de su similitud visual.
 En la literatura reciente se han empleado cuatro métodos de uso común para la clasificación por estilo:
 
-\paragraph{K-Means Clustering.}
-\textit{K-Means} es un algoritmo ampliamente utilizado que particiona los datos en $K$ \textit{clusters} minimizando la varianza intra-\textit{cluster}~\cite{guerin2018,dangeti2024}.
-Su simplicidad y escalabilidad lo convierten en un referente para la evaluación de la calidad de las características extraídas. Guérin \textit{et al.} obtienen resultados notables (p.ej., una exactitud de \textgreater 60\% sin etiquetas) al aplicar \textit{K-Means} sobre descriptores profundos en conjuntos de imágenes como Pascal VOC~\cite{guerin2018}.
-En experimentos de estilo artístico, se emplea \textit{K-Means} para contrastar distintos tipos de características, por ejemplo, salidas de \textit{DenseNet} o matrices de Gram, y comparar su eficacia en la formación de \textit{clusters} coherentes~\cite{dangeti2024}.
-La principal fortaleza de \textit{K-Means} radica en su eficiencia y facilidad de uso, si bien supone ciertos supuestos (forma aproximadamente esférica de los \textit{clusters} y tamaño similar) que pueden no cumplirse en la práctica.
-Además, el valor de $K$ debe fijarse de antemano o determinarse empleando índices de validez de \textit{clusters}.
-Pese a estas limitaciones, estudios recientes reportan que, cuando las características de la CNN son suficientemente discriminativas, \textit{K-Means} puede incluso superar a métodos de \textit{deep clustering} más complejos~\cite{dangeti2024}.
+\paragraph{K-Means Agrupamiento.}
+\textit{K-Means} es un algoritmo ampliamente utilizado que particiona los datos en $K$ \textit{grupos} minimizando la varianza intra-\textit{grupo}~\cite{guerin2018,dangeti2024}.
+Su simplicidad y escalabilidad lo convierten en un referente para la evaluación de la calidad de las características extraídas.
+Guérin \textit{et al.} obtienen resultados notables, alcanzando precisiones superiores al 60~\% en ausencia de etiquetas, al aplicar \textit{K-Means} sobre descriptores profundos en conjuntos de imágenes como \textit{Pascal VOC}~\cite{guerin2018}.
+En experimentos de estilo artístico, se emplea \textit{K-Means} para contrastar distintos tipos de características, por ejemplo, salidas de \textit{DenseNet} o matrices de Gram, y comparar su eficacia en la formación de \textit{grupos} coherentes~\cite{dangeti2024}.
+La principal fortaleza de \textit{K-Means} radica en su eficiencia y facilidad de uso, si bien supone ciertos supuestos (forma aproximadamente esférica de los \textit{grupos} y tamaño similar) que pueden no cumplirse en la práctica.
+Además, el valor de $K$ debe fijarse de antemano o determinarse empleando índices de validez de \textit{grupos}.
+Pese a estas limitaciones, estudios recientes reportan que, cuando las características de la CNN son suficientemente discriminativas, \textit{K-Means} puede incluso superar a métodos de \textit{deep agrupamiento} más complejos~\cite{dangeti2024}.
 
-\paragraph{Clustering Aglomerativo (Jerárquico).}
-El \textit{clustering} aglomerativo construye una jerarquía de \textit{clusters} al iniciar cada dato como un \textit{cluster} individual y fusionarlos sucesivamente según un criterio de enlace (\textit{linkage})~\cite{guerin2018,parisotto2022}.
+\paragraph{Agrupamiento Aglomerativo (Jerárquico).}
+El \textit{agrupamiento} aglomerativo construye una jerarquía de \textit{grupos} al iniciar cada dato como un \textit{grupo} individual y fusionarlos sucesivamente según un criterio de enlace (\textit{linkage})~\cite{guerin2018,parisotto2022}.
 Diversas investigaciones en patrimonio cultural aprovechan la flexibilidad de este enfoque, pues la estructura jerárquica puede revelar relaciones a múltiples escalas (por ejemplo, subestilos dentro de una tradición pictórica mayor).
 Guérin \textit{et al.} reportan un desempeño competitivo con características de CNN y el método de enlace de Ward, llegando en ocasiones a superar a \textit{K-Means}~\cite{guerin2018}.
-Una ventaja clave del \textit{clustering} aglomerativo es que no requiere especificar a priori el número de \textit{clusters}.
+Una ventaja clave del \textit{agrupamiento} aglomerativo es que no requiere especificar a priori el número de \textit{grupos}.
 El usuario puede “cortar” el dendrograma en el nivel deseado o analizar la estructura de la jerarquía. No obstante, su complejidad computacional ($O(n^2)$) puede volverse problemática en conjuntos de datos grandes.
-Para muestras de tamaño moderado, es una solución sólida que, además, puede capturar \textit{clusters} con formas no convexas.
+Para muestras de tamaño moderado, es una solución sólida que, además, puede capturar \textit{grupos} con formas no convexas.
 
-\paragraph{DBSCAN (Clustering Basado en Densidad).}
+\paragraph{DBSCAN (Agrupamiento Basado en Densidad).}
 \textit{DBSCAN} agrupa datos que están densamente ubicados en el espacio de características y marca como ruido aquellos puntos aislados~\cite{guerin2018}.
-En teoría, resulta útil cuando se esperan \textit{clusters} muy compactos y otras regiones menos densas.
+En teoría, resulta útil cuando se esperan \textit{grupos} muy compactos y otras regiones menos densas.
 Sin embargo, en el espacio de características de alta dimensionalidad de una CNN, la noción de “densidad” se vuelve difícil de parametrizar.
-Estudios como el de Guérin \textit{et al.}~\cite{guerin2018} muestran que el desempeño de \textit{DBSCAN} puede verse seriamente afectado por la elección de sus parámetros (\textit{eps} y \textit{minPts}), llegando a colapsar en un único \textit{cluster} o en un etiquetado de ruido masivo (NMI \textasciitilde 0).
-Si bien \textit{DBSCAN} no exige un número de \textit{clusters} fijo, la literatura sugiere que, para el análisis de estilos, métodos como \textit{K-Means} o aglomerativo suelen ofrecer resultados más consistentes~\cite{dangeti2024}.
+Estudios como el de Guérin \textit{et al.}~\cite{guerin2018} muestran que el desempeño de \textit{DBSCAN} puede verse seriamente afectado por la elección de sus parámetros (\textit{eps} y \textit{minPts}), llegando a colapsar en un único \textit{grupo} o en un etiquetado de ruido masivo (NMI \textasciitilde 0).
+Si bien \textit{DBSCAN} no exige un número de \textit{grupos} fijo, la literatura sugiere que, para el análisis de estilos, métodos como \textit{K-Means} o aglomerativo suelen ofrecer resultados más consistentes~\cite{dangeti2024}.
 
-\paragraph{Spectral Clustering.}
-El \textit{Spectral clustering} se basa en la construcción de un grafo de similitud entre las instancias y la partición de dicho grafo empleando los autovectores de la \textit{Laplaciana}~\cite{guerin2018,gultepe2018}.
-Este método puede capturar separaciones complejas y no lineales en los datos, sin asumir la forma de los \textit{clusters}.
-Trabajos en análisis de pinturas muestran que el \textit{Spectral clustering} logra agrupar obras de arte en estilos definidos con alta precisión, siempre que se defina adecuadamente la métrica de similitud (p.ej., coseno o distancia euclidiana sobre características de CNN)~\cite{gultepe2018}.
+\paragraph{Spectral Agrupamiento.}
+El \textit{Spectral agrupamiento} se basa en la construcción de un grafo de similitud entre las instancias y la partición de dicho grafo empleando los autovectores de la \textit{Laplaciana}~\cite{guerin2018,gultepe2018}.
+Este método puede capturar separaciones complejas y no lineales en los datos, sin asumir la forma de los \textit{grupos}.
+Trabajos en análisis de pinturas muestran que el \textit{Spectral agrupamiento} logra agrupar obras de arte en estilos definidos con alta precisión, siempre que se defina adecuadamente la métrica de similitud (p.ej., coseno o distancia euclidiana sobre características de CNN)~\cite{gultepe2018}.
 La desventaja principal es el alto costo de computar los autovectores para grandes $n$ (el grafo requiere una matriz de $n \times n$), aunque existen aproximaciones para escalar el método.
-Adicionalmente, el número de \textit{clusters} se fija o se estima a partir de estrategias como la brecha espectral (\textit{eigen-gap}).
-Aun así, en conjuntos de tamaño moderado y con una afinidad bien diseñada, \textit{Spectral clustering} sobresale en la detección de grupos con límites no convexos.
+Adicionalmente, el número de \textit{grupos} se fija o se estima a partir de estrategias como la brecha espectral (\textit{eigen-gap}).
+Aun así, en conjuntos de tamaño moderado y con una afinidad bien diseñada, \textit{Spectral agrupamiento} sobresale en la detección de grupos con límites no convexos.
 
-\paragraph{Deep Embedded Clustering (y otros métodos de \textit{deep clustering}).}
-Un desarrollo reciente consiste en integrar el proceso de \textit{clustering} con la propia extracción de características en una misma arquitectura neuronal.
-\textit{Deep Embedded Clustering} (\textit{DEC}) representa uno de los enfoques más notables: entrena una red (con frecuencia, un autoencoder) que mapea las imágenes a un espacio latente, a la par que ajusta las asignaciones de \textit{cluster} minimizando una función de costo basada en la divergencia KL u otros criterios~\cite{dangeti2024}.
-De esta manera, la red “aprende” características enfocadas en la separabilidad de los \textit{clusters}, superando a veces los métodos clásicos en datos complejos.
-Estudios como los de Dangeti \textit{et al.} aplican \textit{DEC} en el \textit{clustering} de estilos artísticos, combinando características iniciales de \textit{DenseNet} o matrices de Gram con un autoencoder que reduce la dimensionalidad~\cite{dangeti2024}.
+\paragraph{Deep Embedded Agrupamiento (y otros métodos de \textit{deep agrupamiento}).}
+Un desarrollo reciente consiste en integrar el proceso de \textit{agrupamiento} con la propia extracción de características en una misma arquitectura neuronal.
+\textit{Deep Embedded Agrupamiento} (\textit{DEC}) representa uno de los enfoques más notables: entrena una red (con frecuencia, un autoencoder) que mapea las imágenes a un espacio latente, a la par que ajusta las asignaciones de \textit{grupo} minimizando una función de costo basada en la divergencia KL u otros criterios~\cite{dangeti2024}.
+De esta manera, la red “aprende” características enfocadas en la separabilidad de los \textit{grupos}, superando a veces los métodos clásicos en datos complejos.
+Estudios como los de Dangeti \textit{et al.} aplican \textit{DEC} en el \textit{agrupamiento} de estilos artísticos, combinando características iniciales de \textit{DenseNet} o matrices de Gram con un autoencoder que reduce la dimensionalidad~\cite{dangeti2024}.
 Este esquema facilita ignorar variaciones irrelevantes (como iluminación o textura de fondo) y resaltar los rasgos que definen la estética subyacente.
-Alternativas de \textit{deep clustering}, como enfoques basados en autoencoders variacionales (\textit{VAE}) o contrastive learning, también muestran resultados prometedores en la literatura reciente~\cite{parisotto2022}.
+Alternativas de \textit{deep agrupamiento}, como enfoques basados en autoencoders variacionales (\textit{VAE}) o contrastive learning, también muestran resultados prometedores en la literatura reciente~\cite{parisotto2022}.
 
-\paragraph{Resumen de la Elección del Método de \textit{Clustering}.}
-La decisión sobre qué método de \textit{clustering} utilizar depende en gran medida de las características de los datos y de los objetivos del estudio~\cite{dangeti2024}.
-\textit{K-Means} y el \textit{clustering} aglomerativo ofrecen un punto de partida sólido, especialmente si las características obtenidas de la CNN ya distinguen con claridad los estilos.
-\textit{Spectral clustering} puede gestionar separaciones más complejas siempre y cuando se definan apropiadamente las similitudes, mientras que \textit{DBSCAN} tiende a requerir un ajuste de parámetros cuidadoso en espacios de alta dimensión.
-Finalmente, \textit{DEC} y otros métodos de \textit{deep clustering} representan la vanguardia cuando se busca la máxima coherencia en la formación de \textit{clusters}, aunque al coste de mayor complejidad de entrenamiento.
+\paragraph{Resumen de la Elección del Método de \textit{Agrupamiento}.}
+La decisión sobre qué método de \textit{agrupamiento} utilizar depende en gran medida de las características de los datos y de los objetivos del estudio~\cite{dangeti2024}.
+\textit{K-Means} y el \textit{agrupamiento} aglomerativo ofrecen un punto de partida sólido, especialmente si las características obtenidas de la CNN ya distinguen con claridad los estilos.
+\textit{Spectral agrupamiento} puede gestionar separaciones más complejas siempre y cuando se definan apropiadamente las similitudes, mientras que \textit{DBSCAN} tiende a requerir un ajuste de parámetros cuidadoso en espacios de alta dimensión.
+Finalmente, \textit{DEC} y otros métodos de \textit{deep agrupamiento} representan la vanguardia cuando se busca la máxima coherencia en la formación de \textit{grupos}, aunque al coste de mayor complejidad de entrenamiento.
 Cualquiera que sea la elección, la experiencia coincide en que un buen \textit{embedding} inicial (derivado de redes profundas preentrenadas o afinadas (\textit{fine-tuned})), constituye la base esencial para lograr agrupaciones estilísticamente relevantes en el arte rupestre~\cite{guerin2018,gultepe2018,dangeti2024}.
 
-\subsubsection{Criterios de Evaluación de la Calidad del Clustering }
-Evaluar el rendimiento de un \textit{clustering} no supervisado en el contexto de la clasificación estilística resulta complejo, pues a menudo no existe una “verdadera” forma de agrupar las obras (o los motivos) según su estilo~\cite{dangeti2024}.
+\subsubsection{Criterios de Evaluación de la Calidad del Agrupamiento }
+Evaluar el rendimiento de un \textit{agrupamiento} no supervisado en el contexto de la clasificación estilística resulta complejo, pues a menudo no existe una “verdadera” forma de agrupar las obras (o los motivos) según su estilo~\cite{dangeti2024}.
 En el campo del arte y la arqueología, la subjetividad o la ausencia de taxonomías claramente definidas dificultan el uso de métricas puramente cuantitativas.
 Por ello, la práctica habitual combina indicadores numéricos con validaciones cualitativas por parte de expertos.
 
-\paragraph{Exactitud de Clustering / Recuperación de Etiquetas.}
-Cuando se dispone de clases de referencia, como etiquetas de movimiento artístico o tipos de motivo, es posible cuantificar cuán bien el \textit{clustering} reproduce dichas categorías~\cite{guerin2018}.
-Para ello, suele asignarse cada \textit{cluster} a la etiqueta dominante y calcular la fracción de muestras correctamente agrupadas tras una asignación óptima de etiquetas.
-Gültepe \textit{et al.} aplican este esquema con \textit{Spectral Clustering} y evalúan su habilidad para “recuperar” ocho estilos artísticos conocidos, reportando exactitud y \textit{F-score}~\cite{gultepe2018}.
+\paragraph{Exactitud de Agrupamiento / Recuperación de Etiquetas.}
+Cuando se dispone de clases de referencia, como etiquetas de movimiento artístico o tipos de motivo, es posible cuantificar cuán bien el \textit{agrupamiento} reproduce dichas categorías~\cite{guerin2018}.
+Para ello, suele asignarse cada \textit{grupo} a la etiqueta dominante y calcular la fracción de muestras correctamente agrupadas tras una asignación óptima de etiquetas.
+Gültepe \textit{et al.} aplican este esquema con \textit{Spectral Agrupamiento} y evalúan su habilidad para “recuperar” ocho estilos artísticos conocidos, reportando exactitud y \textit{F-score}~\cite{gultepe2018}.
 Esta métrica resulta intuitiva (p.ej., “un X\% de las imágenes de arte rupestre se agruparon en su motivo correcto”), pero presupone la existencia de una clasificación consensuada.
 En la práctica, se emplea sobre conjuntos con etiquetas conocidas o como medida “proxy” en escenarios de validación controlada.
 
 \paragraph{Adjusted Rand Index (ARI).} El ARI compara dos particiones de los datos y ajusta la coincidencia entre ellas en función de lo esperado por azar, con un rango de valores que va de 0 (equivalente a agrupamientos aleatorios) a 1 (acuerdo perfecto)~\cite{gultepe2018,guerin2018}.
 En estudios de estilos artísticos, el ARI se utiliza cuando hay etiquetas nominales, por ejemplo, categorías de motivos (“zoomorfo”, “antropomorfo”, “abstracto”).
-Dangeti \textit{et al.} muestran que el ARI complementa otros indicadores al penalizar los desacuerdos entre la asignación de \textit{clusters} y las clases reales~\cite{dangeti2024}.
-Sin embargo, si las etiquetas oficiales son incompletas o demasiado genéricas, el ARI puede subestimar las posibles agrupaciones más finas que el \textit{clustering} sea capaz de detectar.
+Dangeti \textit{et al.} muestran que el ARI complementa otros indicadores al penalizar los desacuerdos entre la asignación de \textit{grupos} y las clases reales~\cite{dangeti2024}.
+Sin embargo, si las etiquetas oficiales son incompletas o demasiado genéricas, el ARI puede subestimar las posibles agrupaciones más finas que el \textit{agrupamiento} sea capaz de detectar.
 
-\paragraph{Normalized Mutual Information (NMI) y V-Measure.}
+\paragraph{\emph{Normalized Mutual Information} (NMI) y V-Measure.}
 La NMI cuantifica el solapamiento de información entre las etiquetas predichas y las verdaderas, escalando su valor entre 0 (sin correlación) y 1 (correlación perfecta)~\cite{dangeti2024,guerin2018}.
-Guérin \textit{et al.} la utilizan como métrica principal para comparar distintas combinaciones de características de CNN y algoritmos de \textit{clustering}~\cite{guerin2018}.
-De forma análoga, la \textit{V-Measure} calcula la \emph{homogeneidad} y \emph{completitud} de los \textit{clusters} (es decir, cuán puros son internamente y cuán bien abarcan las clases reales), tomando la media armónica de ambas~\cite{li2010}.
-Estas métricas no dependen de la etiqueta absoluta asignada a cada \textit{cluster}, sino de la relación mutua entre la asignación y las clases de referencia.
+Guérin \textit{et al.} la utilizan como métrica principal para comparar distintas combinaciones de características de CNN y algoritmos de \textit{agrupamiento}~\cite{guerin2018}.
+De forma análoga, la \textit{V-Measure} calcula la \emph{homogeneidad} y \emph{completitud} de los \textit{grupos} (es decir, cuán puros son internamente y cuán bien abarcan las clases reales), tomando la media armónica de ambas~\cite{li2010}.
+Estas métricas no dependen de la etiqueta absoluta asignada a cada \textit{grupo}, sino de la relación mutua entre la asignación y las clases de referencia.
 
 \paragraph{Coeficiente de Silueta (Silhouette Score).}
-Este índice mide, para cada punto, la diferencia entre la distancia media a los miembros de su propio \textit{cluster} y la distancia media al \textit{cluster} más cercano, normalizando el valor entre -1 y +1~\cite{dangeti2024,gultepe2018}.
-Un valor positivo elevado (\textasciitilde 0.7) indica \textit{clusters} bien definidos, mientras que valores cercanos a 0 sugieren solapamiento entre grupos.
+Este índice mide, para cada punto, la diferencia entre la distancia media a los miembros de su propio \textit{grupo} y la distancia media al \textit{grupo} más cercano, normalizando el valor entre -1 y +1~\cite{dangeti2024,gultepe2018}.
+Un valor positivo elevado (\textasciitilde 0.7) indica \textit{grupos} bien definidos, mientras que valores cercanos a 0 sugieren solapamiento entre grupos.
 Xue \textit{et al.} reportan \textit{silhouette scores} superiores a 0.7 en la agrupación de obras de arte emocional, señal de una separación clara en el espacio latente~\cite{gultepe2018}.
-Este criterio interno no requiere etiquetas previas y puede usarse para determinar el número de \textit{clusters} optimizando el valor de la silueta.
-No obstante, su sensibilidad a la forma de los \textit{clusters} (preferentemente convexos) limita su interpretación en datos con estructuras más complejas.
+Este criterio interno no requiere etiquetas previas y puede usarse para determinar el número de \textit{grupos} optimizando el valor de la silueta.
+No obstante, su sensibilidad a la forma de los \textit{grupos} (preferentemente convexos) limita su interpretación en datos con estructuras más complejas.
 
 \paragraph{Índices Calinski–Harabasz (CH) y Davies–Bouldin (DB).}
-Ambos son indicadores internos que valoran la dispersión inter-\textit{clusters} respecto a la dispersión intra-\textit{cluster}.
-El índice CH (o criterio de varianza) crece con la separación y compacidad de los grupos, mientras que el DB decrece si los \textit{clusters} están bien separados~\cite{dangeti2024}.
+Ambos son indicadores internos que valoran la dispersión inter-\textit{grupos} respecto a la dispersión intra-\textit{grupo}.
+El índice CH (o criterio de varianza) crece con la separación y compacidad de los grupos, mientras que el DB decrece si los \textit{grupos} están bien separados~\cite{dangeti2024}.
 Castellano \textit{y} Vessio (2022) monitorizan la evolución del CH y la silueta durante el entrenamiento de su red para confirmar la coherencia de sus agrupaciones~\cite{castellano2022}.
-Si bien estos índices permiten comparar métodos o configuraciones de forma rápida, no garantizan que los \textit{clusters} hallados sean significativos en términos de estilo: sólo miden propiedades geométricas del espacio de características.
+Si bien estos índices permiten comparar métodos o configuraciones de forma rápida, no garantizan que los \textit{grupos} hallados sean significativos en términos de estilo: sólo miden propiedades geométricas del espacio de características.
 
 \paragraph{Evaluación Cualitativa y Validación de Expertos.}
-Más allá de los números, la inspección visual de los \textit{clusters} resulta esencial para comprobar si las agrupaciones poseen coherencia estilística~\cite{gultepe2018}.
-Es habitual visualizar representaciones reducidas (p.ej., \textit{t-SNE} o UMAP) y colorear los puntos según el \textit{cluster}, o bien mostrar ejemplos de imágenes pertenecientes a cada grupo.
+Más allá de los números, la inspección visual de los \textit{grupos} resulta esencial para comprobar si las agrupaciones poseen coherencia estilística~\cite{gultepe2018}.
+Es habitual visualizar representaciones reducidas (p.ej., \textit{t-SNE} o UMAP) y colorear los puntos según el \textit{grupo}, o bien mostrar ejemplos de imágenes pertenecientes a cada grupo.
 Dangeti \textit{et al.} discuten cómo algunas obras de Edvard Munch se separan en “subestilos” no rotulados, validados posteriormente por expertos~\cite{dangeti2024}.
-En arqueología, un especialista en arte rupestre podría revisar si un \textit{cluster} corresponde a grabados con cierto trazo fino o a pinturas de técnica ocre gruesa, generando interpretaciones que trascienden las métricas numéricas.
+En arqueología, un especialista en arte rupestre podría revisar si un \textit{grupo} corresponde a grabados con cierto trazo fino o a pinturas de técnica ocre gruesa, generando interpretaciones que trascienden las métricas numéricas.
 El descubrimiento de nuevos patrones o subcategorías que concuerdan con la evidencia arqueológica ofrece un valioso aporte científico, incluso si las métricas cuantitativas no capturan plenamente dicha diferenciación.
 
 \paragraph{Conclusiones sobre la Evaluación.}
-La mayoría de los trabajos combinan métricas externas (ARI, NMI, \textit{clustering accuracy}) cuando disponen de etiquetas parciales, con índices internos (\textit{silhouette}, CH, DB) para medir la cohesión y separación de los \textit{clusters}, y complementan estos resultados con verificación cualitativa~\cite{guerin2018,dangeti2024}.
+La mayoría de los trabajos combinan métricas externas (ARI, NMI) cuando disponen de etiquetas parciales, con índices internos (\textit{silhouette}, CH, DB) para medir la cohesión y separación de los \textit{grupos}, y complementan estos resultados con verificación cualitativa~\cite{guerin2018,dangeti2024}.
 Dado que el estilo en arte rupestre puede carecer de una segmentación “canónica”, la opinión de los expertos y la búsqueda de patrones novedosos desempeñan un rol fundamental en la validación.
 En última instancia, la correcta interpretación de los resultados depende tanto del valor numérico de las métricas como de la pertinencia cultural e histórica de los agrupamientos propuestos.
 
 \subsubsection{Hallazgos Comparativos y Aplicaciones al Arte Rupestre}
 
-La combinación de características provenientes de redes neuronales convolucionales (CNN) con algoritmos de \textit{clustering} no supervisado ha reportado resultados prometedores en la clasificación por estilo de obras de arte y, potencialmente, en el análisis de motivos rupestres~\cite{dangeti2024,castellano2022}.
+La combinación de características provenientes de redes neuronales convolucionales (CNN) con algoritmos de \textit{agrupamiento} no supervisado ha reportado resultados prometedores en la clasificación por estilo de obras de arte y, potencialmente, en el análisis de motivos rupestres~\cite{dangeti2024,castellano2022}.
 Diversos estudios comparativos resaltan tanto los puntos fuertes como las limitaciones de cada aproximación, ofreciendo orientación valiosa para la aplicación en arte rupestre:
 
 \paragraph{Arquitecturas CNN: Desempeño Comparativo.}
-Las redes profundas (\textit{ResNet}, \textit{Inception}, \textit{VGG}, \textit{DenseNet}) tienden a producir espacios de características más separables para el \textit{clustering} que las arquitecturas más sencillas o menos utilizadas~\cite{guerin2018}.
+Las redes profundas (\textit{ResNet}, \textit{Inception}, \textit{VGG}, \textit{DenseNet}) tienden a producir espacios de características más separables para el \textit{agrupamiento} que las arquitecturas más sencillas o menos utilizadas~\cite{guerin2018}.
 Guérin \textit{et al.} documentan que \textit{ResNet50}, \textit{InceptionV3} y \textit{VGG19} alcanzan valores de NMI de 0.65–0.68, mientras que otras redes (p.ej. \textit{Xception}) se quedan en torno a 0.47~\cite{guerin2018}.
 Por otra parte, es fundamental elegir la capa adecuada de la CNN (normalmente la de \textit{pooling} global o la completamente conectada final), ya que las características de alto nivel representan mejor la similitud semántica o estilística.
 En términos de estilo, las redes de tipo \textit{VGG} suelen capturar con mayor precisión los detalles de textura (en especial si se emplean matrices de Gram), mientras que \textit{ResNet} o \textit{DenseNet} pueden reflejar mejor la forma y la composición de los motivos, gracias a su mayor profundidad y conectividad~\cite{gairola2020}.
@@ -583,36 +517,36 @@ Algunos estudios indican que \textit{fine-tuning} en datos de arte puede mejorar
 Para el arte rupestre, que a menudo presenta un uso de color limitado y un predominio de trazos lineales o texturas muy sutiles, podría resultar ventajoso optar por arquitecturas con buena representación de la forma (p.ej. \textit{ResNet18}) combinadas con descriptores adicionales que capturen matices de textura.
 La literatura sugiere que no existe una red “universalmente superior”, sino que la elección depende de los rasgos visuales prioritarios y del volumen de datos disponible para \textit{fine-tuning}~\cite{guerin2018,gairola2020}.
 
-\paragraph{Algoritmos de Clustering: Rendimiento y Tendencias.}
-Entre los métodos de \textit{clustering} tradicionales, \textit{K-Means} y el \textit{clustering} aglomerativo (\textit{Ward}, \textit{complete} o \textit{average linkage}) han mostrado un desempeño sorprendentemente sólido cuando se emplean características de CNN~\cite{gairola2020,guerin2018}.
+\paragraph{Algoritmos de Agrupamiento: Rendimiento y Tendencias.}
+Entre los métodos de \textit{agrupamiento} tradicionales, \textit{K-Means} y el \textit{agrupamiento} aglomerativo (\textit{Ward}, \textit{complete} o \textit{average linkage}) han mostrado un desempeño sorprendentemente sólido cuando se emplean características de CNN~\cite{gairola2020,guerin2018}.
 En varios experimentos, superan a métodos más complejos como \textit{affinity propagation} o \textit{mean-shift}, lo que sugiere que la clave reside en disponer de un buen espacio de características más que en la sofisticación del algoritmo~\cite{dangeti2024}.
-\textit{Spectral clustering}, por su parte, ofrece flexibilidad al definir la métrica de similitud y puede descubrir grupos no convexos, aunque exige un mayor costo computacional~\cite{gultepe2018}.
-\textit{DBSCAN} aparece como la opción menos confiable en espacios de alta dimensión si no se afinan sus parámetros (\textit{eps} y \textit{minPts}), pudiendo colapsar a uno o varios \textit{clusters} triviales~\cite{dangeti2024}.
-En contraste, los métodos de \textit{deep clustering} como \textit{DEC} aprenden un espacio de características “amigable” para el \textit{clustering} mientras ajustan las asignaciones de los datos, lo que puede desagregar mejor estilos muy similares~\cite{castellano2022}.
-Sin embargo, \textit{DEC} requiere una configuración más compleja, especificar el número de \textit{clusters} y un tiempo de entrenamiento mayor.
-En proyectos de arte rupestre, donde la cantidad o el tipo de estilos puede ser incierto, algunos autores sugieren fijar un número de \textit{clusters} superior al real y luego fusionar \textit{clusters} afines, o apoyarse en criterios jerárquicos~\cite{dangeti2024}.
+\textit{Spectral agrupamiento}, por su parte, ofrece flexibilidad al definir la métrica de similitud y puede descubrir grupos no convexos, aunque exige un mayor costo computacional~\cite{gultepe2018}.
+\textit{DBSCAN} aparece como la opción menos confiable en espacios de alta dimensión si no se afinan sus parámetros (\textit{eps} y \textit{minPts}), pudiendo colapsar a uno o varios \textit{grupos} triviales~\cite{dangeti2024}.
+En contraste, los métodos de \textit{deep agrupamiento} como \textit{DEC} aprenden un espacio de características “amigable” para el \textit{agrupamiento} mientras ajustan las asignaciones de los datos, lo que puede desagregar mejor estilos muy similares~\cite{castellano2022}.
+Sin embargo, \textit{DEC} requiere una configuración más compleja, especificar el número de \textit{grupos} y un tiempo de entrenamiento mayor.
+En proyectos de arte rupestre, donde la cantidad o el tipo de estilos puede ser incierto, algunos autores sugieren fijar un número de \textit{grupos} superior al real y luego fusionar \textit{grupos} afines, o apoyarse en criterios jerárquicos~\cite{dangeti2024}.
 
 \paragraph{Fortalezas y Debilidades de la Clasificación Estilística No Supervisada.}
-Una de las mayores ventajas de combinar CNN y \textit{clustering} no supervisado radica en la posibilidad de descubrir patrones sin forzar las taxonomías humanas~\cite{castellano2022,wynen2018}.
+Una de las mayores ventajas de combinar CNN y \textit{agrupamiento} no supervisado radica en la posibilidad de descubrir patrones sin forzar las taxonomías humanas~\cite{castellano2022,wynen2018}.
 Estos “estilos emergentes” pueden resultar especialmente valiosos en arte rupestre, pues podrían señalar técnicas, escuelas o autores desconocidos. Asimismo, la escalabilidad de las CNN permite procesar grandes volúmenes de imágenes, incrementando la eficiencia y la consistencia frente a las labores manuales.
-Numerosos estudios reportan resultados cercanos a los métodos supervisados en conjuntos de datos bien definidos, superando el 80\% de exactitud de \textit{clustering} en ciertos escenarios~\cite{xue2023}.
-Las principales carencias involucran la interpretabilidad y la subjetividad de los grupos formados: un \textit{cluster} heterogéneo puede reflejar tanto un “error” en la agrupación como un estilo no catalogado.
+Numerosos estudios reportan resultados cercanos a los métodos supervisados en conjuntos de datos bien definidos, superando el 80\% de exactitud de \textit{agrupamiento} en ciertos escenarios~\cite{xue2023}.
+Las principales carencias involucran la interpretabilidad y la subjetividad de los grupos formados: un \textit{grupo} heterogéneo puede reflejar tanto un “error” en la agrupación como un estilo no catalogado.
 Además, las CNN preentrenadas (por ejemplo, en \textit{ImageNet}) suelen priorizar características de objetos más que atributos de estilo, dificultando la agrupación de motivos distintos en su contenido pero similares en la técnica~\cite{gairola2020}.
 Para paliarlo, algunos autores combinan matrices de Gram u otros descriptores enfocados en textura, o definen estrategias de pseudo-etiquetado para guiar el aprendizaje~\cite{gairola2020,dangeti2024}.
 
 \paragraph{Aplicabilidad Práctica en Arqueología.}
 La evidencia actual dibuja una ruta clara para aplicar estos métodos a motivos rupestres.
 En primer lugar, la extracción de características se beneficia de \textit{transfer learning} y de un preprocesamiento robusto (\textit{DStretch} u otros realces de contraste) para enfocar la atención de la CNN en el pigmento o el trazo, en lugar de la textura rocosa~\cite{guerin2018}.
-Una vez obtenido un espacio de características estable, el \textit{clustering} puede organizar miles de fotografías de manera rápida y consistente, revelando posibles inconsistencias en la taxonomía tradicional.
+Una vez obtenido un espacio de características estable, el \textit{agrupamiento} puede organizar miles de fotografías de manera rápida y consistente, revelando posibles inconsistencias en la taxonomía tradicional.
 Por ejemplo, un método no supervisado podría agrupar ciertos “barcos” y “caballos” juntos, sugiriendo la similitud en el trazo de grabado y motivando una reevaluación arqueológica~\cite{gairola2020}.
-Del mismo modo, la comparación con tipologías clásicas (p.ej. estilos culturales o fases cronológicas) permite validar o refinar los \textit{clusters} hallados.
-Este enfoque se asemeja a los trabajos con perfiles de cerámica, donde las herramientas de \textit{clustering} no supervisado han permitido emparejar fragmentos que no coincidían plenamente con clasificaciones previas~\cite{parisotto2022}.
+Del mismo modo, la comparación con tipologías clásicas (p.ej. estilos culturales o fases cronológicas) permite validar o refinar los \textit{grupos} hallados.
+Este enfoque se asemeja a los trabajos con perfiles de cerámica, donde las herramientas de \textit{agrupamiento} no supervisado han permitido emparejar fragmentos que no coincidían plenamente con clasificaciones previas~\cite{parisotto2022}.
 En definitiva, la fortaleza de la clasificación no supervisada radica en su capacidad para “dejar que los datos hablen”, complementando las categorías establecidas y abriendo la puerta a nuevas interpretaciones estilísticas.
 
 \paragraph{Conclusión.}
-En conjunto, la investigación entre 2018 y 2024 sugiere que la unión de arquitecturas CNN (ResNet, VGG, DenseNet, Inception) con métodos de \textit{clustering} (K-Means, aglomerativo, \textit{Spectral}, \textit{DEC}) ofrece clasificaciones automáticas del estilo con un nivel creciente de precisión y riqueza de hallazgos~\cite{parisotto2022,castellano2022,dangeti2024}.
+En conjunto, la investigación entre 2018 y 2024 sugiere que la unión de arquitecturas CNN (ResNet, VGG, DenseNet, Inception) con métodos de \textit{agrupamiento} (K-Means, aglomerativo, \textit{Spectral}, \textit{DEC}) ofrece clasificaciones automáticas del estilo con un nivel creciente de precisión y riqueza de hallazgos~\cite{parisotto2022,castellano2022,dangeti2024}.
 Cada componente aporta fortalezas complementarias: \textit{ResNet} e \textit{Inception} capturan temas visuales de alto nivel, VGG-gram enfatiza texturas y trazos, y \textit{DEC} afina el espacio latente para distinguir variaciones estilísticas sutiles.
-El principal reto sigue siendo la interpretación de los \textit{clusters}, donde la colaboración con expertos arqueólogos resulta ineludible. No obstante, el potencial de estos métodos para trascender las taxonomías rígidas y revelar patrones estilísticos no contemplados previamente representa un avance significativo en el estudio de la expresión artística prehistórica.
+El principal reto sigue siendo la interpretación de los \textit{grupos}, donde la colaboración con expertos arqueólogos resulta ineludible. No obstante, el potencial de estos métodos para trascender las taxonomías rígidas y revelar patrones estilísticos no contemplados previamente representa un avance significativo en el estudio de la expresión artística prehistórica.
 
 \section{Limitaciones del Conjunto de Datos}
 

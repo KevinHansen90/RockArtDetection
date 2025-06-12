@@ -312,23 +312,19 @@ Estos ajustes se contemplan antes del despliegue definitivo en trabajo de campo.
 \section{Agrupamiento No Supervisado de Motivos}
 
 El propósito de esta sección es indagar si los motivos rupestres se agrupan de forma natural a partir de sus rasgos visuales, prescindiendo de la clasificación arqueológica pre-existente.
-Para ello se concatenaron descriptores extraídos con cuatro arquitecturas profundas (\texttt{densenet121}, \texttt{resnet18}, \texttt{resnet50} y \texttt{vgg16}) con cuatro algoritmos de agrupamiento (\texttt{k}-means, clustering espectral, aglomerativo jerárquico y \texttt{DBSCAN}).
+Para ello se concatenaron descriptores extraídos con cuatro arquitecturas profundas (\texttt{densenet121}, \texttt{resnet18}, \texttt{resnet50} y \texttt{vgg16}) con cuatro algoritmos de agrupamiento (\texttt{k}-means, agrupamiento espectral, aglomerativo jerárquico y \texttt{DBSCAN}).
 
-En los métodos que requieren fijar el número de grupos se ensayó un rango amplio de $k$, mientras que los esquemas basados en densidad determinaron el total de clusters a partir de sus propios parámetros.
-La calidad interna de cada combinación se evaluó mediante homogeneidad ($H$) y completitud ($C$), y los resultados más prometedores se sometieron a una inspección cualitativa por parte de una especialista, que revisó tanto una selección dirigida de imágenes como un muestreo aleatorio por cluster.
+En los métodos que requieren fijar el número de grupos se ensayó un rango amplio de $k$, mientras que los esquemas basados en densidad determinaron el total de grupos a partir de sus propios parámetros.
+La calidad interna de cada combinación se evaluó mediante homogeneidad ($H$) y completitud ($C$), y los resultados más prometedores se sometieron a una inspección cualitativa por parte de una especialista, que revisó tanto una selección dirigida de imágenes como un muestreo aleatorio por grupo.
 
 Las subsecciones siguientes presentan primero las métricas cuantitativas de coherencia interna y, luego, las observaciones cualitativas que revelan la influencia predominante de la temperatura de color frente a la morfología de los motivos.
 
-\subsection{Calidad Interna de Clusters}
+\subsection{Calidad Interna de Grupos}
 
-\paragraph{Convención de métricas.}
-Para todas las configuraciones se reportan tres índices de cohesión–separación
-re-escalados al rango \([0,1]\) y con dirección “mayor–mejor”:
-\(\widehat S=(S+1)/2\) para Silhouette,
-\(\widehat{DB}=1-\frac{DB-\min(DB)}{\max(DB)-\min(DB)}\) para Davies–Bouldin
-(invirtiendo su sentido original) y
-\(\widehat{CH}=\frac{CH-\min(CH)}{\max(CH)-\min(CH)}\) para Calinski–Harabasz.
-Con esta normalización los tres índices son directamente comparables.
+En esta sección se evalúa la \emph{calidad interna} de los grupos obtenidos con cada combinación de extractor de características y algoritmo de agrupamiento.
+Primero se analizan los métodos \emph{particionales} —K–Means, Agglomerative y Spectral— comparando el efecto de \(k\) sobre los índices \(\widehat S\), \(\widehat{DB}\) y \(\widehat{CH}\).
+A continuación se examina el enfoque basado en densidad (DBSCAN), explorando su sensibilidad a \(\varepsilon\) y \texttt{min\_samples}.
+Las subsubsecciones presentan (i) tablas con las mejores combinaciones según los tres índices normalizados, (ii) curvas \emph{elbow} para la selección de \(k\) óptimo y (iii) visualizaciones t-SNE que ilustran la separabilidad de los grupos.
 
 %....................................................................
 \subsubsection{Particionales: K–Means, Agglomerative, Spectral}
@@ -341,7 +337,7 @@ Se evaluaron \(108\) combinaciones
 Tabla~\ref{tab:app:int_quality_partitional} en el Apéndice).
 En el cuerpo del capítulo sólo se reseñan las configuraciones que
 obtienen simultáneamente valores altos de \(\widehat S\) y
-\(\widehat{CH}\) —es decir, las que maximizan la cohesión intra-cluster
+\(\widehat{CH}\) —es decir, las que maximizan la cohesión intra-grupo
 y la separación entre grupos.
 
 \begin{table}[ht]
@@ -367,12 +363,12 @@ Se observa que:
   \item \textbf{ResNet-50 + K–Means} y \textbf{DenseNet-121 + K–Means}
         lideran el ranking al exhibir los máximos
         \(\widehat S\) y \(\widehat{CH}\), señalando particiones con
-        clusters densos y bien separados.
+        grupos densos y bien separados.
   \item Aunque los métodos aglomerativos producen valores de
         \(\widehat{DB}\) ligeramente más estables,
         su \(\widehat S\) típico es inferior,
         lo que sugiere límites menos definidos entre grupos.
-  \item Spectral clustering no supera a K–Means en ninguno de los
+  \item Spectral agrupamiento no supera a K–Means en ninguno de los
         extractores, pero mantiene una varianza reducida frente a cambios
         de \(k\), lo que podría ser ventajoso en tareas sensibles a la
         estabilidad.
@@ -385,7 +381,7 @@ Se observa que:
 Para cada extractor (\textbf{ResNet-18, ResNet-50, DenseNet-121, VGG-16})
 y algoritmo particional (\textbf{K–Means, Agglomerative, Spectral})
 se calculó la variación de \(\widehat S\), \(\widehat{DB}\) y
-\(\widehat{CH}\) al incrementar el número de clusters
+\(\widehat{CH}\) al incrementar el número de grupos
 \(k\in\{2,\dots,10\}\).
 Las doce curvas resultantes se ilustran en la
 Fig.~\ref{fig:elbow_grid}, donde cada subfigura corresponde a una pareja
@@ -450,7 +446,7 @@ Fig.~\ref{fig:elbow_grid}, donde cada subfigura corresponde a una pareja
 \end{itemize}
 
 \vspace{1ex}
-\paragraph{Número óptimo de clusters.}
+\paragraph{Número óptimo de grupos.}
 Combinando la evidencia de la Fig.~\ref{fig:elbow_grid} con
 la Tabla~\ref{tab:app:int_quality_partitional}, se adopta \(k^\ast=4\) para
 ResNet-50 y DenseNet-121, y \(k^\ast=5\) para VGG-16.
@@ -496,7 +492,7 @@ Se observa que:
   \item ResNet-18 necesita un \(\varepsilon\) mayor (0.45) para obtener
         su mejor \(\widehat S\); la consecuencia es un
         \textit{noise\_ratio} mucho menor (\(\sim\)5 \%),
-        aunque la densidad de los clusters disminuye.
+        aunque la densidad de los grupos disminuye.
   \item En todos los extractores, valores intermedios de
         \(\varepsilon\approx0.30\)–0.35 equilibran cohesión y cobertura,
         pero sin sobresalir en ninguno de los indicadores.
@@ -555,7 +551,7 @@ mediante t-SNE (perplejidad = 30, 1\,000 iteraciones) para las tres
 configuraciones de mayor desempeño global
 (ResNet-50 + K–Means, DenseNet-121 + K–Means, DenseNet-121 + Spectral).
 Las Figuras~\ref{fig:tsne_resnet50_kmeans}–\ref{fig:tsne_dense_spectral}
-ilustran la separabilidad visual de los clusters.
+ilustran la separabilidad visual de los grupos.
 
 \begin{figure}[!h]
   \centering
@@ -569,7 +565,7 @@ ilustran la separabilidad visual de los clusters.
 
   %----- caption + label -----
   \caption{Proyección t-SNE de las configuraciones con mayor media
-    geométrica de los índices internos. Cada color representa un cluster;
+    geométrica de los índices internos. Cada color representa un grupo;
     la separación espacial respalda la coherencia semántica discutida.}%
   \label{fig:tsne_best}
 \end{figure}
@@ -582,16 +578,16 @@ Apéndice~B: ilustran que la calidad interna mejora hasta
 Dado que DBSCAN no optimiza $k$, estas gráficas se usan solo como referencia
 de densidad y no influyen en la selección final de configuraciones.
 
-\subsection{Distribución de Motivos por Cluster}
+\subsection{Distribución de Motivos por Grupo}
 
 Antes de analizar el contenido de cada conglomerado se examinó la cantidad de imágenes que cayó en cada uno.
-La Tabla~\ref{tab:cluster_sizes} muestra el número de motivos por cluster para las mismas tres configuraciones.
+La Tabla~\ref{tab:cluster_sizes} muestra el número de motivos por grupo para las mismas tres configuraciones.
 
 \begin{table}[!h]
   \centering
   \begin{tabular}{lccc}
     \hline
-    Cluster & \texttt{densenet121\_kmeans} & \texttt{densenet121\_spectral} & \texttt{resnet50\_kmeans}\\
+    Grupo & \texttt{densenet121\_kmeans} & \texttt{densenet121\_spectral} & \texttt{resnet50\_kmeans}\\
     \hline
     0 & 2\,250 & 4\,634 & 2\,012\\
     1 & 2\,065 & 2\,667 & 1\,674\\
@@ -599,51 +595,51 @@ La Tabla~\ref{tab:cluster_sizes} muestra el número de motivos por cluster para 
     3 & 2\,036 & 184    & 2\,285\\
     \hline
   \end{tabular}
-  \caption{Número de motivos asignados a cada cluster.  La desproporción extrema en el cluster 2 de \texttt{densenet121\_spectral\_k4} obedece a la separación de un motivo atípico (véase Sección~\ref{ssec:analisis_cualitativo}).}
+  \caption{Número de motivos asignados a cada grupo.  La desproporción extrema en el grupo 2 de \texttt{densenet121\_spectral\_k4} obedece a la separación de un motivo atípico (véase Sección~\ref{ssec:analisis_cualitativo}).}
   \label{tab:cluster_sizes}
 \end{table}
 
 La distribución revela dos aspectos clave.
-Primero, la configuración \texttt{densenet121\_spectral\_k4} concentra casi el 60 \% de sus imágenes en el cluster 0, mientras que su cluster 2 se reduce a apenas 19 ejemplos.
+Primero, la configuración \texttt{densenet121\_spectral\_k4} concentra casi el 60 \% de sus imágenes en el grupo 0, mientras que su grupo 2 se reduce a apenas 19 ejemplos.
 Este reparto extremo sugiere que el algoritmo espectral, combinado con las características extraídas por \texttt{densenet121}, identificó un subconjunto muy específico (una única escena de guanaco con superposición de mano en diferentes iluminaciones) y lo aisló casi por completo.
-Segundo, los métodos basados en \texttt{k}-means muestran particiones más equilibradas, aunque mantienen un ligero predominio de los clusters que agrupan tonalidades amarillas y anaranjadas (clusters 0 y 3, respectivamente).
+Segundo, los métodos basados en \texttt{k}-means muestran particiones más equilibradas, aunque mantienen un ligero predominio de los grupos que agrupan tonalidades amarillas y anaranjadas (grupos 0 y 3, respectivamente).
 
 \subsection{Análisis Cualitativo Guiado por la Especialista}
 \label{ssec:analisis_cualitativo}
 
 La arqueóloga examinó dos subconjuntos:
 (i) una selección dirigida de 100 imágenes curadas y
-(ii) un muestreo aleatorio de 20 imágenes por cluster.
+(ii) un muestreo aleatorio de 20 imágenes por grupo.
 
 Los tres algoritmos, pese a sus diferencias en $H$ y $C$, convergen en un mismo sesgo: agrupan principalmente según la \emph{temperatura de color} y las condiciones de iluminación, no por la morfología de los motivos.
-Así, los clusters dominados por tonos amarillos reúnen con frecuencia guanacos clasificados arqueológicamente como estilo A1, mientras que las escenas con fondos grisáceos concentran ejemplares estilo A2, junto con algunas figuras estilizadas de clase A5.
+Así, los grupos dominados por tonos amarillos reúnen con frecuencia guanacos clasificados arqueológicamente como estilo A1, mientras que las escenas con fondos grisáceos concentran ejemplares estilo A2, junto con algunas figuras estilizadas de clase A5.
 
-En \texttt{densenet121\_kmeans\_k4}, el cluster 2 reúne imágenes de contraste tenue y composición alargada, sin un tema zoomórfico claramente dominante.
-Contrasta con los clusters 0 y 3, coherentes en cromática amarillo–roja respectiva.
-La versión espectral con \texttt{densenet121} va más lejos: el mismo guanaco, superpuesto con una mano pintada y captado bajo iluminaciones diversas, se aísla casi en exclusividad dentro del cluster 2 (19 imágenes).
+En \texttt{densenet121\_kmeans\_k4}, el grupo 2 reúne imágenes de contraste tenue y composición alargada, sin un tema zoomórfico claramente dominante.
+Contrasta con los grupos 0 y 3, coherentes en cromática amarillo–roja respectiva.
+La versión espectral con \texttt{densenet121} va más lejos: el mismo guanaco, superpuesto con una mano pintada y captado bajo iluminaciones diversas, se aísla casi en exclusividad dentro del grupo 2 (19 imágenes).
 \texttt{resnet50\_kmeans\_k4} reproduce la separación cromática en bandas (amarillo, cálido anaranjado, gris azulado) y, en la selección curada, marca una distinción algo más nítida entre estilos A y B.
 Sin embargo, esa separación se diluye al observar el muestreo aleatorio.
 
-Un experimento adicional consistió en forzar el número de clusters a ocho, el mismo que emplea la tipología estilística vigente.
-Con \texttt{resnet50\_kmeans\_k8} observamos que los guanacos de estilo~A1 se agrupan aún con mayor pureza: el \textbf{cluster 5} concentra más del 90 \% de las imágenes etiquetadas como A1 en la selección curada y muestra una coherencia cromática y morfológica superior a la vista en los modelos con $k=4$.
+Un experimento adicional consistió en forzar el número de grupos a ocho, el mismo que emplea la tipología estilística vigente.
+Con \texttt{resnet50\_kmeans\_k8} observamos que los guanacos de estilo~A1 se agrupan aún con mayor pureza: el \textbf{grupo 5} concentra más del 90 \% de las imágenes etiquetadas como A1 en la selección curada y muestra una coherencia cromática y morfológica superior a la vista en los modelos con $k=4$.
 La Fig.~\ref{fig:r50k8_cluster5} ilustra ese conglomerado.
 
 \begin{figure}[!h]
   \centering
   \includegraphics[width=0.8\linewidth]{Images/resnet50_kmeans8_cluster5_collage}
-  \caption{Collage de 20 miniaturas del \textbf{cluster 5} generado por \texttt{resnet50\_kmeans\_k8}.
-  Predominan guanacos de estilo~A1, lo que sugiere que aumentar el número de clusters favorece la separación fina de este estilo.}
+  \caption{Collage de 20 miniaturas del \textbf{grupo 5} generado por \texttt{resnet50\_kmeans\_k8}.
+  Predominan guanacos de estilo~A1, lo que sugiere que aumentar el número de grupos favorece la separación fina de este estilo.}
   \label{fig:r50k8_cluster5}
 \end{figure}
 
-La Fig.~\ref{fig:cluster_collages} ilustra, mediante collages de 20 miniaturas, los cuatro clusters generados por \texttt{densenet121\_spectral\_k4}.
+La Fig.~\ref{fig:cluster_collages} ilustra, mediante collages de 20 miniaturas, los cuatro grupos generados por \texttt{densenet121\_spectral\_k4}.
 La fuerte coherencia tonal salta a la vista, al tiempo que la diversidad morfológica dentro de cada collage confirma el predominio del color como factor de agrupación.
 
 \begin{figure}[!h]
   \centering
   \includegraphics[width=\linewidth]{Images/densenet121_spectral_collage}
-  \caption{Collages ilustrativos de los cuatro clusters generados con \texttt{densenet121\_spectral\_k4}.
-  Cada collage agrupa 20 imágenes seleccionadas aleatoriamente dentro del cluster.}
+  \caption{Collages ilustrativos de los cuatro grupos generados con \texttt{densenet121\_spectral\_k4}.
+  Cada collage agrupa 20 imágenes seleccionadas aleatoriamente dentro del grupo.}
   \label{fig:cluster_collages}
 \end{figure}
 
