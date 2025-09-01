@@ -23,7 +23,7 @@ El desempeño se resume mediante mAP$_{0.5}$ y mAR$_{100}$, acompañado de ejemp
 La Figura~\ref{fig:phase1_small_multiples} sintetiza, en un \emph{small-multiples} \footnote{El término, popularizado por Edward Tufte, designa una cuadrícula de gráficos de igual formato y escala que permite comparar visualmente varias series de datos de un vistazo.}, la evolución de funciones de pérdida para los conjuntos de entrenamiento y validación, respectivamente (filas superiores), junto con los indicadores de desempeño mAP$_{0.5}$ y mAR$_{100}$ (filas inferiores) para las cuatro arquitecturas que se evalúan.
 Cada columna corresponde a un modelo y cada punto representa una época.
 
-\begin{figure}[!ht]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=\textwidth]{Images/phase1_small_multiples}
   \caption[Curvas de pérdida y métricas de la Fase 1]{Evolución de las pérdidas y métricas durante la prueba inicial. Las líneas sólidas muestran los valores por época.}
@@ -35,7 +35,7 @@ El Cuadro~\ref{tab:fase1_final} resume los valores que se obtienen en la última
 YOLOv5 lidera en mAP$_{0.5}$ (30 \%), seguido por Deformable DETR (18 \%).
 Faster R–CNN alcanza 5 \% y RetinaNet se mantiene por debajo del 1 \%.
 
-\begin{table}[!ht]
+\begin{table}[htpb]
   \centering
   \begin{tabular}{lcccc}
     \hline
@@ -80,7 +80,7 @@ Los resultados de esta fase constituyen la línea base sobre la cual se desarrol
 Se evalúan cinco técnicas de preprocesamiento —\textit{Base} (sin filtros), \textit{Bilateral Filter}, \textit{CLAHE}, \textit{Unsharp Masking} y \textit{Laplacian Pyramid}— aplicadas a las cuatro arquitecturas de la Fase 1.
 Para cada combinación se registra el mayor mAP\(_{0.5}\) dentro de la ventana de entrenamiento, y se refleja en la tabla~\ref{tab:fase2_map}.
 
-\begin{table}[!ht]
+\begin{table}[htpb]
   \centering
   \begin{tabular}{lccccc}
     \hline
@@ -109,7 +109,7 @@ Se representan en total \(n=240\) mediciones (5 filtros \(\times\) 4 detectores 
   \item En ausencia de sobre-representación de un detector concreto, las diferencias observadas pueden atribuirse principalmente al preprocesamiento aplicado.
 \end{itemize}
 
-\begin{figure}[!ht]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=\textwidth]{Images/phase2_ridgelines}
   \caption[Distribución de mAP\(_{0.5}\) por técnica]{Comparación de las distribuciones de mAP\(_{0.5}\) (160 mediciones en total).
@@ -136,7 +136,7 @@ Los valores se muestran con tres decimales; un incremento de \(+0.011\) equivale
         Para este detector, el preprocesamiento resulta contraproducente: el filtro \emph{Bilateral} reduce la mAP\(_{0.5}\) en –0.033 pp y la mAR\(_{100}\) en –0.029 pp; incluso el mejor caso (\emph{CLAHE}) apenas compensa esta caída.
 \end{itemize}
 
-\begin{figure*}[!ht]
+\begin{figure*}[htpb]
   \centering
   \includegraphics[width=.48\textwidth]{Images/phase2_delta_map_heat}\hfill
   \includegraphics[width=.48\textwidth]{Images/phase2_delta_mar_heat}
@@ -150,7 +150,7 @@ Los valores se muestran con tres decimales; un incremento de \(+0.011\) equivale
 \paragraph{Mejores ejecuciones.}
 La Figura~\ref{fig:fase2_bestruns} ilustra las curvas de funciones de pérdida y métricas de las tres combinaciones con mayor potencial: Faster R–CNN + Bilateral, YOLOv5 + Bilateral y Deformable DETR + Base.
 
-\begin{figure}[!ht]
+\begin{figure}[htpb]
   \centering
   \includegraphics[height=0.8\textheight,keepaspectratio]{Images/phase2_best_runs}
   \caption[Evolución de las mejores configuraciones]{Curvas de \texttt{loss} y métricas para las configuraciones preseleccionadas en la Fase 2.}
@@ -167,7 +167,7 @@ En síntesis, \textbf{Bilateral Filter} emerge como el preprocesamiento más rob
 A partir de la Fase 2 se entrenan a convergencia prolongada las tres combinaciones mejor posicionadas.
 El Cuadro~\ref{tab:fase3_ranking} ordena los resultados finales según mAP\(_{0.5}\) y mAR\(_{100}\).
 
-\begin{table}[!ht]
+\begin{table}[htpb]
   \centering
   \begin{tabular}{lccc}
     \hline
@@ -210,7 +210,7 @@ Se observan tres comportamientos bien diferenciados:
 Para una comparación sintética, la Figura~\ref{fig:phase4_bars} agrupa los mejores valores de mAP\(_{0.5}\) y mAR\(_{100}\) alcanzados en validación.
 La Tabla~\ref{tab:phase4_val} aporta la referencia numérica exacta:
 
-\begin{table}[!ht]
+\begin{table}[htpb]
   \centering
   \caption{Mejores métricas de validación obtenidas en la Fase 4.
            El conjunto \textit{test} se reserva para la Fase 5.}
@@ -226,7 +226,7 @@ La Tabla~\ref{tab:phase4_val} aporta la referencia numérica exacta:
   \end{tabular}
 \end{table}
 
-\begin{figure}[!ht]
+\begin{figure}[htpb]
   \centering
   \includegraphics[height=0.8\textheight,keepaspectratio]{Images/phase4_curves}
   \caption[Evolución de las métricas durante la Fase 4 (resumen)]%
@@ -240,7 +240,7 @@ La Tabla~\ref{tab:phase4_val} aporta la referencia numérica exacta:
 \footnotetext{Durante las tres primeras épocas se aplica un \emph{warm-up} lineal del \emph{learning rate}.}
 
 
-\begin{figure}[!ht]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=.9\textwidth]{Images/phase4_summary_bars}
   \caption{Comparación de los mejores mAP\(_{0.5}\) y mAR\(_{100}\)
@@ -264,7 +264,7 @@ Sin embargo:
   \item Varias predicciones presentan confianzas entre 0.3 y 0.7, indicio de que el entrenamiento aún no alcanza su máximo potencial.
 \end{itemize}
 
-\begin{figure}[!ht]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=\textwidth]{Images/yolov5_val}
   \caption{Ejemplos de predicción con YOLOv5 en validación. Azul: “Animal”; cian: “Hand”.}
@@ -274,9 +274,9 @@ Sin embargo:
 \subsection{Fase 5 — Validación Experta}
 \label{ssec:fase5_experta}
 
-La validación cualitativa se basa en la matriz de confusión de YOLOv5 (Fig.~\ref{fig:yolov5_cm}) y en la inspección visual de la arqueóloga.
+La validación cualitativa se basa en la matriz de confusión de YOLOv5 (Fig.~\ref{fig:yolov5_cm}) obtenida del Entrenamiento Integral con utilizando todas las imágenes, y en la inspección visual de la arqueóloga.
 
-\begin{figure}[!ht]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=.7\textwidth]{Images/yolov5_cm}
   \caption{Matriz de confusión de YOLOv5 en validación.
@@ -387,7 +387,7 @@ Las doce curvas resultantes se ilustran en la
 Fig.~\ref{fig:elbow_grid}, donde cada subfigura corresponde a una pareja
 \emph{extractor–algoritmo}.
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
   \centering
   % ---------- Fila 1: ResNet-18 ----------
   \subfloat[ResNet-18 + K-Means\label{fig:elbow_r18_km}]{%
@@ -507,7 +507,7 @@ Para facilitar la comparación se selecciona, por cada
 \((\widehat S,\widehat{DB},\widehat{CH})\).
 La Tabla~\ref{tab:int_quality_best} resume dichos “ganadores”.
 
-\begin{table}[!h]
+\begin{table}[htpb]
   \centering
   \caption{Resumen de las mejores configuraciones por extractor y algoritmo, usando la media geométrica de los tres índices normalizados como criterio global.}
   \label{tab:int_quality_best}
@@ -553,7 +553,7 @@ configuraciones de mayor desempeño global
 Las Figuras~\ref{fig:tsne_resnet50_kmeans}–\ref{fig:tsne_dense_spectral}
 ilustran la separabilidad visual de los grupos.
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
   \centering
   % ----------- t-SNE plots -----------
   \subfloat[ResNet-50 + K--Means ($k=4$)\label{fig:tsne_resnet50_kmeans}]{%
@@ -583,7 +583,7 @@ de densidad y no influyen en la selección final de configuraciones.
 Antes de analizar el contenido de cada conglomerado se examinó la cantidad de imágenes que cayó en cada uno.
 La Tabla~\ref{tab:cluster_sizes} muestra el número de motivos por grupo para las mismas tres configuraciones.
 
-\begin{table}[!h]
+\begin{table}[htpb]
   \centering
   \begin{tabular}{lccc}
     \hline
@@ -624,7 +624,7 @@ Un experimento adicional consistió en forzar el número de grupos a ocho, el mi
 Con \texttt{resnet50\_kmeans\_k8} observamos que los guanacos de estilo~A1 se agrupan aún con mayor pureza: el \textbf{grupo 5} concentra más del 90 \% de las imágenes etiquetadas como A1 en la selección curada y muestra una coherencia cromática y morfológica superior a la vista en los modelos con $k=4$.
 La Fig.~\ref{fig:r50k8_cluster5} ilustra ese conglomerado.
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=0.8\linewidth]{Images/resnet50_kmeans8_cluster5_collage}
   \caption{Collage de 20 miniaturas del \textbf{grupo 5} generado por \texttt{resnet50\_kmeans\_k8}.
@@ -635,7 +635,7 @@ La Fig.~\ref{fig:r50k8_cluster5} ilustra ese conglomerado.
 La Fig.~\ref{fig:cluster_collages} ilustra, mediante collages de 20 miniaturas, los cuatro grupos generados por \texttt{densenet121\_spectral\_k4}.
 La fuerte coherencia tonal salta a la vista, al tiempo que la diversidad morfológica dentro de cada collage confirma el predominio del color como factor de agrupación.
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=\linewidth]{Images/densenet121_spectral_collage}
   \caption{Collages ilustrativos de los cuatro grupos generados con \texttt{densenet121\_spectral\_k4}.

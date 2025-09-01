@@ -30,7 +30,7 @@ En la Figura~\ref{fig:imagen_ejemplo} se muestra un ejemplo de las imágenes sel
 La diferenciación de algunos de estos elementos respecto del fondo presenta dificultades, dadas las similitudes cromáticas y la erosión natural que ha sufrido la superficie rocosa a lo largo del tiempo.
 Estas condiciones complican el reconocimiento automatizado del arte rupestre.
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
     \centering
     \includegraphics[width=\textwidth]{Images/imagen_ejemplo}
     \caption{Ejemplo de una imagen seleccionada para el estudio.}
@@ -45,7 +45,7 @@ Esta diversidad iconográfica refleja la riqueza del arte rupestre de la región
 Con el objetivo de llevar a cabo un análisis detallado y sistemático, se propone una clasificación inicial de las imágenes, que comprende un total de 19 clases distintas, basada en los conocimientos de la licenciada Agustina Papú.
 Las clases iniciales propuestas son las siguientes:
 
-\begin{table}[!h]
+\begin{table}[htpb]
     \centering
     \begin{tabular}{r l}
         \hline
@@ -80,7 +80,7 @@ Esta flexibilidad permite adaptarse a la disponibilidad de la arqueóloga, optim
 A lo largo de un mes, se lleva a cabo el etiquetado de las imágenes utilizando la clasificación inicial mencionada, lo que facilita no sólo la organización de los datos, sino también un análisis más profundo de las representaciones iconográficas presentes en el sitio.
 Se presenta un resumen de las cantidades de elementos etiquetados por cada categoría en la tabla~\ref{tab:conteo_porcentajes}.
 
-\begin{table}[!h]
+\begin{table}[htpb]
     \centering
     \begin{tabular}{l r r}
         \hline
@@ -115,7 +115,7 @@ Se presenta un resumen de las cantidades de elementos etiquetados por cada categ
 En la Figura~\ref{fig:imagen_etiquetada} se presenta un ejemplo de una de las imágenes etiquetadas según esta clasificación inicial.
 Esta figura ilustra cómo las diferentes clases se aplican a los elementos identificados en la imagen, proporcionando una visualización clara del proceso de etiquetado.
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
     \centering
     \includegraphics[width=\textwidth]{Images/imagen_etiquetada}
     \caption{Imagen etiquetada con la clasificación inicial propuesta.}
@@ -132,7 +132,7 @@ Los motivos geométricos, ``Círculos'', ``Círculos concéntricos'', ``Líneas 
 Por último, ``Escala'' y ``Persona'', identificadores 13 y 14, se integran en la categoría \textit{Other}.
 La Tabla~\ref{tab:grupos} resume la nueva distribución de frecuencias y porcentajes y evidencia la reducción del desbalance inicial.
 
-\begin{table}[!h]
+\begin{table}[htpb]
     \centering
     \begin{tabular}{l r r}
         \hline
@@ -163,7 +163,7 @@ La proporción entre clases se mantiene de forma aproximada, siendo las diferenc
 En la Figura~\ref{fig:imagen_dividida} se muestran cinco recortes de 512x512 píxeles obtenidos a partir de la imagen original.
 Cada clase identificada en los recortes está representada por un color específico, lo cual facilita la visualización de los distintos elementos en el arte rupestre.
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
     \centering
     \begin{minipage}{0.19\textwidth}
         \includegraphics[width=\textwidth]{Images/recorte1}
@@ -205,7 +205,7 @@ Se observa que aunque el ruido del fondo se minimice, el de superposición sigue
 Trabajar con imágenes aisladas de esta forma reduce el ruido de fondo, homogeneiza la escala y facilita la comparación de texturas, contornos y cromatismos.
 Además incrementa el tamaño efectivo del conjunto de datos, lo que mejora la densidad de muestras y, por extensión, la robustez de técnicas como \emph{k}-means.
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
     \centering
     \includegraphics[width=.3\textwidth]{Images/crop_example1}\hfill
     \includegraphics[width=.3\textwidth]{Images/crop_example2}\hfill
@@ -328,11 +328,20 @@ El rendimiento de cada modelo se valora mediante cuatro métricas complementaria
           +\lambda\,\mathcal{L}_{\text{IoU}}^{(b)}
         \bigr)
       \]
-      donde
+      donde $B$ denota el número total de mini‑lotes (\emph{batches}) empleados para calcular el promedio
+      —por ejemplo, los $B$ lotes que conforman una época completa— y
       \begin{itemize}
         \item $\mathcal{L}_{\text{cls}}$ \,(pérdida de \textit{clasificación}, \emph{classification loss}) cuantifica el error al asignar la clase correcta a cada instancia; suele implementarse como entropía cruzada o \emph{Focal Loss}.
-        \item $\mathcal{L}_{\text{reg}}$ \,(pérdida de \textit{regresión de cajas}, \emph{box regression loss}) mide la discrepancia entre las coordenadas predichas y las cajas de verdad‐terreno.
-        \item $\mathcal{L}_{\text{IoU}}$ \,(pérdida de \textit{superposición IoU}, \emph{IoU-based loss}) penaliza predicciones con baja intersección-sobre-unión; $\lambda$ es su peso relativo.
+        \item $\mathcal{L}_{\text{reg}}$ \,(pérdida de \textit{regresión de cajas}, \emph{box regression loss}) mide la discrepancia entre las coordenadas predichas y las cajas de verdad‑terreno.
+        \item $\mathcal{L}_{\text{IoU}}$ \,(pérdida de \textit{superposición IoU}, \emph{IoU‑based loss}) penaliza predicciones con baja intersección‑sobre‑unión; $\lambda$ es su peso relativo.
+              La \emph{intersección‑sobre‑unión} entre una caja predicha $B_{p}$ y su caja de verdad‑terreno $B_{gt}$ se define como
+              \[
+                \mathrm{IoU}(B_{p},B_{gt})
+                \;=\;
+                \frac{\lvert B_{p}\cap B_{gt}\rvert}{\lvert B_{p}\cup B_{gt}\rvert},
+              \]
+              razón entre el área de solapamiento (\(\lvert B_{p}\cap B_{gt}\rvert\)) y el área total combinada (\(\lvert B_{p}\cup B_{gt}\rvert\)).
+              Su rango está acotado a \([0,1]\): cuanto más se aproxima a \(1\), más precisa es la predicción geométrica.
       \end{itemize}
       Un descenso sostenido de $\mathcal{L}_{\text{train}}$ indica que el optimizador encuentra gradientes informativos y ajusta los parámetros al dominio de la tarea~\cite{goodfellow2016deep}.
 
@@ -425,9 +434,9 @@ Los modelos seleccionados incluyen:
 \end{itemize}
 
 Cada modelo potencialmente tiene beneficios para el problema en cuestión.
-A continuación, se describen en la tabla~\ref{tab:justificacion_modelos}:
+A continuación, se describen en la tabla~\ref{tab:justificacion_modelos}.
 
-\begin{table}[!h]
+\begin{table}[htpb]
     \centering
     \begin{tabular}{p{3.5cm} p{10.8cm}}
         \hline
@@ -567,7 +576,7 @@ donde \(\eta\) es la tasa de aprendizaje, \(\lambda\) el coeficiente de \emph{we
 
 En nuestras pruebas piloto, AdamW acelera la estabilización de la función de pérdida cuando la \emph{backbone} permanece activa, mostrando menor oscilación que Adam y mejor rendimiento final que SGD con momento en conjuntos de datos desbalanceados.
 
-\begin{table}[!h]
+\begin{table}[htpb]
     \centering
     \begin{tabular}{p{3.2cm} p{10.5cm}}
         \hline
@@ -636,7 +645,7 @@ Cada ciclo reestablece una tasa alta que favorece la exploración y reduce la pr
 Incrementa la tasa de forma rápida hasta un máximo y luego la reduce siguiendo una función cóncava, estrategia que acelera la convergencia inicial y promueve la generalización (\emph{super-convergence})~\cite{smith2019}.
 Su dinamismo resulta ventajoso en entrenamientos cortos sobre miles de recortes.
 
-\begin{table}[!h]
+\begin{table}[htpb]
     \centering
     \begin{tabular}{p{3.8cm} p{10.4cm}}
         \hline
@@ -672,7 +681,7 @@ Se realiza un \emph{ajuste fino} (\emph{fine-tuning}) de cada una de las cuatro 
 Los experimentos se ejecutan de forma mixta: local y en Vertex AI sobre \texttt{n2-highmem-16} (\emph{CPU}) para controlar costos y depurar el flujo de trabajo.
 La partición aleatoria queda:
 
-\begin{table}[!h]
+\begin{table}[htpb]
     \centering
     \begin{tabular}{l r r r}
         \hline
@@ -693,18 +702,23 @@ Un \emph{paso de optimización} se define como la operación en la que se realiz
 Si se emplea \textit{gradient accumulation}, varias mini-lotes pueden acumularse antes de dicho paso.
 En cada arquitectura se ajustan \texttt{num\_epochs}, \texttt{batch\_size} y \texttt{grad\_accum\_steps} de modo que el \emph{lote efectivo} ()número de imágenes que contribuyen a un mismo gradiente) sea siempre \(16\) y la suma de pasos de optimización coincida dentro de un margen del 2\,\%.
 
-\begin{center}
-\begin{tabular}{lccc}
+\begin{table}[htbp]
+\centering
+\caption{Parámetros globales de entrenamiento}
+\label{tab:train_summary}
+
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{p{4.2cm}ccc}
 \hline
-\textbf{Modelo} & \texttt{num\_epochs} & \texttt{batch\_size} & \texttt{grad\_accum\_steps} \\
+\textbf{Modelo} & \texttt{num\_epochs} & \texttt{batch\_size} & \texttt{grad\_accum\_steps}\\
 \hline
-Faster\,R--CNN   & 8  & 4  & 4  \\
-RetinaNet        & 8  & 4  & 4  \\
-Deformable\,DETR & 10 & 2  & 8  \\
-YOLOv5\,(valores internos del \texttt{train.py}) & 30 & 16 & -- \\
+Faster\,R-CNN         & 8  & 4  & 4  \\
+RetinaNet             & 8  & 4  & 4  \\
+Deformable\,DETR      & 10 & 2  & 8  \\
+\shortstack{YOLOv5\\(valores internos\\de \texttt{train.py})} & 30 & 16 & -- \\
 \hline
 \end{tabular}
-\end{center}
+\end{table}
 
 \noindent\small
 \textit{Nota.} Deformable~DETR necesita más pasos (\(\sim 7\,800\)) para estabilizar su mecanismo de atención, mientras que YOLOv5 fija el número de épocas desde su propio motor de entrenamiento.
@@ -716,21 +730,31 @@ Así se evita que las diferencias de rendimiento provengan de una mayor exposici
 
 Para hacer totalmente reproducible el piloto y aislar el efecto de la arquitectura, se fijaron explícitamente los hiperparámetros de optimización que más influyen en la convergencia (optimizador, tasas de aprendizaje, regularización y planificador de LR).  A continuación se resumen.
 
-\begin{table}[!h]
+\begin{table}[htbp]
 \centering
 \caption{Hiperparámetros de entrenamiento utilizados en el piloto}
 \label{tab:pilot_hparams}
-\begin{tabular}{lcccccc}
+
+% Fuente un punto menor y separación horizontal reducida
+{\small
+\setlength{\tabcolsep}{4pt}
+
+\begin{tabular}{p{2.9cm} c c c c p{2.6cm} c}
 \hline
-\textbf{Modelo} & Opt.\ & LR back & LR head & WD & Scheduler (T\textsubscript{max}) & Warm-up \\
-\hline
-Faster R-CNN         & SGD   & $4\times10^{-4}$ & $4.5\times10^{-3}$ & $1\times10^{-4}$ & CosAnneal (8)  & 1 época \\
-RetinaNet            & SGD   & $1\times10^{-3}$ & $1\times10^{-2}$   & $1\times10^{-4}$ & CosAnneal (8)  & 1 época \\
-Deformable DETR      & AdamW & $1\times10^{-5}$ & $2\times10^{-4}$   & $1\times10^{-4}$ & CosAnneal (10) & 2 épocas \\
-YOLOv5\,(train.py)   & SGD   & $1\times10^{-3}$ & —                 & $5\times10^{-4}$ & CosAnneal (30) & 3 épocas \\
-\hline
-\end{tabular}
+\textbf{Modelo} &
+\textbf{Opt.} &
+\shortstack{\textbf{LR}\\\textbf{back}} &
+\shortstack{\textbf{LR}\\\textbf{head}} &
+\textbf{WD} &
+\shortstack{\textbf{Scheduler}\\(T\textsubscript{max})} &
+\textbf{Warm‑up} \\ \hline
+Faster R‑CNN        & SGD   & $4\times10^{-4}$ & $4.5\times10^{-3}$ & $1\times10^{-4}$ & CosAnneal(8)  & 1 época  \\
+RetinaNet           & SGD   & $1\times10^{-3}$ & $1\times10^{-2}$   & $1\times10^{-4}$ & CosAnneal(8)  & 1 época  \\
+Deformable DETR     & AdamW & $1\times10^{-5}$ & $2\times10^{-4}$   & $1\times10^{-4}$ & CosAnneal(10) & 2 épocas \\
+YOLOv5 (train.py)   & SGD   & $1\times10^{-3}$ & —                  & $5\times10^{-4}$ & CosAnneal(30) & 3 épocas \\ \hline
+\end{tabular}}
 \end{table}
+
 
 \noindent
 Las tasas de aprendizaje diferenciadas para la \emph{backbone} y la \emph{head} optimizan la transferencia de conocimiento: una tasa menor en la \emph{backbone} preserva las características genéricas aprendidas en ImageNet, mientras que una tasa mayor en la \emph{head} (inicializada desde cero) acelera la adaptación a los motivos específicos del arte rupestre.

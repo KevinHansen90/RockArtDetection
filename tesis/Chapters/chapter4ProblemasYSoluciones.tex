@@ -12,7 +12,7 @@ Primero se tratan los \textbf{datos y el pre-procesamiento}: \emph{tiling}, augm
 Luego se examinan los desafíos inherentes a la \textbf{configuración de los modelos}.
 Entre ellos se cuentan la unificación de las implementaciones, la congelación progresiva de la red troncal \emph{backbone}, la inicialización de los módulos de predicción y la recalibración de los anclajes de referencia.
 
-VER SI SE PONE EN SU SECCION CORRESPONDIENTE: La congelación progresiva consiste en bloquear de forma escalonada los parámetros de las capas iniciales durante el entrenamiento, con el fin de preservar las representaciones generales ya aprendidas y centrar la optimización en las capas superiores especializadas.
+La congelación progresiva consiste en bloquear de forma escalonada los parámetros de las capas iniciales durante el entrenamiento, con el fin de preservar las representaciones generales ya aprendidas y centrar la optimización en las capas superiores especializadas.
 
 A continuación se revisan las \textbf{limitaciones del entrenamiento local} y la migración a la nube mediante la plataforma \textbf{Vertex AI}, con énfasis en plantillas de ejecución, organización de artefactos y control de costes.
 Seguidamente, la sección de \textbf{seguimiento de experimentos} explica cómo se unifican las métricas entre entornos y se fijan criterios de comparación equitativos.
@@ -62,14 +62,14 @@ Como muestra la Figura~\ref{fig:hist_tiles}, tras dividir en sub‐imágenes de 
       Se registra la métrica de \emph{tile utilisation rate}, entendida como la fracción de subimágenes que contienen al menos un motivo sobre el total de subimágenes generadas.
 \end{itemize}
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=\textwidth]{Images/histogram_raw}
   \caption{Distribución de motivos en las imágenes originales.}
   \label{fig:hist_raw}
 \end{figure}
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=\textwidth]{Images/histogram_tiles}
   \caption{Distribución de motivos tras el proceso de \textit{tiling}.}
@@ -98,7 +98,7 @@ El conjunto de transformaciones se ejecuta de manera homogénea durante la fase 
    Pruebas piloto internas confirmaron la presencia de halos y falsos positivos, por lo que se excluyen del proceso final.
 \end{itemize}
 
-\begin{table}[!h]
+\begin{table}[htpb]
     \centering
     \caption{Ganancia media reportada al activar aumentos básicos (\texttt{albumentations}) en entrenamientos completos ($\ge 50$ épocas).}
     \label{tab:aug_lit}
@@ -137,19 +137,29 @@ Para garantizar la reproducibilidad se adopta un mecanismo centralizado que asoc
         Se incorpora una rutina de verificación que compara las listas de clases mediante sumas de verificación MD5 y detiene el flujo de procesamiento si detecta discrepancias, indicando las primeras diferencias encontradas.
 \end{itemize}
 
-\begin{table}[!h]
+\begin{table}[htbp]
 \centering
-\caption{Esquema de índices de clase e implementación de las cajas delimitadoras en cada detector.}
+\caption{Esquema de índices de clase e implementación de las cajas delimitadoras en cada detector}
 \label{tab:label_schemes}
-\begin{tabularx}{\textwidth}{|l|c|c|X|}
+
+% El entorno tabularx ajusta la anchura total exactamente a \textwidth
+\begin{tabularx}{\textwidth}{|p{2.8cm}|c|c|>{\raggedright\arraybackslash}X|}
 \hline
-\textbf{Detector} & \textbf{Rango de índices} & \textbf{Índice de fondo} & \textbf{Formato de caja} \\ \hline
-YOLOv5            & \(0\dots N-1\)           & implícito                & \((x_c,y_c,w,h)\) normalizados (0–1) \\ \hline
-Faster R-CNN      & \(1\dots N\)             & \(0\)                    & \((x_{\min},y_{\min},x_{\max},y_{\max})\) en píxeles \\ \hline
-RetinaNet         & \(1\dots N\)             & \(0\)                    & igual al anterior \\ \hline
-Deformable DETR   & \(0\dots N-1\)           & clase \(N\) (\emph{no obj}) & \((x_{\min},y_{\min},w,h)\) en píxeles \\ \hline
+\textbf{Detector} &
+\textbf{Rango de índices} &
+\textbf{Índice de fondo} &
+\textbf{Formato de caja} \\ \hline
+YOLOv5            & \(0\dots N-1\) & implícito &
+\((x_c,y_c,w,h)\)\newline normalizados (0–1) \\ \hline
+Faster R‑CNN      & \(1\dots N\)   & \(0\) &
+\((x_{\min},y_{\min},x_{\max},y_{\max})\)\newline en píxeles \\ \hline
+RetinaNet         & \(1\dots N\)   & \(0\) &
+igual al anterior \\ \hline
+Deformable DETR   & \(0\dots N-1\) & clase \(N\) (\emph{no‑obj}) &
+\((x_{\min},y_{\min},w,h)\)\newline en píxeles \\ \hline
 \end{tabularx}
 \end{table}
+
 
 
 \subsection{Desbalance de Clases y Objetos Pequeños}\label{ssec:small_obj}
@@ -508,18 +518,27 @@ La comparación entre detectores resulta significativa únicamente si todos comp
 Para este estudio se fija un lote equivalente de dieciséis imágenes y se ajustan las épocas, el tamaño del lote y la acumulación de gradientes según el consumo de memoria de cada arquitectura.
 Los hiperparámetros finales, extraídos de los archivos de configuración, se sintetizan en la Tabla~\ref{tab:train_params}.
 
-\begin{table}[!h]
-  \centering
-  \caption{Hiperparámetros normalizados y pasos aproximados de entrenamiento.}
-  \label{tab:train_params}
-  \begin{tabular}{|l|c|c|c|c|c|}
-    \hline
-    \textbf{Modelo} & \textbf{Épocas} & \textbf{Tamaño de lote} & \textbf{Acum.\ grad.} & \textbf{Lote efectivo} & \textbf{Pasos aprox.} \\ \hline
-    Deformable DETR & 10 & 2  & 8 & 16 & 7\,800 \\ \hline
-    Faster R-CNN    &  8 & 4  & 4 & 16 & 5\,100 \\ \hline
-    RetinaNet       &  8 & 4  & 4 & 16 & 5\,100 \\ \hline
-    YOLOv5          & 30 & 16 & 1 & 16 & 7\,700 \\ \hline
-  \end{tabular}
+\begin{table}[htbp]
+\centering
+\caption{Hiperparámetros normalizados y pasos aproximados de entrenamiento}
+\label{tab:train_params}
+
+% Ajuste fino: reducimos espacio entre columnas y partimos los encabezados largos
+\setlength{\tabcolsep}{4pt}
+
+\begin{tabular}{|p{3cm}|c|c|c|c|c|}
+\hline
+\textbf{Modelo}
+  & \textbf{Épocas}
+  & \shortstack{\textbf{Tamaño}\\\textbf{de lote}}
+  & \shortstack{\textbf{Acum.}\\\textbf{grad.}}
+  & \shortstack{\textbf{Lote}\\\textbf{efectivo}}
+  & \shortstack{\textbf{Pasos}\\\textbf{aprox.}} \\ \hline
+Deformable DETR & 10 & 2  & 8 & 16 & 7\,800 \\ \hline
+Faster R‑CNN    &  8 & 4  & 4 & 16 & 5\,100 \\ \hline
+RetinaNet       &  8 & 4  & 4 & 16 & 5\,100 \\ \hline
+YOLOv5          & 30 & 16 & 1 & 16 & 7\,700 \\ \hline
+\end{tabular}
 \end{table}
 
 \textbf{Justificación de las métricas}
@@ -549,7 +568,7 @@ La Figura~\ref{fig:heatmap_pp} resume, mediante un mapa de calor, la variación 
   \item Los filtros de contraste agresivos, representados por la pirámide laplaciana, degradan el rendimiento de todas las arquitecturas y, en consecuencia, se excluyen de la configuración final (Sección~\ref{ssec:contraste}).
 \end{enumerate}
 
-\begin{figure}[!h]
+\begin{figure}[htpb]
   \centering
   \includegraphics[width=\textwidth]{Images/heatmap_pp}
   \caption{Variación de \(\text{mAP}_{50}\) (verde = mejora, rojo = descenso) respecto de la configuración de referencia sin preprocesamiento.}
@@ -561,7 +580,7 @@ La Figura~\ref{fig:heatmap_pp} resume, mediante un mapa de calor, la variación 
 La Tabla~\ref{tab:tradeoff} resume la relación entre precisión, velocidad de inferencia y coste horario de cada detector cuando se ejecuta en una instancia \texttt{n1-standard-4} con GPU Tesla\,T4 de prioridad interrumpible.
 Los resultados se obtuvieron tras aplicar las optimizaciones descritas en la Sección~\ref{sec:modelos}, a saber: recalibración de anclajes, congelación programada de la red troncal e inicialización específica de las capas finales.
 
-\begin{table}[!h]
+\begin{table}[htpb]
   \centering
   \caption{Precisión, rendimiento y coste estimado por arquitectura.}
   \label{tab:tradeoff}

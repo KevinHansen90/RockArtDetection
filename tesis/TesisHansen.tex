@@ -8,10 +8,34 @@
 \sloppy
 
 % Definición de encabezamientos y pié de página
-\lhead[Kevin Hansen]{Titulo de la Tesis}
-\rhead[Titulo]{Kevin Hansen}
-\lfoot[\thepage]{Capítulo \thechapter .\ \leftmark}
-\rfoot[Capítulo \thechapter .\ \leftmark]{\thepage}
+% ====== Encabezados y pies de página ======================================
+% (fancyhdr ya está cargado por la clase, pero repetir \usepackage no da error)
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+
+\fancyhf{} % borra definiciones previas
+
+% ---- Encabezado: título de la tesis centrado en todas las páginas
+\chead{\small\slshape Detección y Clasificación Estilística Automática de Arte Rupestre}
+
+% ---- Pie de página: conservar esquema anterior ---------------------------
+\lfoot[\thepage]{Capítulo~\thechapter.\ \leftmark}
+\rfoot[Capítulo~\thechapter.\ \leftmark]{\thepage}
+
+% ---- Que las páginas estilo 'plain' (primeras de capítulo, páginas en blanco)
+%      también lleven el encabezado centrado y el número abajo
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \chead{\small\slshape Detección y Clasificación Estilística Automática de Arte Rupestre}
+  \fancyfoot[C]{\thepage}
+}
+% ===========================================================================
+%\lhead[Detección y Clasificación Estilística Automática de Arte Rupestre]%
+%      {Detección y Clasificación Estilística Automática de Arte Rupestre}
+%\rhead[Detección y Clasificación Estilística Automática de Arte Rupestre]%
+%      {Detección y Clasificación Estilística Automática de Arte Rupestre}
+%\lfoot[\thepage]{Capítulo \thechapter .\ \leftmark}
+%\rfoot[Capítulo \thechapter .\ \leftmark]{\thepage}
 
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{longtable}
@@ -32,8 +56,13 @@
 \definecolor{seagreen}{rgb}{0.2, 0.7, 0.5}
 \definecolor{lightpurple}{rgb}{0.8, 0.6, 0.8}
 
-
-%********************************
+% ---- macro para plasmar las palabras clave -------------
+\makeatletter
+\newcommand{\printkeywords}{%
+  \vspace{1em}%
+  \noindent\textbf{\textit{Palabras clave:}} \@keywords\par}
+\makeatother
+% --------------------------------------------------------
 
 \title{Detección y Clasificación Estilística Automática de Arte Rupestre}
 
@@ -81,6 +110,11 @@
 \microtypecontext{spacing=nonfrench}
 \DisableLigatures{encoding = *, family = * }
 \microtypesetup{expansion=false}
+
+\keywords{Arte rupestre; Cueva de las Manos; Visión por computadora;
+          Redes neuronales convolucionales; Detección automática de motivos;
+          Pre‑procesamiento de imágenes; Algoritmos de agrupamiento}
+
 \begin{document}
 \raggedbottom
 
@@ -110,10 +144,11 @@
 	\mainmatter
 	\include{FrontMatter/abstract}
 	\include{Chapters/chapter1Introduccion}
-    \include{Chapters/chapter2MaterialesYMétodos}
-	\include{Chapters/chapter3Resultados}
+	\include{Chapters/chapter2EstadoDeLaCuestión}
+    \include{Chapters/chapter3MaterialesYMétodos}
+	\include{Chapters/chapter5Resultados}
 	\include{Chapters/chapter4ProblemasYSoluciones}
-	\include{Chapters/chapter5Conclusiones}
+	\include{Chapters/chapter6Conclusiones}
 
 	% ********************************** Back Matter *******************************
 	% Backmatter should be commented out if you are using appendices after References
