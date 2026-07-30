@@ -171,7 +171,11 @@ def freeze_batchnorm(model: nn.Module, backbone_only: bool = True) -> nn.Module:
 def compute_total_loss(loss_dict: Any) -> torch.Tensor:
     """Return a scalar loss from a variety of common detector loss formats."""
     if isinstance(loss_dict, dict):
-        return sum(torch.as_tensor(v).sum() for v in loss_dict.values())
+        losses = [
+            torch.as_tensor(v) for k, v in loss_dict.items()
+            if not any(ign in k for ign in ("error", "accuracy", "cardinality"))
+        ]
+        return sum(losses)
     if isinstance(loss_dict, torch.Tensor):
         return loss_dict
     if hasattr(loss_dict, "loss"):

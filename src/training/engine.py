@@ -1,12 +1,16 @@
 ##!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import time
 from typing import List
 
 import torch
 from torch.backends import cudnn
-from torch.cuda.amp import autocast, GradScaler
+try:
+    from torch.cuda.amp import autocast, GradScaler
+except ImportError:
+    from torch.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import LinearLR
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.detection import MeanAveragePrecision
@@ -19,12 +23,12 @@ from src.training.utils import (
 )
 from src.datasets.yolo_dataset import load_classes
 
+from typing import Any
+
 try:
     from src.models.detection_models import DeformableDETRWrapper
-except Exception:
-    class _Dummy:
-        ...
-    DeformableDETRWrapper = _Dummy
+except ImportError:
+    DeformableDETRWrapper: Any = None
 
 cudnn.benchmark = True
 _map_metric = MeanAveragePrecision(class_metrics=True)
@@ -113,16 +117,18 @@ def evaluate_on_dataset(
             tgts = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in tgts]
 
             if isinstance(model, DeformableDETRWrapper):
-                orig = [t["orig_size"].tolist() for t in tgts]
+                orig = [t["orig_size"].tolist() if "orig_size" in t else [imgs[0].shape[-2], imgs[0].shape[-1]] for t in tgts]
                 preds = model(imgs, orig_sizes=orig)
                 processed = []
                 for t in tgts:
                     b = t["boxes"]
-                    h, w = t["orig_size"].tolist()
+                    h, w = t.get("orig_size", torch.tensor([imgs[0].shape[-2], imgs[0].shape[-1]])).tolist()
                     if b.numel():
-                        cx, cy, ww, hh = b.T
-                        x1, y1 = (cx - ww / 2) * w, (cy - hh / 2) * h
-                        x2, y2 = (cx + ww / 2) * w, (cy + hh / 2) * h
+                        cx, cy, bw, bh = b[:, 0], b[:, 1], b[:, 2], b[:, 3]
+                        x1 = (cx - bw / 2) * w
+                        y1 = (cy - bh / 2) * h
+                        x2 = (cx + bw / 2) * w
+                        y2 = (cy + bh / 2) * h
                         processed.append(
                             {"boxes": torch.stack([x1, y1, x2, y2], 1), "labels": t["labels"]}
                         )
@@ -164,7 +170,8 @@ def evaluate_on_dataset(
 # ─────────────────
 # Training routine
 # ─────────────────
-def train_model(model, train_loader, val_loader, device, optimizer, scheduler, config, wandb_run=None):
+def train_model(model, train_loader, val_loader, device, optimizer, scheduler, config):
+
     config = get_cfg_dict(config)
 
     # ─── freeze-N-epochs settings ──────────────────────────────────────
@@ -179,7 +186,8 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
     warmup_epochs = config.get("warmup_epochs", 0)
     accum_steps = max(1, config.get("grad_accum_steps", 1))
 
-    writer = SummaryWriter(config["log_dir"]) if config.get("log_dir") else None
+    log_dir = os.environ.get("AIP_TENSORBOARD_LOG_DIR") or config.get("log_dir")
+    writer = SummaryWriter(log_dir) if log_dir else None
 
     scaler = GradScaler(enabled=auto_amp_supported(device))
     accum = GradAccumulator(model, optimizer, scaler, accum_steps)
@@ -227,8 +235,13 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
             imgs = [i.to(device, non_blocking=True) for i in imgs]
             tgts = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in tgts]
 
-            with autocast(enabled=scaler.is_enabled()):
-                loss_val = compute_total_loss(model(imgs, tgts))
+            amp_device = device.type if device.type in {"cuda", "cpu"} else "cpu"
+            try:
+                with autocast(device_type=amp_device, enabled=scaler.is_enabled()):
+                    loss_val = compute_total_loss(model(imgs, tgts))
+            except TypeError:
+                with autocast(enabled=scaler.is_enabled()):
+                    loss_val = compute_total_loss(model(imgs, tgts))
 
             stepped = accum.backward(loss_val)
 
@@ -286,7 +299,7 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
         r_l.extend([rl])
 
         lr_backbone = optimizer.param_groups[0]["lr"]
-        lr_head = optimizer.param_groups[1]["lr"]
+        lr_head = optimizer.param_groups[1]["lr"] if len(optimizer.param_groups) > 1 else lr_backbone
         lr_backbones.append(lr_backbone)
         lr_heads.append(lr_head)
         epoch_sec = time.time() - start_t
@@ -297,23 +310,8 @@ def train_model(model, train_loader, val_loader, device, optimizer, scheduler, c
             writer.add_scalar("LR/head", lr_head, global_step)
             writer.add_scalar("Time/epoch_sec", epoch_sec, epoch)
 
-        # ── live W&B logging ──────────────────────────────────────────
-        if wandb_run is not None:
-            wandb_run.log(
-                {
-                    "epoch": epoch + 1,
-                    "train_loss": train_losses[-1],
-                    "val_loss": v_loss,
-                    "mAP@.50": m50,
-                    "mAR@100": mar100,
-                    "lr_backbone": lr_backbone,
-                    "lr_head": lr_head,
-                    "epoch_time_s": epoch_sec,
-                },
-                step=epoch + 1,
-            )
-
         if scheduler:
+
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                 scheduler.step(v_loss)
             elif epoch >= warmup_epochs:

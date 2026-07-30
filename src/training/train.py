@@ -22,9 +22,9 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 try:
-    import wandb
-except ImportError:  # pragma: no cover
-    wandb = None
+    from google.cloud import storage
+except ImportError:
+    storage = None
 
 # ── project root on path ──────────────────────────────────────────────
 _ROOT = Path(__file__).resolve().parents[2]
@@ -57,20 +57,8 @@ log = logging.getLogger("train")
 
 # ══════════════════════════════════════════════════════════════════════
 def run_training(cfg: Dict[str, Any]) -> None:
-    # 0 ─── W&B optional ───────────────────────────────────────────────
-    wb_cfg = cfg.get("wandb", {})
-    wandb_enabled = wb_cfg.get("enabled", False) and wandb is not None
-    wandb_run = None
-    if wandb_enabled:
-        wandb_run = wandb.init(
-            project=wb_cfg.get("project", "rockart-detection"),
-            entity=wb_cfg.get("entity"),
-            name=wb_cfg.get("name"),
-            mode=wb_cfg.get("mode", "online"),
-            config=cfg,
-        )
-
     # 1 ─── Reproducibility ────────────────────────────────────────────
+
     seed = cfg.get("seed", 42)
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -101,8 +89,21 @@ def run_training(cfg: Dict[str, Any]) -> None:
 
     def split(part: str):
         if data_root.startswith("gs://"):
-            return f"{data_root}/{part}/images", f"{data_root}/{part}/labels"
-        return Path(data_root) / part / "images", Path(data_root) / part / "labels"
+            bucket, prefix = data_root[5:].rstrip("/").split("/", 1)
+            part_prefix = f"{prefix}/{part}/images"
+            if storage is not None:
+                try:
+                    blobs = list(storage.Client().list_blobs(bucket, prefix=part_prefix, max_results=1))
+                    if len(blobs) > 0:
+                        return f"{data_root}/{part}/images", f"{data_root}/{part}/labels"
+                except Exception:
+                    pass
+            return f"{data_root}/images", f"{data_root}/labels"
+
+        p_imgs = Path(data_root) / part / "images"
+        if p_imgs.exists():
+            return p_imgs, Path(data_root) / part / "labels"
+        return Path(data_root) / "images", Path(data_root) / "labels"
 
     train_imgs, train_lbls = split("train")
     val_imgs, val_lbls = split("val")
@@ -111,12 +112,12 @@ def run_training(cfg: Dict[str, Any]) -> None:
     # 4 ─── Device & transforms ────────────────────────────────────────
     device = get_device()
     if cfg["model_type"].lower() == "fasterrcnn" and device.type == "mps":
-        log.warning("Faster R-CNN not fully supported on MPS – falling back to CPU.")
+        log.warning("Faster R-CNN not fully supported on MPS - falling back to CPU.")
         device = torch.device("cpu")
     log.info("Device: %s", device)
 
     is_detr = cfg["model_type"].lower() == "deformable_detr"
-    train_tf = _build_train_tf(is_detr, device, seed)
+    train_tf = _build_train_tf(is_detr, torch.device("cpu"), seed)
     test_tf = get_simple_transform()
 
     # 5 ─── Datasets / loaders ─────────────────────────────────────────
@@ -161,17 +162,17 @@ def run_training(cfg: Dict[str, Any]) -> None:
         lr0s, lr1s, epoch_times,
     ) = train_model(
         model, train_loader, val_loader, device,
-        optim, sched, cfg, wandb_run=wandb_run,
+        optim, sched, cfg,
     )
 
     # 8 ─── Plots & CSV ────────────────────────────────────────────────
-    plot_curve(train_losses, "Train Loss", "Train Loss", result_dir / "train_loss.png")
-    plot_curve(val_losses, "Val Loss", "Val Loss", result_dir / "val_loss.png")
-    plot_curve(map50s, "mAP@.50", "mAP@.50", result_dir / "map50.png")
-    plot_curve(mar100s, "mAR@100", "mAR@100", result_dir / "mar100.png")
+    plot_curve(train_losses, "Train Loss", "Train Loss", str(result_dir / "train_loss.png"))
+    plot_curve(val_losses, "Val Loss", "Val Loss", str(result_dir / "val_loss.png"))
+    plot_curve(map50s, "mAP@.50", "mAP@.50", str(result_dir / "map50.png"))
+    plot_curve(mar100s, "mAR@100", "mAR@100", str(result_dir / "mar100.png"))
 
     save_metrics_csv(
-        result_dir / "metrics.csv",
+        str(result_dir / "metrics.csv"),
         {
             "epoch": list(range(1, len(train_losses) + 1)),
             "train_loss": train_losses,
@@ -209,21 +210,30 @@ def run_training(cfg: Dict[str, Any]) -> None:
                              collate_fn=lambda x: x[0])
     evaluate_and_visualize(
         model, test_loader, classes, device,
-        result_dir / "results.png",
+        str(result_dir / "results.png"),
         threshold=cfg.get("eval_threshold", 0.5),
         model_type=cfg["model_type"],
     )
 
-    # 10 ─── Close W&B & clean cache ───────────────────────────────────
-    if wandb_run is not None:
-        wandb_run.finish()
-        wandb_dir = Path(os.environ.get("WANDB_DIR", "./wandb")).resolve()
-        if wandb_dir.exists() and not str(wandb_dir).startswith("/gcs/"):
-            shutil.rmtree(wandb_dir, ignore_errors=True)
+    # 9.5 ─── Upload artifacts to GCS ──────────────────────────────
+    gcs_bucket = cfg.get("gcs_bucket") or os.getenv("GCS_BUCKET")
+    if gcs_bucket and storage is not None:
+        try:
+            client = storage.Client()
+            bucket = client.bucket(gcs_bucket)
+            for path in exp_root.rglob("*"):
+                if path.is_file():
+                    rel_path = path.relative_to(exp_root)
+                    blob = bucket.blob(f"experiments/{run_name}/{rel_path}")
+                    blob.upload_from_filename(str(path))
+            log.info("Successfully uploaded experiment results to gs://%s/experiments/%s", gcs_bucket, run_name)
+        except Exception as e:
+            log.warning("GCS upload failed: %s", e)
+
 
 
 # ══════════════════════════════════════════════════════════════════════
-@hydra.main(config_path=str(_ROOT / "configs"), config_name="defaults", version_base="1.3")
+@hydra.main(config_path="../../configs", config_name="defaults", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     flat = get_cfg_dict(cfg)
     flat["experiment"] = cfg.get("experiment", "run")
