@@ -1,0 +1,5 @@
+model_type: yolov5
+weights: yolov5s.pt
+img_size: 512
+batch_size: 16
+epochs: 50

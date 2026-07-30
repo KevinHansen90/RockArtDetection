@@ -1,0 +1,2 @@
+data_root: "data/tiles/unsharp"
+classes_file: "data/grouped_classes.txt"

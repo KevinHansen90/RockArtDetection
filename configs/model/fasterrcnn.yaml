@@ -1,0 +1,17 @@
+model_type: fasterrcnn
+optimizer: adamw
+backbone_lr: 0.00005
+head_lr: 0.0005
+weight_decay: 0.0005
+momentum: 0.9
+eps: 1e-7
+
+anchor_params:
+  sizes:
+    - [32, 64, 128]
+    - [64, 128, 256]
+    - [128, 256, 512]
+    - [256, 512, 1024]
+    - [512, 1024, 2048]
+  ratios:
+    - [0.5, 1.0, 2.0]

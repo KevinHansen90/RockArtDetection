@@ -1,0 +1,16 @@
+defaults:
+  - model: retinanet
+  - train: local_gpu
+  - _self_
+
+experiment: "run"
+seed: 42
+data_root: "data/tiles/base"
+classes_file: "data/grouped_classes.txt"
+eval_threshold: 0.5
+num_epochs: 5
+batch_size: 4
+num_workers: 0
+gcs_bucket: "your-gcs-bucket-name"
+
+

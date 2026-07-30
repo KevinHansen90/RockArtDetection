@@ -1,0 +1,9 @@
+num_epochs: 15
+batch_size: 2
+grad_accum_steps: 1
+warmup_epochs: 1
+freeze_epochs: 0
+num_workers: 0
+scheduler: cosineannealinglr
+T_max: 15
+eta_min: 1e-6

@@ -1,0 +1,11 @@
+# Fine-tuning training configuration for top performing model (RetinaNet)
+num_epochs: 50
+batch_size: 4
+grad_accum_steps: 2
+warmup_epochs: 3
+freeze_epochs: 1
+num_workers: 4
+scheduler: cosineannealinglr
+T_max: 50
+eta_min: 1e-6
+lr: 0.0005

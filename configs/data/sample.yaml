@@ -1,0 +1,4 @@
+# @package _global_
+data_root: "data/sample"
+classes_file: "data/grouped_classes.txt"
+dataset_type: "yolo"

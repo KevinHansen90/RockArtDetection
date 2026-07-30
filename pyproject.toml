@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rockart-detection"
+version = "0.2.0"
+description = "Detection and unsupervised clustering of Patagonian rock art motifs using PyTorch and GCP"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+  {name = "Kevin Hansen"}
+]
+dependencies = [
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+    "transformers>=4.38.0,<4.44.0",
+    "pillow>=10.0.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.66.0",
+    "PyYAML>=6.0",
+    "matplotlib>=3.8.0",
+    "torchmetrics>=1.3.0",
+    "pandas>=2.1.0",
+    "scikit-learn>=1.3.0",
+    "tensorboard>=2.15.0",
+    "pycocotools>=2.0.7",
+    "timm>=0.9.12",
+    "gcsfs>=2024.2.0",
+    "opencv-python-headless>=4.9.0",
+    "albumentations>=1.4.0",
+    "hydra-core>=1.3.2",
+    "gdown>=5.1.0",
+    "google-cloud-storage>=2.14.0",
+    "google-cloud-aiplatform>=1.42.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.1.0",
+    "flake8>=7.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "configs*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.yml", "*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
