@@ -1,6 +1,23 @@
 # .dockerignore
+.git/
+.gitignore
+.gcloudignore
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
 data/
 experiments/
-*.pyc
-__pycache__/
+outputs/
+results/
 tesis/
+wandb/
+*.egg-info/
+dist/
+build/

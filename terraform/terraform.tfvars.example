@@ -1,0 +1,5 @@
+project_id    = "your-gcp-project-id"
+region        = "us-central1"
+bucket_name   = "your-custom-rockart-bucket-name"
+repository_id = "rockart-docker-repo"
+environment   = "dev"
