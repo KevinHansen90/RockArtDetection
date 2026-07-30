@@ -102,7 +102,8 @@ class YOLODataset(Dataset):
             raise ValueError("stream_gcs=True but images_dir is not a gs:// URI.")
 
         if images_dir.startswith("gs://"):
-            bucket, prefix = images_dir[5:].split("/", 1)
+            bucket, prefix = images_dir[5:].rstrip("/").split("/", 1)
+            prefix = prefix + "/"
             if storage is None:
                 raise RuntimeError("google-cloud-storage missing.")
             blobs = storage.Client().list_blobs(bucket, prefix=prefix)
@@ -139,7 +140,10 @@ class YOLODataset(Dataset):
             else Path(self.labels_dir) / f"{stem}.txt"
         )
         if self.labels_dir.startswith("gs://") and not path.exists():
-            _download_blob(f"{self.labels_dir}/{stem}.txt", str(path))
+            try:
+                _download_blob(f"{self.labels_dir}/{stem}.txt", str(path))
+            except Exception:
+                return []
         if not path.exists():
             return []
         return [tuple(map(float, ln.split())) for ln in open(path)]
