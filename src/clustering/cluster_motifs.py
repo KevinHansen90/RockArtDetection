@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
 """
-cluster_motifs.py  –  2025-05-05 upgrade
-────────────────────────────────────────────────────────────────────────
-Adds:
-  • --pca <d>    : L2-normalise + PCA(d) before clustering
-  • --metric     : euclidean | cosine for DBSCAN
-  • DBSCAN defaults tuned to eps=0.55  min_samples=4
-  • Lean DBSCAN grid {0.35,0.45,0.55} × {4,5}
-
-Back-compatible: if you skip --pca you get the original behaviour.
+cluster_motifs.py - Feature extraction and motif clustering pipeline.
 """
 # ────────────────────────── stdlib & typing ──────────────────────────
 import os, sys, argparse, shutil, json, itertools
@@ -151,31 +143,38 @@ def perform_clustering(features: np.ndarray,
                        eps: float = .55, min_s: int = 4,
                        metric: str = "euclidean"):
     algo = algo.lower()
-    if algo == "kmeans":
-        try:
-            model = KMeans(k, random_state=42, n_init="auto")
-        except TypeError:
-            model = KMeans(k, random_state=42, n_init=10)
-        labels = model.fit_predict(features)
-        inertia = float(model.inertia_)
-    elif algo == "agglomerative":
-        model = AgglomerativeClustering(n_clusters=k, linkage="ward")
-        labels = model.fit_predict(features)
-        inertia = _withinss(features, labels)
-    elif algo == "spectral":
-        if k >= len(features):
-            k = max(1, len(features) - 1)
-        model = SpectralClustering(n_clusters=k, random_state=42,
-                                   assign_labels="kmeans",
-                                   affinity="nearest_neighbors")
-        labels = model.fit_predict(features)
-        inertia = _withinss(features, labels)
-    elif algo == "dbscan":
-        model = DBSCAN(eps=eps, min_samples=min_s, metric=metric)
-        labels = model.fit_predict(features)
+    n_samples = len(features)
+    if algo in ("kmeans", "agglomerative", "spectral"):
+        k = max(1, min(k, n_samples - 1 if n_samples > 1 else 1))
+    try:
+        if algo == "kmeans":
+            try:
+                model = KMeans(k, random_state=42, n_init="auto")
+            except TypeError:
+                model = KMeans(k, random_state=42, n_init=10)
+            labels = model.fit_predict(features)
+            inertia = float(model.inertia_)
+        elif algo == "agglomerative":
+            model = AgglomerativeClustering(n_clusters=k, linkage="ward")
+            labels = model.fit_predict(features)
+            inertia = _withinss(features, labels)
+        elif algo == "spectral":
+            n_neighbors = max(1, min(10, n_samples - 1))
+            model = SpectralClustering(n_clusters=k, random_state=42,
+                                       assign_labels="kmeans",
+                                       affinity="nearest_neighbors",
+                                       n_neighbors=n_neighbors)
+            labels = model.fit_predict(features)
+            inertia = _withinss(features, labels)
+        elif algo == "dbscan":
+            model = DBSCAN(eps=eps, min_samples=min_s, metric=metric)
+            labels = model.fit_predict(features)
+            inertia = None
+        else:
+            raise ValueError(f"Unsupported clustering algo: {algo}")
+    except Exception:
+        labels = np.zeros(n_samples, dtype=int)
         inertia = None
-    else:
-        raise ValueError(f"Unsupported clustering algo: {algo}")
     return labels, inertia
 
 def _withinss(X: np.ndarray, labels: np.ndarray) -> float:
@@ -199,9 +198,13 @@ def tsne_plot(feats: np.ndarray, labels: np.ndarray, out_path: str):
     plt.savefig(out_path, dpi=300); plt.close()
 
 def silhouette_hbar(feats: np.ndarray, labels: np.ndarray, out_path: str):
-    if len(np.unique(labels)) < 2:
+    u_labs = np.unique(labels[labels != -1])
+    if not (2 <= len(u_labs) < len(feats)):
         return
-    svals = silhouette_samples(feats, labels)
+    try:
+        svals = silhouette_samples(feats, labels)
+    except Exception:
+        return
     y_lower = 10
     plt.figure(figsize=(8, 6))
     for lab in np.unique(labels):
@@ -267,10 +270,13 @@ def run_single(input_dir: str, output_dir: str,
     metrics["noise_ratio"] = float((~core).sum()) / len(labels)
 
     unique_core = np.unique(labels[core])
-    if len(unique_core) >= 2:
-        metrics["silhouette"]        = float(silhouette_score(feats[core], labels[core]))
-        metrics["davies_bouldin"]    = float(davies_bouldin_score(feats[core], labels[core]))
-        metrics["calinski_harabasz"] = float(calinski_harabasz_score(feats[core], labels[core]))
+    if 2 <= len(unique_core) < len(feats[core]):
+        try:
+            metrics["silhouette"]        = float(silhouette_score(feats[core], labels[core]))
+            metrics["davies_bouldin"]    = float(davies_bouldin_score(feats[core], labels[core]))
+            metrics["calinski_harabasz"] = float(calinski_harabasz_score(feats[core], labels[core]))
+        except Exception:
+            metrics.update(dict(silhouette=-1, davies_bouldin=float("inf"), calinski_harabasz=-1))
     else:
         metrics.update(dict(silhouette=-1,
                             davies_bouldin=float("inf"),

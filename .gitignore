@@ -115,11 +115,13 @@ cython_debug/
 *.iws
 
 # Project-specific
-data/
-experiments/
-data/.DS_Store
+/data/
+/experiments/
+/outputs/
+/outputs_clustering/
+/results/
 .DS_Store
-configs/
+
 
 # LaTeX-specific
 *.aux
